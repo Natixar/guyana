@@ -1,4 +1,7 @@
 .~lock.*.odt#
 .env
 audit-*
-.claude
+
+# Local Claude Code state stays out; shared skills are versioned.
+.claude/*
+!.claude/skills/
