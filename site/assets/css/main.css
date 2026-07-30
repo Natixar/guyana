@@ -114,6 +114,14 @@ main { flex: 1; padding: 2.5rem 0 3rem; }
 
 .muted { color: var(--muted-foreground); font-size: .9375rem; }
 
+/* Marque d'origine d'une valeur : dérivée, estimée, non mesurée. Une valeur
+   mesurée n'est pas marquée — l'absence de marque est le cas normal. */
+.origin-tag {
+  font-family: var(--font-body); font-size: .75rem; font-weight: var(--fw-medium);
+  color: var(--status-info); background: color-mix(in srgb, var(--status-info) 12%, transparent);
+  padding: .1rem .4rem; border-radius: var(--radius-xs); vertical-align: middle;
+}
+
 /* Pied ----------------------------------------------------------------- */
 .site-footer {
   border-top: 1px solid var(--border);

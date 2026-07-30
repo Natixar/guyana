@@ -25,15 +25,22 @@ const CONTEXTS = [
  * @param {string} p.subjectId     URN opaque du lingot — jamais l'identifiant interne
  * @param {object} p.claims        faits physiques observés par la mine
  * @param {Date}   [p.now]
+ * @param {object} [p.confirmedBy] identité de l'opérateur, si elle est connue
  */
-export function buildCredential({ issuerDid, subjectId, claims, now = new Date() }) {
-  return {
+export function buildCredential({ issuerDid, subjectId, claims, confirmedBy = null, now = new Date() }) {
+  const cred = {
     "@context": CONTEXTS,
     type: ["VerifiableCredential", "DoreBarOriginCredential"],
     issuer: issuerDid,
     validFrom: now.toISOString(),
     credentialSubject: { id: subjectId, ...claims },
   };
+  // L'organisation signe ; l'opérateur est enregistré comme revendication.
+  // La confiance dans cette identité repose alors sur le processus d'AGM et sur
+  // la journalisation, pas sur la cryptographie — et il faut le dire ainsi.
+  // Une clé par opérateur (H3) déplacerait cette garantie vers la signature.
+  if (confirmedBy) cred.confirmedBy = confirmedBy;
+  return cred;
 }
 
 /**

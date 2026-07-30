@@ -1,11 +1,22 @@
 <div class="card">
-  <h2>{{ i18n "barPanelTitle" }}</h2>
+  <h2>{{ i18n "barPanelTitle" }} <span data-pour-origin class="badge badge--pending" hidden></span></h2>
+
   <dl class="facts">
     {{ range site.Params.barFields }}
       <div><dt>{{ .label }}</dt><dd data-field="{{ .key }}">—</dd></div>
     {{ end }}
   </dl>
+
   <p style="margin-top:1.5rem">
     <button class="btn btn--primary" data-sign disabled>{{ i18n "confirmPour" }}</button>
+    <span data-sign-status class="muted" style="margin-left:.75rem"></span>
   </p>
+
+  <div data-signed hidden>
+    <dl class="facts">
+      <div><dt>{{ i18n "subjectId" }}</dt><dd data-signed-subject></dd></div>
+      <div><dt>{{ i18n "signedBy" }}</dt><dd data-signed-by></dd></div>
+    </dl>
+    <p><button class="btn btn--primary" data-download-credential>{{ i18n "downloadCredential" }}</button></p>
+  </div>
 </div>

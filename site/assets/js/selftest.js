@@ -9,6 +9,8 @@ import { canonicalize } from "./canonical.js";
 import { base58btcEncode } from "./multibase.js";
 import { ephemeralKeyPair, loadKeyPair, publicJwk, thumbprint, sign, verify } from "./keys.js";
 import { buildCredential, signCredential, newSubjectId } from "./credential.js";
+import { fetchPour, claimsOf } from "./pour.js";
+import { fetchMe, issuerDid } from "./me.js";
 
 
 const cases = [];
@@ -95,6 +97,31 @@ test("self-check leaves no key behind", async () => {
   const a = await ephemeralKeyPair(), b = await ephemeralKeyPair();
   const ta = await thumbprint(a), tb = await thumbprint(b);
   return ta === tb ? "ephemeral pairs are not distinct — they are being persisted" : null;
+});
+
+// Chaîne complète : identité, coulée, attestation signée. C'est le seul
+// contrôle qui exerce ce que fait réellement le bouton de confirmation.
+test("end to end — identity, pour, signed credential", async () => {
+  const me = await fetchMe();
+  const did = issuerDid(me);
+  if (!did) return "no issuer DID from /api/me";
+  const pour = await fetchPour();
+  if (!pour) return "no pour from /api/pour";
+
+  const pair = await ephemeralKeyPair();
+  const cred = buildCredential({
+    issuerDid: did,
+    subjectId: newSubjectId(),
+    claims: claimsOf(pour),
+    confirmedBy: me.person ? { id: me.person.id, name: me.person.name } : null,
+  });
+  const out = await signCredential(cred, pair, did + "#key-1");
+
+  if (out.issuer !== did) return "issuer does not match /api/me";
+  if (!out.credentialSubject?.barId?.value) return "bar claims missing";
+  if (!out.credentialSubject.carbonIntensity?.origin) return "claim origin not carried";
+  if (!out.proof?.proofValue?.startsWith("z")) return "proof missing or not multibase";
+  return null;
 });
 
 test("subject identifier — opaque and unordered", () => {

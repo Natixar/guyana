@@ -34,3 +34,12 @@ demoBody          = "No one is signed in. A key created here is for testing and 
 signedInAs        = "Signed in as"
 issuerUnknown     = "No organisation identity available — signing is disabled"
 downloadDemoName  = "did.demo.json"
+
+subjectId          = "Subject identifier"
+signedBy           = "Signed by"
+downloadCredential = "Download the signed certificate"
+signNeedsKey       = "Create a signing key first"
+signNoPour         = "No pour awaiting confirmation"
+signDone           = "Signed"
+signFailed         = "Signing failed"
+operatorUnknown    = "not identified — no one is signed in"
