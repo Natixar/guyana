@@ -199,6 +199,9 @@ async function wireReset() {
     });
     if (status) status.textContent = T.resetDone;
     btn.disabled = true;
+    // replace() plutôt que href : le retour arrière ne doit pas ramener sur
+    // une page qui prétend encore qu'une clé existe.
+    location.replace("/");
   });
 }
 

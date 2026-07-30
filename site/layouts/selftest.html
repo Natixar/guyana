@@ -2,24 +2,24 @@
   <h1>{{ .Title }}</h1>
   {{ .Content }}
   <div class="card">
-    <h2>{{ i18n "environmentReport" }}</h2>
-    <p class="muted">{{ i18n "environmentReportBody" }}</p>
+    <h2>{{ partial "t" "environmentReport" }}</h2>
+    <p class="muted">{{ partial "t" "environmentReportBody" }}</p>
     <dl class="facts" data-environment></dl>
   </div>
 
   <div class="card">
-    <h2>{{ i18n "selftestResults" }}
-        <span data-selftest-summary class="badge badge--pending">{{ i18n "selftestRunning" }}</span></h2>
+    <h2>{{ partial "t" "selftestResults" }}
+        <span data-selftest-summary class="badge badge--pending">{{ partial "t" "selftestRunning" }}</span></h2>
     <div data-selftest class="checklist"></div>
   </div>
 
   <div class="card">
-    <h2>{{ i18n "resetTitle" }}</h2>
-    <p class="muted">{{ i18n "resetBody" }}</p>
-    <p><label>{{ i18n "resetLabel" }}<br>
+    <h2>{{ partial "t" "resetTitle" }}</h2>
+    <p class="muted">{{ partial "t" "resetBody" }}</p>
+    <p><label>{{ partial "t" "resetLabel" }}<br>
        <input type="text" data-reset-confirm autocomplete="off" spellcheck="false"></label></p>
     <p class="actions">
-      <button class="btn btn--primary" data-reset disabled>{{ i18n "resetButton" }}</button>
+      <button class="btn btn--primary" data-reset disabled>{{ partial "t" "resetButton" }}</button>
       <span data-reset-status class="muted"></span>
     </p>
   </div>

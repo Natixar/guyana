@@ -35,6 +35,36 @@ async function showFingerprint(pair) {
   $("[data-setup-result]").hidden = false;
 }
 
+/**
+ * Recalcule tout l'affichage à partir de l'état réel.
+ *
+ * Appelée au chargement ET au retour arrière : sans cela, le navigateur
+ * restaure le DOM depuis son cache de session sans réexécuter les scripts, et
+ * la page affiche un état périmé — un bouton de création actif alors qu'une clé
+ * existe, ou l'inverse. C'est une classe de bug, pas un cas particulier.
+ */
+async function refreshState(ctx) {
+  const { status, createBtn, signBtn, signStatus, did } = ctx;
+  const pair = await loadKeyPair();
+
+  setBadge(status, pair ? T.keyPresent : T.keyMissing, pair ? "verified" : "pending");
+
+  if (createBtn) {
+    createBtn.disabled = Boolean(pair);
+    const why = $("[data-create-why]");
+    if (why) why.textContent = pair ? T.keyAlreadyThere : "";
+  }
+
+  const result = $("[data-setup-result]");
+  if (pair) await showFingerprint(pair);
+  else if (result) { result.hidden = true; $("[data-fingerprint]").textContent = "—"; }
+
+  if (signBtn) signBtn.disabled = !pair || !did;
+  if (signStatus && !pair) signStatus.textContent = T.signNeedsKey;
+
+  return pair;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   const status = $("[data-key-status]");
 
@@ -51,29 +81,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  const pair = await loadKeyPair();
-
-  setBadge(status, pair ? T.keyPresent : T.keyMissing, pair ? "verified" : "pending");
-
   const setup = $("[data-setup]");
   if (setup) setup.hidden = false;
-  if (pair) await showFingerprint(pair);
 
-  $("[data-create-key]")?.addEventListener("click", async (e) => {
-    e.target.disabled = true;
+  const ctx = { status, createBtn: $("[data-create-key]"), signBtn: $("[data-sign]"),
+                signStatus: $("[data-sign-status]"), did };
+
+  await refreshState(ctx);
+
+  // Le retour arrière restaure la page depuis le cache de session sans
+  // réexécuter le module : on recalcule explicitement.
+  window.addEventListener("pageshow", (e) => { if (e.persisted) refreshState(ctx); });
+
+  ctx.createBtn?.addEventListener("click", async () => {
+    ctx.createBtn.disabled = true;
     try {
-      await showFingerprint(await createKeyPair());
+      await createKeyPair();
+      await refreshState(ctx);
       setBadge(status, T.keyCreated, "verified");
     } catch (err) {
       setBadge(status, err.code === "KEY_EXISTS" ? T.keyExists : String(err.message ?? err), "warning");
-      e.target.disabled = false;
+      await refreshState(ctx);
     }
   });
 
   // --- La coulée en attente -------------------------------------------
   const pour = await fetchPour();
-  const signBtn = $("[data-sign]");
-  const signStatus = $("[data-sign-status]");
+  const signBtn = ctx.signBtn;
+  const signStatus = ctx.signStatus;
   let signed = null;
 
   if (pour && renderPour(pour)) {
@@ -81,8 +116,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       const tag = $("[data-pour-origin]");
       if (tag) { tag.textContent = pour.dataOrigin.toLowerCase(); tag.hidden = false; }
     }
-    if (signBtn) signBtn.disabled = !(await loadKeyPair()) || !did;
-    if (signStatus && !(await loadKeyPair())) signStatus.textContent = T.signNeedsKey;
   } else if (signStatus) {
     signStatus.textContent = T.signNoPour;
   }

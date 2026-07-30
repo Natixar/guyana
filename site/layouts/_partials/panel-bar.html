@@ -1,25 +1,25 @@
 <div class="card">
-  <h2>{{ i18n "barPanelTitle" }} <span data-pour-origin class="badge badge--pending" hidden></span></h2>
+  <h2>{{ partial "t" "barPanelTitle" }} <span data-pour-origin class="badge badge--pending" hidden></span></h2>
 
-  <h3 class="subhead">{{ i18n "youAttest" }}</h3>
-  <p class="muted">{{ i18n "youAttestBody" }}</p>
+  <h3 class="subhead">{{ partial "t" "youAttest" }}</h3>
+  <p class="muted">{{ partial "t" "youAttestBody" }}</p>
   <dl class="facts" data-operator-facts></dl>
 
-  <h3 class="subhead">{{ i18n "calculatorAttests" }}</h3>
-  <p class="muted">{{ i18n "calculatorAttestsBody" }}</p>
+  <h3 class="subhead">{{ partial "t" "calculatorAttests" }}</h3>
+  <p class="muted">{{ partial "t" "calculatorAttestsBody" }}</p>
   <dl class="facts" data-calculator-facts></dl>
-  <p><span data-calculator-status class="badge badge--pending">{{ i18n "awaitingCalculator" }}</span></p>
+  <p><span data-calculator-status class="badge badge--pending">{{ partial "t" "awaitingCalculator" }}</span></p>
 
   <p class="actions">
-    <button class="btn btn--primary" data-sign disabled>{{ i18n "confirmPour" }}</button>
+    <button class="btn btn--primary" data-sign disabled>{{ partial "t" "confirmPour" }}</button>
     <span data-sign-status class="muted"></span>
   </p>
 
   <div data-signed hidden>
     <dl class="facts">
-      <div><dt>{{ i18n "subjectId" }}</dt><dd data-signed-subject></dd></div>
-      <div><dt>{{ i18n "signedBy" }}</dt><dd data-signed-by></dd></div>
+      <div><dt>{{ partial "t" "subjectId" }}</dt><dd data-signed-subject></dd></div>
+      <div><dt>{{ partial "t" "signedBy" }}</dt><dd data-signed-by></dd></div>
     </dl>
-    <p><button class="btn btn--primary" data-download-credential>{{ i18n "downloadCredential" }}</button></p>
+    <p><button class="btn btn--primary" data-download-credential>{{ partial "t" "downloadCredential" }}</button></p>
   </div>
 </div>

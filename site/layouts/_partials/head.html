@@ -16,15 +16,11 @@
 {{/* Les libellés sont injectés dans le module à la construction (import
      "@params"), et non lus dans le DOM : ils sont ainsi couverts par
      l'empreinte SRI comme le reste du code. */}}
-{{ $i18n := dict
-    "keyPresent"   (i18n "envKeyPresent")
-    "keyMissing"   (i18n "envKeyMissing")
-    "keyCreated"   (i18n "envKeyCreated")
-    "keyExists"    (i18n "envKeyExists")
-    "notSecure"    (i18n "envNotSecure")
-    "noWebCrypto"  (i18n "envNoWebCrypto")
-    "noIndexedDb"  (i18n "envNoIndexedDb")
-    "passed"       (i18n "selftestPassed")
-    "failed"       (i18n "selftestFailed") }}
+{{/* La table entière est lue depuis i18n/en.toml et passée telle quelle.
+     Elle était recopiée clé par clé, et j'ai ajouté des libellés sans les y
+     reporter : une dizaine de chaînes arrivaient vides dans le module, en
+     silence. Une source unique supprime la classe d'erreur plutôt qu'une
+     occurrence. */}}
+{{ $i18n := index site.Data.ui site.Language.Lang }}
 {{ $js := resources.Get $entry | js.Build (dict "format" "esm" "minify" true "target" "es2020" "params" $i18n) | fingerprint "sha384" }}
 <script type="module" src="{{ $js.RelPermalink }}" integrity="{{ $js.Data.Integrity }}" defer></script>
