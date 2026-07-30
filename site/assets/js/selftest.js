@@ -7,7 +7,7 @@
 import T from "@params";
 import { canonicalize } from "./canonical.js";
 import { base58btcEncode } from "./multibase.js";
-import { ephemeralKeyPair, loadKeyPair, publicJwk, thumbprint, sign, verify } from "./keys.js";
+import { ephemeralKeyPair, loadKeyPair, publicJwk, thumbprint, readable, sign, verify } from "./keys.js";
 import { buildCredential, signCredential, newSubjectId } from "./credential.js";
 import { fetchPour, claimsOf } from "./pour.js";
 import { fetchMe, issuerDid } from "./me.js";
@@ -131,6 +131,40 @@ test("subject identifier — opaque and unordered", () => {
   return null;
 });
 
+/** Relevé de l'environnement réel — remplace toute commande à coller. */
+async function environmentReport() {
+  const rows = [["User agent", navigator.userAgent],
+                ["Secure context", String(globalThis.isSecureContext)]];
+  try {
+    const db = await new Promise((res, rej) => {
+      const q = indexedDB.open("natixar-gold-trace");
+      q.onsuccess = () => res(q.result);
+      q.onerror = () => rej(q.error);
+      q.onblocked = () => rej(new Error("blocked by another tab"));
+    });
+    rows.push(["Database version", String(db.version)]);
+    rows.push(["Object stores", [...db.objectStoreNames].join(", ") || "(none)"]);
+    if (db.objectStoreNames.contains("keys")) {
+      const stored = await new Promise((res, rej) => {
+        const t = db.transaction("keys").objectStore("keys").get("signing");
+        t.onsuccess = () => res(t.result); t.onerror = () => rej(t.error);
+      });
+      if (stored) {
+        rows.push(["Stored key", stored.privateKey.algorithm.namedCurve + " " + stored.privateKey.algorithm.name]);
+        rows.push(["Fingerprint", readable(await thumbprint(stored))]);
+        rows.push(["extractable", String(stored.privateKey.extractable)]);
+        rows.push(["Export attempt", await crypto.subtle.exportKey("jwk", stored.privateKey)
+          .then(() => "SUCCEEDED — this is a defect").catch((e) => "refused: " + e.name)]);
+      } else {
+        rows.push(["Stored key", "(none)"]);
+      }
+    }
+  } catch (e) {
+    rows.push(["IndexedDB", "error: " + e.name + " — " + e.message]);
+  }
+  return rows;
+}
+
 function expect(got, want) { return got === want ? null : `attendu ${want}, obtenu ${got}`; }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -143,10 +177,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     try { err = await c.fn(); } catch (e) { err = String(e); }
     if (err) failed++;
     li.innerHTML = `<span class="badge badge--${err ? "warning" : "verified"}">${err ? "fail" : "ok"}</span> ${c.name}` +
-                   (err ? `<div class="muted" style="margin-left:1rem">${err}</div>` : "");
-    li.style.marginBottom = ".5rem";
+                   (err ? `<div class="muted detail">${err}</div>` : "");
     out.append(li);
   }
+  const env = document.querySelector("[data-environment]");
+  if (env) {
+    for (const [k, v] of await environmentReport()) {
+      const row = document.createElement("div");
+      row.innerHTML = `<dt>${k}</dt><dd>${v.replace(/[<&]/g, (c) => ({ "<": "&lt;", "&": "&amp;" })[c])}</dd>`;
+      env.append(row);
+    }
+  }
+
   const s = document.querySelector("[data-selftest-summary]");
   if (s) {
     s.textContent = failed ? `${failed} ${T.failed} / ${cases.length}` : `${cases.length} ${T.passed}`;

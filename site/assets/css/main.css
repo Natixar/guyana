@@ -113,6 +113,11 @@ main { flex: 1; padding: 2.5rem 0 3rem; }
 .btn[disabled] { opacity: .5; cursor: not-allowed; }
 
 .muted { color: var(--muted-foreground); font-size: .9375rem; }
+.actions { margin-top: 1.5rem; }
+.actions .muted { margin-left: .75rem; }
+.checklist { margin-top: 1rem; }
+.checklist > div { margin-bottom: .5rem; }
+.checklist .detail { margin-left: 1rem; }
 
 /* Marque d'origine d'une valeur : dérivée, estimée, non mesurée. Une valeur
    mesurée n'est pas marquée — l'absence de marque est le cas normal. */

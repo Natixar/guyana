@@ -2,8 +2,14 @@
   <h1>{{ .Title }}</h1>
   {{ .Content }}
   <div class="card">
+    <h2>{{ i18n "environmentReport" }}</h2>
+    <p class="muted">{{ i18n "environmentReportBody" }}</p>
+    <dl class="facts" data-environment></dl>
+  </div>
+
+  <div class="card">
     <h2>{{ i18n "selftestResults" }}
         <span data-selftest-summary class="badge badge--pending">{{ i18n "selftestRunning" }}</span></h2>
-    <div data-selftest style="margin-top:1rem"></div>
+    <div data-selftest class="checklist"></div>
   </div>
 {{ end }}

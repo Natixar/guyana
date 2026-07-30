@@ -24,7 +24,7 @@ const FALLBACK = {
 
 export async function fetchMe() {
   try {
-    const r = await fetch("/api/me", { credentials: "same-origin" });
+    const r = await fetch("/api/v1/me", { credentials: "same-origin" });
     if (!r.ok) return { ...FALLBACK, mode: "error", status: r.status };
     return await r.json();
   } catch {

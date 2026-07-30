@@ -7,7 +7,7 @@
 
 export async function fetchPour() {
   try {
-    const r = await fetch("/api/pour", { credentials: "same-origin" });
+    const r = await fetch("/api/v1/pour", { credentials: "same-origin" });
     return r.ok ? await r.json() : null;
   } catch {
     return null;

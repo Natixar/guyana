@@ -26,15 +26,34 @@ const KEY_ID = "signing";
 const ALG = { name: "ECDSA", namedCurve: "P-256" };
 const SIGN_ALG = { name: "ECDSA", hash: "SHA-256" };
 
-function openDb() {
+function rawOpen(version) {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    const req = version ? indexedDB.open(DB_NAME, version) : indexedDB.open(DB_NAME);
     req.onupgradeneeded = () => {
       if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
+    req.onblocked = () => reject(new Error("IndexedDB upgrade blocked by another tab"));
   });
+}
+
+/**
+ * Ouvre la base en garantissant que le magasin existe.
+ *
+ * Ne pas supposer qu'une base à la bonne version contient ses magasins : une
+ * base peut avoir été créée en version 1 sans aucun magasin par n'importe quel
+ * autre code — une commande tapée dans la console, un autre outil. Dans ce cas
+ * `onupgradeneeded` ne se déclenche pas et la transaction échoue par
+ * NotFoundError. On force alors une montée de version, seul moyen de créer un
+ * magasin manquant.
+ */
+async function openDb() {
+  let db = await rawOpen();                       // version courante, quelle qu'elle soit
+  if (db.objectStoreNames.contains(STORE)) return db;
+  const next = db.version + 1;
+  db.close();
+  return rawOpen(next);
 }
 
 function tx(db, mode, fn) {

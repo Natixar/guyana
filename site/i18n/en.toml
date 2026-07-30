@@ -43,3 +43,6 @@ signNoPour         = "No pour awaiting confirmation"
 signDone           = "Signed"
 signFailed         = "Signing failed"
 operatorUnknown    = "not identified — no one is signed in"
+
+environmentReport     = "Environment"
+environmentReportBody = "Copy this block when reporting from another browser. It replaces any command to paste into the console."
