@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="{{ site.Language.LanguageCode }}">
+<head>{{ partial "head.html" . }}</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <span class="brand">{{ partial "logo.html" (dict "variant" "blue") }}</span>
+      <span class="brand-name">{{ site.Params.platformName }}</span>
+    </div>
+  </header>
+
+  <main><div class="wrap">{{ block "main" . }}{{ end }}</div></main>
+
+  <footer class="site-footer">
+    <div class="wrap">{{ site.Params.platformName }} — projet Aurora</div>
+  </footer>
+</body>
+</html>

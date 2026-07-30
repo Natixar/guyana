@@ -1,0 +1,50 @@
+baseURL = "https://guyana.natixar.pro/"
+languageCode = "fr-FR"
+defaultContentLanguage = "fr"
+title = "Natixar Gold Trace"
+
+# Pas de flux, pas de sitemap, pas de taxonomies : ce site a deux pages.
+disableKinds = ["taxonomy", "term", "RSS", "sitemap", "robotsTXT", "404"]
+
+[params]
+  platformName = "Natixar Gold Trace"
+
+  # Champs affichés pour un lingot. Ordre et libellés modifiables ici, sans
+  # toucher au gabarit ; les clés sont celles du modèle de données.
+  [[params.barFields]]
+    key = "barId"
+    label = "Identifiant"
+  [[params.barFields]]
+    key = "pourDate"
+    label = "Date de coulée"
+  [[params.barFields]]
+    key = "weight"
+    label = "Masse"
+  [[params.barFields]]
+    key = "assay"
+    label = "Titre"
+  [[params.barFields]]
+    key = "carbonIntensity"
+    label = "Intensité carbone"
+
+[imaging]
+  # Lanczos donne le meilleur rendu sur un logo au trait fortement réduit.
+  resampleFilter = "Lanczos"
+  quality = 85
+  [imaging.exif]
+    disableDate = true
+    disableLatLong = true
+
+[build]
+  # Les jetons sont dans un fichier commenté ; on ne veut pas que Hugo
+  # supprime les commentaires avant que le CSS ait servi à quelqu'un.
+  writeStats = false
+
+[minify]
+  disableCSS = false
+  disableJS = false
+  disableHTML = true   # lisibilité du rendu > 2 Ko
+
+[security]
+  [security.funcs]
+    getenv = ["^HUGO_", "^CI$"]

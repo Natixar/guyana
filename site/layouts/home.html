@@ -1,0 +1,7 @@
+{{ define "main" }}
+  <h1>{{ .Title }}</h1>
+  {{ with .Content }}{{ . }}{{ end }}
+
+  {{ partial "panel-environment.html" . }}
+  {{ partial "panel-bar.html" . }}
+{{ end }}

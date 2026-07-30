@@ -1,0 +1,52 @@
+/* Jetons de design — relevés sur la maquette publiée, pas inventés.
+   Source : video-snort-80174231.figma.site, feuille /_components/v2/…css
+   Voir analyses/2026-07-30_jetons-de-design-extraits.md */
+:root {
+  /* typographie ------------------------------------------------------- */
+  --font-heading: "DM Sans", system-ui, sans-serif;
+  --font-body:    "Inter", system-ui, sans-serif;
+  --font-mono:    ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-size: 15px;
+  --fw-light: 300; --fw-normal: 400; --fw-medium: 500;
+  --fw-semibold: 600; --fw-bold: 700;
+
+  /* marque ------------------------------------------------------------ */
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --primary-soft: #dbeafe;
+  --primary-foreground: #fff;
+  --accent: #0ea5e9;
+  --accent-foreground: #fff;
+  --ring: #2563eb;
+
+  /* neutres ----------------------------------------------------------- */
+  --background: #f7f9fc;
+  --background-secondary: #fff;
+  --background-tertiary: #eff3f8;
+  --card: #fff;
+  --foreground: #0f172a;
+  --muted: #f8f9fb;
+  --muted-foreground: #64748b;
+  --secondary: #f1f3f6;
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --input: #fff;
+  --input-border: #d1d5db;
+
+  /* statuts — vocabulaire déjà présent dans la maquette --------------- */
+  --status-verified: #10b981;
+  --status-pending:  #f59e0b;
+  --status-info:     #0ea5e9;
+  --status-warning:  #ef4444;
+  --destructive:     #ef4444;
+  --co2-accent:      #10b981;
+
+  /* graphiques -------------------------------------------------------- */
+  --chart-1: #2563eb; --chart-2: #0ea5e9; --chart-3: #10b981;
+  --chart-4: #f59e0b; --chart-5: #8b5cf6; --chart-6: #ec4899;
+
+  /* rayons ------------------------------------------------------------ */
+  --radius-xs: .125rem;
+  --radius: .5rem;
+  --radius-2xl: 1rem;
+}

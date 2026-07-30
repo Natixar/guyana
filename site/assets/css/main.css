@@ -1,0 +1,102 @@
+@import "tokens.css";
+
+/* Fontes — À FAIRE : déposer les .woff2 dans assets/fonts/ et décommenter.
+   Elles doivent être EMBARQUÉES, jamais appelées chez un tiers : cette page
+   signe, donc aucune ressource externe ne doit pouvoir en altérer le code.
+   DM Sans et Inter sont sous licence SIL OFL, l'auto-hébergement est permis.
+@font-face { font-family:"Inter"; src:url("../fonts/inter.woff2") format("woff2");
+             font-weight:300 700; font-display:swap; }
+@font-face { font-family:"DM Sans"; src:url("../fonts/dm-sans.woff2") format("woff2");
+             font-weight:400 700; font-display:swap; } */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { font-size: var(--font-size); }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-body);
+  font-weight: var(--fw-normal);
+  line-height: 1.6;
+  color: var(--foreground);
+  background: var(--background);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: var(--font-heading); font-weight: var(--fw-semibold);
+             line-height: 1.25; margin: 0 0 .5rem; }
+h1 { font-size: clamp(1.5rem, 4vw, 2rem); }
+h2 { font-size: 1.25rem; }
+p  { margin: 0 0 1rem; }
+
+.wrap { width: min(56rem, 100% - 2.5rem); margin-inline: auto; }
+
+/* En-tête ------------------------------------------------------------- */
+.site-header {
+  background: var(--background-secondary);
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 0;
+}
+.site-header .wrap { display: flex; align-items: center; gap: 1rem; }
+.brand img { display: block; height: 1.75rem; width: auto; }
+.brand-name {
+  font-family: var(--font-heading); font-weight: var(--fw-semibold);
+  font-size: 1.0625rem; letter-spacing: -.01em;
+}
+
+/* Contenu ------------------------------------------------------------- */
+main { flex: 1; padding: 2.5rem 0 3rem; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-2xl);
+  padding: 1.75rem;
+  margin-bottom: 1.25rem;
+}
+
+/* Champs de données d'un lingot : la lecture doit être sans ambiguïté,
+   donc chiffres en chasse fixe et libellés en retrait. */
+.facts { display: grid; gap: .75rem; margin: 0; }
+.facts > div { display: grid; grid-template-columns: minmax(9rem, 30%) 1fr;
+               gap: 1rem; align-items: baseline; }
+.facts dt { color: var(--muted-foreground); font-size: .9375rem; }
+.facts dd { margin: 0; font-family: var(--font-mono); font-weight: var(--fw-medium); }
+
+/* Statuts — reprend le vocabulaire de la maquette ---------------------- */
+.badge {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .25rem .625rem; border-radius: 999px;
+  font-size: .8125rem; font-weight: var(--fw-medium);
+}
+.badge::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%;
+                 background: currentColor; }
+.badge--verified { color: var(--status-verified); background: color-mix(in srgb, var(--status-verified) 12%, transparent); }
+.badge--pending  { color: var(--status-pending);  background: color-mix(in srgb, var(--status-pending) 12%, transparent); }
+.badge--warning  { color: var(--status-warning);  background: color-mix(in srgb, var(--status-warning) 12%, transparent); }
+.badge--info     { color: var(--status-info);     background: color-mix(in srgb, var(--status-info) 12%, transparent); }
+
+/* Actions -------------------------------------------------------------- */
+.btn {
+  font: inherit; font-family: var(--font-heading); font-weight: var(--fw-medium);
+  padding: .75rem 1.5rem; border-radius: var(--radius);
+  border: 1px solid transparent; cursor: pointer;
+  transition: background-color .15s ease;
+}
+.btn--primary { background: var(--primary); color: var(--primary-foreground); }
+.btn--primary:hover { background: var(--primary-hover); }
+.btn--primary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+
+.muted { color: var(--muted-foreground); font-size: .9375rem; }
+
+/* Pied ----------------------------------------------------------------- */
+.site-footer {
+  border-top: 1px solid var(--border);
+  padding: 1.25rem 0; font-size: .875rem; color: var(--muted-foreground);
+}
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
