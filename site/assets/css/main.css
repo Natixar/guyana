@@ -43,8 +43,8 @@ p  { margin: 0 0 1rem; }
 
 /* En-tête ------------------------------------------------------------- */
 .site-header {
-  background: var(--background-secondary);
-  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--header-gradient-start), var(--header-gradient-end));
+  color: var(--header-foreground);
   padding: 1rem 0;
 }
 .site-header .wrap { display: flex; align-items: center; gap: 1rem; }
@@ -52,6 +52,7 @@ p  { margin: 0 0 1rem; }
 .brand-name {
   font-family: var(--font-heading); font-weight: var(--fw-semibold);
   font-size: 1.0625rem; letter-spacing: -.01em;
+  color: var(--header-foreground);
 }
 
 /* Contenu ------------------------------------------------------------- */

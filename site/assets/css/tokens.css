@@ -19,6 +19,14 @@
   --accent-foreground: #fff;
   --ring: #2563eb;
 
+  /* chrome — l'en-tête bleu de la marque. C'est la surface à laquelle le
+     logo blanc est destiné ; le corps de page reste clair, comme dans la
+     maquette, pour que les cartes et les pastilles de statut gardent leur
+     contraste. */
+  --header-gradient-start: #3b6ba5;
+  --header-gradient-end:   #2c5282;
+  --header-foreground:     #fff;
+
   /* neutres ----------------------------------------------------------- */
   --background: #f7f9fc;
   --background-secondary: #fff;
