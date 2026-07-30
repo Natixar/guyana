@@ -14,25 +14,47 @@ export async function fetchPour() {
   }
 }
 
-/** Remplit le panneau et rend visible l'origine de chaque valeur. */
+function row(field, key) {
+  const div = document.createElement("div");
+  const dt = document.createElement("dt");
+  dt.textContent = field.label ?? key;
+  const dd = document.createElement("dd");
+  dd.textContent = field.value ?? "—";
+  dd.dataset.field = key;
+  if (field.origin && field.origin !== "MEASURED") {
+    const tag = document.createElement("span");
+    tag.className = "origin-tag";
+    tag.textContent = field.origin.toLowerCase();
+    dd.append(" ", tag);
+  }
+  div.append(dt, dd);
+  return div;
+}
+
+/**
+ * Rend les deux blocs séparément, parce que ce sont deux attestations
+ * distinctes signées par deux émetteurs différents. L'opérateur doit voir
+ * exactement ce qu'il engage : les faits physiques qu'il observe, et rien
+ * d'autre. L'intensité carbone est affichée à côté, mais explicitement comme
+ * n'étant pas de son ressort.
+ */
 export function renderPour(pour, root = document) {
   if (!pour) return false;
-  for (const [key, field] of Object.entries(pour.fields ?? {})) {
-    const cell = root.querySelector(`[data-field="${key}"]`);
-    if (!cell) continue;
-    cell.textContent = field.value ?? "—";
-    if (field.origin && field.origin !== "MEASURED") {
-      const tag = document.createElement("span");
-      tag.className = "origin-tag";
-      tag.textContent = field.origin.toLowerCase();
-      cell.append(" ", tag);
+  const own = root.querySelector("[data-operator-facts]");
+  const calc = root.querySelector("[data-calculator-facts]");
+  if (own) for (const [k, f] of Object.entries(pour.attestedByOperator ?? {})) own.append(row(f, k));
+  if (calc) {
+    const c = pour.computedByCalculator ?? {};
+    for (const [k, f] of Object.entries(c)) {
+      if (f && typeof f === "object" && "value" in f) calc.append(row(f, k));
     }
   }
   return true;
 }
 
-/** Les revendications signées : les valeurs, et l'origine de chacune. */
-export const claimsOf = (pour) =>
+/** Les seules revendications que l'opérateur signe : ce qu'il observe. */
+export const operatorClaims = (pour) =>
   Object.fromEntries(
-    Object.entries(pour.fields ?? {}).map(([k, f]) => [k, { value: f.value, origin: f.origin }])
+    Object.entries(pour.attestedByOperator ?? {})
+      .map(([k, f]) => [k, { value: f.value, origin: f.origin }])
   );

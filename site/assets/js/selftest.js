@@ -9,7 +9,7 @@ import { canonicalize } from "./canonical.js";
 import { base58btcEncode } from "./multibase.js";
 import { ephemeralKeyPair, loadKeyPair, publicJwk, thumbprint, readable, sign, verify } from "./keys.js";
 import { buildCredential, signCredential, newSubjectId } from "./credential.js";
-import { fetchPour, claimsOf } from "./pour.js";
+import { fetchPour, operatorClaims } from "./pour.js";
 import { fetchMe, issuerDid } from "./me.js";
 
 
@@ -112,14 +112,17 @@ test("end to end — identity, pour, signed credential", async () => {
   const cred = buildCredential({
     issuerDid: did,
     subjectId: newSubjectId(),
-    claims: claimsOf(pour),
+    claims: operatorClaims(pour),
     confirmedBy: me.person ? { id: me.person.id, name: me.person.name } : null,
   });
   const out = await signCredential(cred, pair, did + "#key-1");
 
   if (out.issuer !== did) return "issuer does not match /api/me";
   if (!out.credentialSubject?.barId?.value) return "bar claims missing";
-  if (!out.credentialSubject.carbonIntensity?.origin) return "claim origin not carried";
+  if (!out.credentialSubject.weight?.origin) return "claim origin not carried";
+  // Le calcul carbone n'appartient pas à cette attestation : la mine ne signe
+  // pas un chiffre qu'elle n'a pas produit.
+  if ("carbonIntensity" in out.credentialSubject) return "carbon intensity must not be signed by the mine";
   if (!out.proof?.proofValue?.startsWith("z")) return "proof missing or not multibase";
   return null;
 });
@@ -167,6 +170,38 @@ async function environmentReport() {
 
 function expect(got, want) { return got === want ? null : `attendu ${want}, obtenu ${got}`; }
 
+async function wireReset() {
+  const btn = document.querySelector("[data-reset]");
+  const status = document.querySelector("[data-reset-status]");
+  if (!btn) return;
+
+  const me = await fetchMe();
+  if (me.authenticated) {                       // en production, on tourne, on n'efface pas
+    btn.disabled = true;
+    if (status) status.textContent = T.resetProduction;
+    return;
+  }
+
+  const stored = await loadKeyPair();
+  const expected = stored ? readable(await thumbprint(stored)) : null;
+  if (!stored) { btn.disabled = true; if (status) status.textContent = T.resetNoKey; return; }
+
+  btn.disabled = false;
+  btn.addEventListener("click", async () => {
+    const input = document.querySelector("[data-reset-confirm]");
+    if (input?.value.trim() !== expected) {
+      if (status) status.textContent = T.resetMismatch;
+      return;
+    }
+    await new Promise((res) => {
+      const q = indexedDB.deleteDatabase("natixar-gold-trace");
+      q.onsuccess = q.onerror = q.onblocked = () => res();
+    });
+    if (status) status.textContent = T.resetDone;
+    btn.disabled = true;
+  });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   const out = document.querySelector("[data-selftest]");
   if (!out) return;
@@ -188,6 +223,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       env.append(row);
     }
   }
+
+  await wireReset();
 
   const s = document.querySelector("[data-selftest-summary]");
   if (s) {

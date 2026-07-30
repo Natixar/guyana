@@ -46,3 +46,18 @@ operatorUnknown    = "not identified — no one is signed in"
 
 environmentReport     = "Environment"
 environmentReportBody = "Copy this block when reporting from another browser. It replaces any command to paste into the console."
+
+youAttest              = "What you attest"
+youAttestBody          = "Physical facts observed on site. Your signature covers these, and only these."
+calculatorAttests      = "Attested separately by Natixar"
+calculatorAttestsBody  = "The carbon intensity is computed, not observed. It is signed by Natixar under its own key, in a separate certificate that references this bar. You are not asked to vouch for it."
+awaitingCalculator     = "Awaiting the monthly allocation"
+
+resetTitle       = "Reset local state"
+resetBody        = "Deletes the signing key held in this browser. Available only while no one is signed in — in production, rotate rather than delete, so certificates already issued stay verifiable. Type the current fingerprint to confirm: you cannot do this without already having it in front of you."
+resetLabel       = "Current fingerprint"
+resetButton      = "Delete the local key"
+resetDone        = "Deleted. Reload the page."
+resetMismatch    = "Fingerprint does not match — nothing was deleted."
+resetNoKey       = "No key to delete."
+resetProduction  = "Disabled: someone is signed in. Use key rotation instead."

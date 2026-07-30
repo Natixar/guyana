@@ -1,13 +1,22 @@
 {
   "pourId": "pour-2026-0417-03",
   "status": "pending",
-  "fields": {
-    "barId":           { "value": "AUR-2026-0417-03", "origin": "MEASURED" },
-    "pourDate":        { "value": "2026-04-17",       "origin": "MEASURED" },
-    "weight":          { "value": "12.482 kg",        "origin": "MEASURED" },
-    "assay":           { "value": "87.3 % Au",        "origin": "MEASURED" },
-    "carbonIntensity": { "value": "0.94 tCO2e / oz",  "origin": "DERIVED" }
+  "subjectId": null,
+
+  "attestedByOperator": {
+    "barId":    { "label": "Bar identifier", "value": "AUR-2026-0417-03", "origin": "MEASURED" },
+    "pourDate": { "label": "Pour date",      "value": "2026-04-17",       "origin": "MEASURED" },
+    "weight":   { "label": "Weight",         "value": "12.482 kg",        "origin": "MEASURED" },
+    "assay":    { "label": "Assay",          "value": "87.3 % Au",        "origin": "MEASURED" }
   },
-  "dataOrigin": "SAMPLE",
-  "note": "Sample pour. Replace with the gold room register once G-01 is released."
+
+  "computedByCalculator": {
+    "issuer": "did:web:natixar.pro",
+    "status": "pending",
+    "note": "Issued separately once the monthly allocation closes. Not signed by the mine.",
+    "carbonIntensity": { "label": "Carbon intensity", "value": null, "origin": "DERIVED",
+                         "methodology": null, "factorSetVersion": null }
+  },
+
+  "dataOrigin": "SAMPLE"
 }

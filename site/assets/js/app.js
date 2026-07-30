@@ -4,7 +4,7 @@ import T from "@params";
 import { loadKeyPair, createKeyPair, thumbprint, readable } from "./keys.js";
 import { buildDidDocument, downloadJson } from "./did.js";
 import { fetchMe, issuerDid, isDemo } from "./me.js";
-import { fetchPour, renderPour, claimsOf } from "./pour.js";
+import { fetchPour, renderPour, operatorClaims } from "./pour.js";
 import { buildCredential, signCredential, newSubjectId } from "./credential.js";
 
 const $ = (s) => document.querySelector(s);
@@ -95,7 +95,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const cred = buildCredential({
         issuerDid: did,
         subjectId,
-        claims: claimsOf(pour),
+        claims: operatorClaims(pour),
         confirmedBy: me.person ? { id: me.person.id, name: me.person.name } : null,
       });
       signed = await signCredential(cred, pair, `${did}#${me.keyPolicy?.keyName ?? "key-1"}`);

@@ -12,4 +12,15 @@
         <span data-selftest-summary class="badge badge--pending">{{ i18n "selftestRunning" }}</span></h2>
     <div data-selftest class="checklist"></div>
   </div>
+
+  <div class="card">
+    <h2>{{ i18n "resetTitle" }}</h2>
+    <p class="muted">{{ i18n "resetBody" }}</p>
+    <p><label>{{ i18n "resetLabel" }}<br>
+       <input type="text" data-reset-confirm autocomplete="off" spellcheck="false"></label></p>
+    <p class="actions">
+      <button class="btn btn--primary" data-reset disabled>{{ i18n "resetButton" }}</button>
+      <span data-reset-status class="muted"></span>
+    </p>
+  </div>
 {{ end }}

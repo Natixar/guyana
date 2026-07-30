@@ -113,8 +113,19 @@ main { flex: 1; padding: 2.5rem 0 3rem; }
 .btn[disabled] { opacity: .5; cursor: not-allowed; }
 
 .muted { color: var(--muted-foreground); font-size: .9375rem; }
+.subhead { font-family: var(--font-heading); font-size: .9375rem; font-weight: var(--fw-semibold);
+           text-transform: uppercase; letter-spacing: .04em; color: var(--muted-foreground);
+           margin: 1.5rem 0 .25rem; }
+.subhead:first-of-type { margin-top: .5rem; }
 .actions { margin-top: 1.5rem; }
 .actions .muted { margin-left: .75rem; }
+input[type="text"] {
+  font: inherit; font-family: var(--font-mono); margin-top: .35rem;
+  padding: .6rem .75rem; width: min(24rem, 100%);
+  background: var(--input); color: var(--foreground);
+  border: 1px solid var(--input-border); border-radius: var(--radius);
+}
+input[type="text"]:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .checklist { margin-top: 1rem; }
 .checklist > div { margin-bottom: .5rem; }
 .checklist .detail { margin-left: 1rem; }

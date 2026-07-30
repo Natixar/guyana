@@ -1,11 +1,14 @@
 <div class="card">
   <h2>{{ i18n "barPanelTitle" }} <span data-pour-origin class="badge badge--pending" hidden></span></h2>
 
-  <dl class="facts">
-    {{ range site.Params.barFields }}
-      <div><dt>{{ .label }}</dt><dd data-field="{{ .key }}">—</dd></div>
-    {{ end }}
-  </dl>
+  <h3 class="subhead">{{ i18n "youAttest" }}</h3>
+  <p class="muted">{{ i18n "youAttestBody" }}</p>
+  <dl class="facts" data-operator-facts></dl>
+
+  <h3 class="subhead">{{ i18n "calculatorAttests" }}</h3>
+  <p class="muted">{{ i18n "calculatorAttestsBody" }}</p>
+  <dl class="facts" data-calculator-facts></dl>
+  <p><span data-calculator-status class="badge badge--pending">{{ i18n "awaitingCalculator" }}</span></p>
 
   <p class="actions">
     <button class="btn btn--primary" data-sign disabled>{{ i18n "confirmPour" }}</button>
