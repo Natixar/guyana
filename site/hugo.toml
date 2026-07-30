@@ -1,5 +1,5 @@
 baseURL = "https://guyana.natixar.pro/"
-languageCode = "fr-FR"
+locale = "fr-FR"
 defaultContentLanguage = "fr"
 title = "Natixar Gold Trace"
 

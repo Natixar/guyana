@@ -43,6 +43,19 @@ texte.
 | `layouts/_partials/panel-*.html` | un panneau d'écran par fichier |
 | `hugo.toml` | libellés et ordre des champs d'un lingot |
 
+## Auto-vérification
+
+`/selftest/` exécute, **dans le navigateur et sur le code réellement servi**,
+les contrôles qui comptent : canonicalisation JCS (tri des clés, absence
+d'espace, refus de `NaN` et d'`undefined`), encodage base58btc sur vecteurs
+connus, **non-exportabilité effective de la clé privée**, aller-retour
+signature/vérification, et forme de l'attestation signée.
+
+C'est délibéré : je n'ai pas de navigateur dans mon environnement de travail.
+Je ne peux donc pas affirmer que ce code fonctionne — seulement le rendre
+vérifiable en une visite par quiconque ouvre la page. Ouvrez-la après chaque
+déploiement.
+
 ## Ce qui manque
 
 - **Les fontes.** DM Sans et Inter, sous licence SIL OFL, doivent être déposées
