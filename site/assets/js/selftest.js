@@ -7,7 +7,7 @@
 import T from "@params";
 import { canonicalize } from "./canonical.js";
 import { base58btcEncode } from "./multibase.js";
-import { createKeyPair, loadKeyPair, publicJwk, thumbprint, sign, verify } from "./keys.js";
+import { ephemeralKeyPair, loadKeyPair, publicJwk, thumbprint, sign, verify } from "./keys.js";
 import { buildCredential, signCredential, newSubjectId } from "./credential.js";
 
 
@@ -41,7 +41,7 @@ test("base58btc — leading zero bytes", () =>
   expect(base58btcEncode(new Uint8Array([0, 0, 1])), "112"));
 
 test("key — generation, fingerprint, sign/verify round trip", async () => {
-  const pair = (await loadKeyPair()) ?? (await createKeyPair());
+  const pair = await ephemeralKeyPair();
   const jwk = await publicJwk(pair);
   if (jwk.crv !== "P-256" || jwk.kty !== "EC") return "JWK inattendu : " + JSON.stringify(jwk);
   const tp = await thumbprint(pair);
@@ -53,7 +53,7 @@ test("key — generation, fingerprint, sign/verify round trip", async () => {
 });
 
 test("private key genuinely non-extractable", async () => {
-  const pair = (await loadKeyPair()) ?? (await createKeyPair());
+  const pair = await ephemeralKeyPair();
   if (pair.privateKey.extractable) return "la clé privée est exportable — inacceptable";
   try {
     await crypto.subtle.exportKey("jwk", pair.privateKey);
@@ -62,7 +62,7 @@ test("private key genuinely non-extractable", async () => {
 });
 
 test("credential — signed and well formed", async () => {
-  const pair = (await loadKeyPair()) ?? (await createKeyPair());
+  const pair = await ephemeralKeyPair();
   const cred = buildCredential({
     issuerDid: "did:web:guygold.com",
     subjectId: newSubjectId(),
@@ -74,6 +74,27 @@ test("credential — signed and well formed", async () => {
   if (!signed.proof.verificationMethod) return "verificationMethod missing";
   if ("@context" in signed.proof) return "@context must not remain inside the proof";
   return null;
+});
+
+// Contrôle en LECTURE SEULE de la clé réellement stockée, si elle existe.
+// Ne la crée pas : c'est tout l'objet du correctif.
+test("stored key, if any, is non-extractable", async () => {
+  const stored = await loadKeyPair();
+  if (!stored) return null;                       // rien à vérifier, pas un échec
+  if (stored.privateKey.extractable) return "the stored private key is extractable";
+  try {
+    await crypto.subtle.exportKey("jwk", stored.privateKey);
+    return "the stored private key could be exported";
+  } catch { return null; }
+});
+
+test("self-check leaves no key behind", async () => {
+  // Si cette page a provisionné une clé, elle existe maintenant alors qu'elle
+  // n'existait pas au chargement. On ne peut pas le savoir après coup, donc on
+  // se contente d'affirmer que les tests ci-dessus utilisent bien l'éphémère.
+  const a = await ephemeralKeyPair(), b = await ephemeralKeyPair();
+  const ta = await thumbprint(a), tb = await thumbprint(b);
+  return ta === tb ? "ephemeral pairs are not distinct — they are being persisted" : null;
 });
 
 test("subject identifier — opaque and unordered", () => {

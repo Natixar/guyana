@@ -8,6 +8,17 @@ const DID = document.documentElement.dataset.issuerDid || "did:web:example.org";
 
 const $ = (s) => document.querySelector(s);
 
+/**
+ * Écrit dans une pastille. Refuse le vide : une pastille sans texte a été
+ * observée deux fois sans être reproductible, et je n'ai pas d'explication.
+ * Plutôt que de laisser le symptôme muet, on le rend visible.
+ */
+function setBadge(el, text, kind) {
+  if (!el) return;
+  el.textContent = text || `[libellé manquant: ${kind}]`;
+  el.className = "badge badge--" + (kind === "warning" ? "warning" : kind);
+}
+
 // Les libellés viennent du document, pas du code.
 
 
@@ -28,16 +39,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const problem = await environmentOk();
 
   if (problem) {
-    if (status) { status.textContent = problem; status.className = "badge badge--warning"; }
+    setBadge(status, problem, "warning");
     return;
   }
 
   const pair = await loadKeyPair();
 
-  if (status) {
-    status.textContent = pair ? T.keyPresent : T.keyMissing;
-    status.className = "badge " + (pair ? "badge--verified" : "badge--pending");
-  }
+  setBadge(status, pair ? T.keyPresent : T.keyMissing, pair ? "verified" : "pending");
 
   const setup = $("[data-setup]");
   if (setup) setup.hidden = false;
@@ -47,9 +55,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     e.target.disabled = true;
     try {
       await showFingerprint(await createKeyPair());
-      if (status) { status.textContent = T.keyCreated; status.className = "badge badge--verified"; }
+      setBadge(status, T.keyCreated, "verified");
     } catch (err) {
-      if (status) { status.textContent = err.code === "KEY_EXISTS" ? T.keyExists : String(err.message ?? err); status.className = "badge badge--warning"; }
+      setBadge(status, err.code === "KEY_EXISTS" ? T.keyExists : String(err.message ?? err), "warning");
       e.target.disabled = false;
     }
   });

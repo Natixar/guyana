@@ -75,6 +75,19 @@ export async function createKeyPair() {
   return pair;
 }
 
+/**
+ * Paire jetable, en mémoire, jamais écrite dans IndexedDB.
+ *
+ * Destinée aux diagnostics. Une page d'auto-vérification qui provisionnerait la
+ * vraie clé de signature de la mine créerait une clé n'ayant jamais suivi la
+ * cérémonie d'installation — pas de lecture d'empreinte à voix haute, pas de
+ * confirmation par Natixar — et qui pourrait finir publiée dans un did.json.
+ * Un diagnostic ne doit pas avoir d'effet de bord sur l'état de production.
+ */
+export function ephemeralKeyPair() {
+  return crypto.subtle.generateKey(ALG, false, ["sign", "verify"]);
+}
+
 export async function publicJwk(pair) {
   const jwk = await crypto.subtle.exportKey("jwk", pair.publicKey);
   // Champs strictement nécessaires : une empreinte RFC 7638 ne tolère rien d'autre.
