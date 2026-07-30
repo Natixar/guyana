@@ -46,8 +46,22 @@ function tx(db, mode, fn) {
   });
 }
 
-/** La paire existante, ou null. */
+/**
+ * La paire existante, ou null.
+ *
+ * N'ouvre la base que si elle existe déjà : `indexedDB.open` la CRÉE sinon,
+ * et une page d'auto-vérification qui laisse une base vide derrière elle ne
+ * tient pas tout à fait sa promesse de ne rien laisser.
+ *
+ * `indexedDB.databases()` n'existe pas dans Firefox ; on y retombe sur
+ * l'ouverture directe, qui crée une base vide. C'est sans conséquence — un
+ * conteneur vide n'est pas une clé — mais autant que ce soit écrit.
+ */
 export async function loadKeyPair() {
+  if (typeof indexedDB.databases === "function") {
+    const known = await indexedDB.databases();
+    if (!known.some((d) => d.name === DB_NAME)) return null;
+  }
   const db = await openDb();
   const stored = await tx(db, "readonly", (s) => s.get(KEY_ID));
   db.close();

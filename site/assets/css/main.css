@@ -55,6 +55,19 @@ p  { margin: 0 0 1rem; }
   color: var(--header-foreground);
 }
 
+/* Bandeaux --------------------------------------------------------------- */
+.banner {
+  display: flex; flex-wrap: wrap; gap: .5rem;
+  padding: .875rem 1.125rem; margin-bottom: 1.25rem;
+  border-radius: var(--radius); font-size: .9375rem;
+}
+.banner--demo {
+  background: color-mix(in srgb, var(--status-pending) 14%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--status-pending) 45%, transparent);
+  color: var(--foreground);
+}
+.banner[hidden] { display: none; }
+
 /* Contenu ------------------------------------------------------------- */
 main { flex: 1; padding: 2.5rem 0 3rem; }
 

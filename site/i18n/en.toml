@@ -28,3 +28,9 @@ selftestPassed    = "checks passed"
 selftestFailed    = "failed"
 
 footer            = "Aurora project"
+
+demoTitle         = "Demonstration mode."
+demoBody          = "No one is signed in. A key created here is for testing and must not be published."
+signedInAs        = "Signed in as"
+issuerUnknown     = "No organisation identity available — signing is disabled"
+downloadDemoName  = "did.demo.json"

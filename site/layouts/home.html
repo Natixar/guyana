@@ -2,6 +2,7 @@
   <h1>{{ .Title }}</h1>
   {{ with .Content }}{{ . }}{{ end }}
 
+  {{ partial "banner-demo.html" . }}
   {{ partial "panel-environment.html" . }}
   {{ partial "panel-setup.html" . }}
   {{ partial "panel-bar.html" . }}

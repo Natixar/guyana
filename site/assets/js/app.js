@@ -3,8 +3,7 @@
 import T from "@params";
 import { loadKeyPair, createKeyPair, thumbprint, readable } from "./keys.js";
 import { buildDidDocument, downloadJson } from "./did.js";
-
-const DID = document.documentElement.dataset.issuerDid || "did:web:example.org";
+import { fetchMe, issuerDid, isDemo } from "./me.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -36,6 +35,13 @@ async function showFingerprint(pair) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   const status = $("[data-key-status]");
+
+  // L'identité d'abord : elle décide de ce qu'on signe et au nom de qui.
+  const me = await fetchMe();
+  const did = issuerDid(me);
+  const demo = isDemo(me);
+
+  if (demo) $("[data-demo-banner]")?.removeAttribute("hidden");
   const problem = await environmentOk();
 
   if (problem) {
@@ -64,6 +70,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   $("[data-download-did]")?.addEventListener("click", async () => {
     const p = await loadKeyPair();
-    if (p) downloadJson(await buildDidDocument(p, DID), "did.json");
+    if (!p) return;
+    if (!did) { setBadge(status, T.issuerUnknown, "warning"); return; }
+    // En mode dégradé le nom du fichier porte la mention : rien de ce qui sort
+    // d'ici sans authentification ne doit pouvoir être publié par inadvertance.
+    downloadJson(await buildDidDocument(p, did, me.keyPolicy?.keyName ?? "key-1"),
+                 demo ? T.downloadDemoName : "did.json");
   });
 });
