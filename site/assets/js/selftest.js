@@ -4,12 +4,13 @@
 // affirmer que ce code fonctionne, seulement le rendre vérifiable par qui
 // ouvre la page. Les vecteurs de canonicalisation viennent de la RFC 8785.
 
+import T from "@params";
 import { canonicalize } from "./canonical.js";
 import { base58btcEncode } from "./multibase.js";
 import { createKeyPair, loadKeyPair, publicJwk, thumbprint, sign, verify } from "./keys.js";
 import { buildCredential, signCredential, newSubjectId } from "./credential.js";
 
-const T = JSON.parse(document.getElementById("i18n")?.textContent || "{}");
+
 const cases = [];
 const test = (name, fn) => cases.push({ name, fn });
 

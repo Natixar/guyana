@@ -60,7 +60,13 @@ export async function loadKeyPair() {
  * émises sous l'ancienne.
  */
 export async function createKeyPair() {
-  if (await loadKeyPair()) throw new Error("une clé existe déjà — la remplacer exige une rotation explicite");
+  if (await loadKeyPair()) {
+    // Un code, pas une phrase : le texte affiché appartient à la couche
+    // d'interface, qui seule connaît la langue.
+    const err = new Error("key already exists");
+    err.code = "KEY_EXISTS";
+    throw err;
+  }
   // extractable = false porte sur la clé PRIVÉE ; la publique reste exportable.
   const pair = await crypto.subtle.generateKey(ALG, false, ["sign", "verify"]);
   const db = await openDb();

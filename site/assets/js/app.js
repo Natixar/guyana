@@ -1,5 +1,6 @@
 // Écran de signature. Sans dépendance : WebCrypto est natif.
 
+import T from "@params";
 import { loadKeyPair, createKeyPair, thumbprint, readable } from "./keys.js";
 import { buildDidDocument, downloadJson } from "./did.js";
 
@@ -8,7 +9,7 @@ const DID = document.documentElement.dataset.issuerDid || "did:web:example.org";
 const $ = (s) => document.querySelector(s);
 
 // Les libellés viennent du document, pas du code.
-const T = JSON.parse(document.getElementById("i18n")?.textContent || "{}");
+
 
 async function environmentOk() {
   if (!globalThis.isSecureContext) return T.notSecure;
@@ -48,7 +49,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       await showFingerprint(await createKeyPair());
       if (status) { status.textContent = T.keyCreated; status.className = "badge badge--verified"; }
     } catch (err) {
-      if (status) { status.textContent = String(err.message ?? err); status.className = "badge badge--warning"; }
+      if (status) { status.textContent = err.code === "KEY_EXISTS" ? T.keyExists : String(err.message ?? err); status.className = "badge badge--warning"; }
       e.target.disabled = false;
     }
   });
