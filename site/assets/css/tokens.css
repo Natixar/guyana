@@ -3,7 +3,7 @@
    Voir analyses/2026-07-30_jetons-de-design-extraits.md */
 :root {
   /* typographie ------------------------------------------------------- */
-  --font-heading: "DM Sans", system-ui, sans-serif;
+  --font-heading: "Inter", system-ui, sans-serif;  /* DM Sans absente des dépôts — à substituer dès réception */
   --font-body:    "Inter", system-ui, sans-serif;
   --font-mono:    ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --font-size: 15px;
