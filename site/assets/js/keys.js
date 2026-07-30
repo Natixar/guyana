@@ -16,6 +16,8 @@
 // ajoutant la nouvelle et en conservant l'ancienne, pour que les attestations
 // déjà émises restent vérifiables.
 
+import { canonicalBytes } from "./canonical.js";
+
 const DB_NAME = "natixar-gold-trace";
 const DB_VERSION = 1;
 const STORE = "keys";
@@ -80,7 +82,10 @@ export async function publicJwk(pair) {
  */
 export async function thumbprint(pair) {
   const jwk = await publicJwk(pair);
-  const bytes = new TextEncoder().encode(JSON.stringify(jwk)); // déjà en ordre lexicographique
+  // RFC 7638 exige les membres requis en ordre lexicographique, sans espace.
+  // S'en remettre à l'ordre d'insertion d'un littéral d'objet marcherait ici
+  // par coïncidence ; on passe par la sérialisation canonique, qui le garantit.
+  const bytes = canonicalBytes(jwk);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return b64url(new Uint8Array(digest));
 }

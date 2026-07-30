@@ -69,8 +69,9 @@ test("credential — signed and well formed", async () => {
   });
   const signed = await signCredential(cred, pair, "did:web:guygold.com#key-1");
   if (signed.proof?.cryptosuite !== "ecdsa-jcs-2019") return "suite inattendue";
-  if (!signed.proof.proofValue?.startsWith("z")) return "proofValue non multibase";
-  if ("proofValue" in { ...signed.proof, proofValue: undefined } === false) return null;
+  if (!signed.proof.proofValue?.startsWith("z")) return "proofValue is not multibase";
+  if (!signed.proof.verificationMethod) return "verificationMethod missing";
+  if ("@context" in signed.proof) return "@context must not remain inside the proof";
   return null;
 });
 
