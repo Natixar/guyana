@@ -1,0 +1,27 @@
+# Chaînes d'interface. Une seule langue au POC, mais externalisées : ajouter le
+# français ou le chinois plus tard ne demandera pas de toucher aux gabarits.
+environment       = "Environment"
+envChecking       = "Checking…"
+envKeyPresent     = "Signing key present"
+envKeyMissing     = "No signing key — setup required"
+envKeyCreated     = "Signing key created"
+envNotSecure      = "This page is not served over HTTPS — signing is not possible"
+envNoWebCrypto    = "This browser does not provide WebCrypto"
+envNoIndexedDb    = "This browser does not provide IndexedDB"
+keyStaysHere      = "The signing key is generated in this browser and never leaves it."
+
+setup             = "Setup"
+setupOnce         = "This happens once. It creates the mine's signing key in this browser."
+createKey         = "Create the signing key"
+fingerprint       = "Key fingerprint"
+readAloud         = "Read this fingerprint aloud to your Natixar contact. It confirms that the key we publish is the one on this computer."
+downloadDid       = "Download did.json"
+thenPublish       = "The downloaded file must then be published on your website. The installation guide explains how, step by step."
+
+barPanelTitle     = "Bar awaiting confirmation"
+confirmPour       = "Confirm this pour"
+
+selftestResults   = "Results"
+selftestRunning   = "running…"
+selftestPassed    = "checks passed"
+selftestFailed    = "failed"

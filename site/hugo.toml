@@ -1,6 +1,9 @@
 baseURL = "https://guyana.natixar.pro/"
-locale = "fr-FR"
-defaultContentLanguage = "fr"
+# Anglais : le Guyana est anglophone, le contrat et le paquet de données le
+# sont, et les interlocuteurs opérationnels d'AGM sont locaux. Le chinois est
+# la langue de l'encadrement expatrié, pas celle de la salle d'or.
+locale = "en-GB"
+defaultContentLanguage = "en"
 title = "Natixar Gold Trace"
 
 # Pas de flux, pas de sitemap, pas de taxonomies : ce site a deux pages.
@@ -14,19 +17,19 @@ disableKinds = ["taxonomy", "term", "RSS", "sitemap", "robotsTXT", "404"]
   # toucher au gabarit ; les clés sont celles du modèle de données.
   [[params.barFields]]
     key = "barId"
-    label = "Identifiant"
+    label = "Bar identifier"
   [[params.barFields]]
     key = "pourDate"
-    label = "Date de coulée"
+    label = "Pour date"
   [[params.barFields]]
     key = "weight"
-    label = "Masse"
+    label = "Weight"
   [[params.barFields]]
     key = "assay"
-    label = "Titre"
+    label = "Assay"
   [[params.barFields]]
     key = "carbonIntensity"
-    label = "Intensité carbone"
+    label = "Carbon intensity"
 
 [imaging]
   # Lanczos donne le meilleur rendu sur un logo au trait fortement réduit.

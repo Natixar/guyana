@@ -1,7 +1,7 @@
 ---
-title: "Attestation d'origine"
-description: "Signer l'origine et l'intensité carbone d'un lingot de doré."
+title: "Origin attestation"
+description: "Sign the origin and carbon intensity of a doré bar."
 ---
 
-Vérifiez les données ci-dessous, puis confirmez. Votre signature atteste que
-ce lingot a bien été coulé sur le site, tel que décrit.
+Check the details below, then confirm. Your signature attests that this bar was
+poured on site, as described.

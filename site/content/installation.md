@@ -26,7 +26,7 @@ is not in this file.
 ## Step 1 — Create the key
 
 On the computer that will confirm pours, open the signing page and select
-**Créer la clé de signature**.
+**Create the signing key**.
 
 A short code appears, in six groups of four characters. Read it aloud to your
 Natixar contact. They will confirm it matches what they see. This takes a minute
@@ -38,7 +38,7 @@ us — a second key is added alongside the first, not in place of it.
 
 ## Step 2 — Download the file
 
-Select **Télécharger did.json**. Your browser saves a file named `did.json`,
+Select **Download did.json**. Your browser saves a file named `did.json`,
 about one kilobyte.
 
 Do not rename it, and do not open it in Word or a similar program — a text

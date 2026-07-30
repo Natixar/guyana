@@ -1,20 +1,17 @@
 {{/* Installation : opération unique, faite une fois avec Natixar en visio. */}}
 <div class="card" data-setup hidden>
-  <h2>Installation</h2>
-  <p>Cette étape n'a lieu qu'une fois. Elle crée la clé de signature de la mine
-     dans ce navigateur.</p>
+  <h2>{{ i18n "setup" }}</h2>
+  <p>{{ i18n "setupOnce" }}</p>
 
-  <p><button class="btn btn--primary" data-create-key>Créer la clé de signature</button></p>
+  <p><button class="btn btn--primary" data-create-key>{{ i18n "createKey" }}</button></p>
 
   <div data-setup-result hidden>
     <dl class="facts">
-      <div><dt>Empreinte de la clé</dt><dd data-fingerprint>—</dd></div>
+      <div><dt>{{ i18n "fingerprint" }}</dt><dd data-fingerprint>—</dd></div>
     </dl>
-    <p class="muted">Lisez cette empreinte à voix haute à votre interlocuteur
-       Natixar. Elle confirme que la clé publiée est bien celle de ce poste.</p>
-    <p><button class="btn btn--primary" data-download-did>Télécharger <code>did.json</code></button></p>
-    <p class="muted">Le fichier obtenu doit ensuite être déposé sur votre site.
-       La marche à suivre est décrite pas à pas dans le
-       <a href="{{ (site.GetPage "/installation").RelPermalink }}">guide d'installation</a>.</p>
+    <p class="muted">{{ i18n "readAloud" }}</p>
+    <p><button class="btn btn--primary" data-download-did>{{ i18n "downloadDid" }}</button></p>
+    <p class="muted">{{ i18n "thenPublish" | safeHTML }}
+       <a href="{{ (site.GetPage "/installation").RelPermalink }}">{{ (site.GetPage "/installation").Title }}</a>.</p>
   </div>
 </div>

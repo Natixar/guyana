@@ -2,7 +2,8 @@
   <h1>{{ .Title }}</h1>
   {{ .Content }}
   <div class="card">
-    <h2>Résultats <span data-selftest-summary class="badge badge--pending">exécution…</span></h2>
+    <h2>{{ i18n "selftestResults" }}
+        <span data-selftest-summary class="badge badge--pending">{{ i18n "selftestRunning" }}</span></h2>
     <div data-selftest style="margin-top:1rem"></div>
   </div>
 {{ end }}

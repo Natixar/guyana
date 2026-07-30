@@ -9,36 +9,37 @@ import { base58btcEncode } from "./multibase.js";
 import { createKeyPair, loadKeyPair, publicJwk, thumbprint, sign, verify } from "./keys.js";
 import { buildCredential, signCredential, newSubjectId } from "./credential.js";
 
+const T = JSON.parse(document.getElementById("i18n")?.textContent || "{}");
 const cases = [];
 const test = (name, fn) => cases.push({ name, fn });
 
-test("JCS — tri des clés", () =>
+test("JCS — keys are sorted", () =>
   expect(canonicalize({ b: 1, a: 2 }), '{"a":2,"b":1}'));
 
-test("JCS — imbrication et tableaux", () =>
+test("JCS — nesting and arrays", () =>
   expect(canonicalize({ z: [3, { y: 1, x: 2 }], a: null }), '{"a":null,"z":[3,{"x":2,"y":1}]}'));
 
-test("JCS — pas d'espace insignifiant", () =>
+test("JCS — no insignificant whitespace", () =>
   expect(canonicalize({ a: "x y" }), '{"a":"x y"}'));
 
-test("JCS — tri par unités de code UTF-16", () =>
+test("JCS — sorted by UTF-16 code units", () =>
   expect(canonicalize({ "é": 1, e: 2, Z: 3 }), '{"Z":3,"e":2,"é":1}'));
 
-test("JCS — refuse NaN", () => {
+test("JCS — rejects NaN", () => {
   try { canonicalize({ a: NaN }); return "aurait dû lever"; } catch { return null; }
 });
 
-test("JCS — refuse undefined", () => {
+test("JCS — rejects undefined", () => {
   try { canonicalize({ a: undefined }); return "aurait dû lever"; } catch { return null; }
 });
 
-test("base58btc — vecteur connu", () =>
+test("base58btc — known vector", () =>
   expect(base58btcEncode(new TextEncoder().encode("hello world")), "StV1DL6CwTryKyV"));
 
-test("base58btc — octets nuls de tête", () =>
+test("base58btc — leading zero bytes", () =>
   expect(base58btcEncode(new Uint8Array([0, 0, 1])), "112"));
 
-test("clé — génération, empreinte, signature aller-retour", async () => {
+test("key — generation, fingerprint, sign/verify round trip", async () => {
   const pair = (await loadKeyPair()) ?? (await createKeyPair());
   const jwk = await publicJwk(pair);
   if (jwk.crv !== "P-256" || jwk.kty !== "EC") return "JWK inattendu : " + JSON.stringify(jwk);
@@ -50,7 +51,7 @@ test("clé — génération, empreinte, signature aller-retour", async () => {
   return null;
 });
 
-test("clé privée non exportable", async () => {
+test("private key genuinely non-extractable", async () => {
   const pair = (await loadKeyPair()) ?? (await createKeyPair());
   if (pair.privateKey.extractable) return "la clé privée est exportable — inacceptable";
   try {
@@ -59,7 +60,7 @@ test("clé privée non exportable", async () => {
   } catch { return null; }
 });
 
-test("attestation — signée et structurée", async () => {
+test("credential — signed and well formed", async () => {
   const pair = (await loadKeyPair()) ?? (await createKeyPair());
   const cred = buildCredential({
     issuerDid: "did:web:guygold.com",
@@ -73,7 +74,7 @@ test("attestation — signée et structurée", async () => {
   return null;
 });
 
-test("identifiant de sujet — opaque et non ordonné", () => {
+test("subject identifier — opaque and unordered", () => {
   const a = newSubjectId(), b = newSubjectId();
   if (!/^urn:aurora:dore:[0-9a-f]{32}$/.test(a)) return "format inattendu : " + a;
   if (a === b) return "deux tirages identiques";
@@ -91,14 +92,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     let err;
     try { err = await c.fn(); } catch (e) { err = String(e); }
     if (err) failed++;
-    li.innerHTML = `<span class="badge badge--${err ? "warning" : "verified"}">${err ? "échec" : "ok"}</span> ${c.name}` +
+    li.innerHTML = `<span class="badge badge--${err ? "warning" : "verified"}">${err ? "fail" : "ok"}</span> ${c.name}` +
                    (err ? `<div class="muted" style="margin-left:1rem">${err}</div>` : "");
     li.style.marginBottom = ".5rem";
     out.append(li);
   }
   const s = document.querySelector("[data-selftest-summary]");
   if (s) {
-    s.textContent = failed ? `${failed} échec(s) sur ${cases.length}` : `${cases.length} vérifications passées`;
+    s.textContent = failed ? `${failed} ${T.failed} / ${cases.length}` : `${cases.length} ${T.passed}`;
     s.className = "badge badge--" + (failed ? "warning" : "verified");
   }
 });

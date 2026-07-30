@@ -1,11 +1,11 @@
 ---
-title: "Auto-vérification"
-description: "Contrôles exécutés dans le navigateur : canonicalisation, encodage, clé, signature."
+title: "Self-check"
+description: "Checks run in the browser: canonicalisation, encoding, key, signature."
 jsEntry: "js/selftest.js"
 layout: "selftest"
 ---
 
-Ces contrôles s'exécutent **dans votre navigateur**, sur le code réellement
-servi par cette page. Ils vérifient la sérialisation canonique contre les
-règles de la RFC 8785, l'encodage des signatures, la non-exportabilité de la
-clé privée, et un aller-retour signature/vérification complet.
+These checks run **in your browser**, against the code this page actually
+serves. They verify canonical serialisation against RFC 8785, signature
+encoding, that the private key genuinely cannot be exported, and a full
+sign-then-verify round trip.

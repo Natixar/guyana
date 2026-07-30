@@ -1,13 +1,11 @@
-{{/* Les libellés viennent de la configuration : ils seront traduits, et le
-     vocabulaire métier doit pouvoir changer sans toucher au gabarit. */}}
 <div class="card">
-  <h2>{{ i18n "barPanelTitle" | default "Lingot à confirmer" }}</h2>
+  <h2>{{ i18n "barPanelTitle" }}</h2>
   <dl class="facts">
     {{ range site.Params.barFields }}
       <div><dt>{{ .label }}</dt><dd data-field="{{ .key }}">—</dd></div>
     {{ end }}
   </dl>
   <p style="margin-top:1.5rem">
-    <button class="btn btn--primary" data-sign disabled>Confirmer cette coulée</button>
+    <button class="btn btn--primary" data-sign disabled>{{ i18n "confirmPour" }}</button>
   </p>
 </div>
