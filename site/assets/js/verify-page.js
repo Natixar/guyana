@@ -6,6 +6,24 @@ import { verifyCredential, didWebUrl } from "./verify.js";
 const $ = (s) => document.querySelector(s);
 const state = { credential: null, didDoc: null };
 
+/** Accolades équilibrées, en ignorant celles qui sont dans une chaîne. */
+function looksComplete(raw) {
+  if (!raw.startsWith("{") && !raw.startsWith("[")) return false;
+  let depth = 0, inStr = false, escaped = false;
+  for (const ch of raw) {
+    if (inStr) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === "{" || ch === "[") depth++;
+    else if (ch === "}" || ch === "]") depth--;
+  }
+  return !inStr && depth === 0;
+}
+
 const esc = (s) => String(s).replace(/[<&]/g, (c) => ({ "<": "&lt;", "&": "&amp;" })[c]);
 
 /** Accepts either a chosen file or pasted text — pasting is the easier path. */
@@ -31,9 +49,23 @@ function wireInput(name, onLoad) {
     const f = file.files?.[0];
     if (f) accept(await f.text(), f.name);
   });
+  // Un JSON incomplet n'est pas une erreur : c'est quelqu'un en train de taper.
+  // On attend une pause, et l'on ne signale un défaut que si le texte semble
+  // fini — accolades équilibrées hors chaînes. Sinon on reste « en attente ».
+  let timer;
   text?.addEventListener("input", () => {
+    clearTimeout(timer);
     const raw = text.value.trim();
-    if (raw) accept(raw, T.vPasted);
+    if (!raw) {
+      status.textContent = T.vAwaiting;
+      status.className = "badge badge--pending";
+      return;
+    }
+    status.textContent = T.vTyping;
+    status.className = "badge badge--pending";
+    timer = setTimeout(() => {
+      if (looksComplete(raw)) accept(raw, T.vPasted);
+    }, 400);
   });
 }
 

@@ -24,13 +24,35 @@ export function didWebUrl(did) {
     : `https://${host}/.well-known/did.json`;
 }
 
+/**
+ * Exact match only.
+ *
+ * An earlier version fell back to matching on the fragment when the full
+ * identifier differed. That was helpfulness in the wrong direction: the
+ * identifier is what binds a key to a controller, and accepting a near-match
+ * means accepting a key the document did not name.
+ */
 function findKey(didDoc, methodId) {
-  const methods = didDoc?.verificationMethod ?? [];
-  // Exact match first; fall back to the fragment, since a document may be
-  // published under a slightly different base identifier.
-  return methods.find((m) => m.id === methodId)
-      ?? methods.find((m) => m.id?.split("#")[1] === methodId?.split("#")[1])
-      ?? null;
+  return (didDoc?.verificationMethod ?? []).find((m) => m.id === methodId) ?? null;
+}
+
+/**
+ * Is this method authorised to make assertions?
+ *
+ * verificationMethod publishes key material; the verification relationships —
+ * assertionMethod, authentication, keyAgreement — say what each key may be used
+ * for. A credential is an assertion, so its key must appear in assertionMethod.
+ *
+ * Skipping this check means a key published for authentication only could be
+ * used to forge credentials. It also means a document whose assertionMethod is
+ * missing — or misspelled — verifies anyway, which is how this was found.
+ *
+ * Entries may be identifier strings or embedded methods; both forms are valid.
+ */
+function isAssertionMethod(didDoc, methodId) {
+  const rel = didDoc?.assertionMethod;
+  if (!Array.isArray(rel)) return false;
+  return rel.some((e) => (typeof e === "string" ? e : e?.id) === methodId);
 }
 
 export async function verifyCredential(credential, didDoc) {
@@ -44,13 +66,30 @@ export async function verifyCredential(credential, didDoc) {
     return { ok: false, reason: `${T.vSuite} ${proof.cryptosuite ?? "—"}`, notes };
   }
 
+  // A credential is an assertion. Any other purpose is out of scope here, and
+  // silently accepting one would defeat the point of declaring purposes.
+  if (proof.proofPurpose !== "assertionMethod") {
+    return { ok: false, reason: `${T.vPurpose} ${proof.proofPurpose ?? "—"}`, notes };
+  }
+
   if (didDoc?.id && document.issuer && didDoc.id !== document.issuer) {
     return { ok: false, reason: `${T.vIssuerMismatch} ${document.issuer} ≠ ${didDoc.id}`, notes };
   }
 
   const method = findKey(didDoc, proof.verificationMethod);
-  if (!method?.publicKeyJwk) return { ok: false, reason: T.vNoKey, notes };
-  if (method.id !== proof.verificationMethod) notes.push(T.vKeyByFragment);
+  if (!method?.publicKeyJwk) {
+    return { ok: false, reason: `${T.vNoKey} ${proof.verificationMethod ?? "—"}`, notes };
+  }
+
+  // The document must authorise this key for assertions, not merely publish it.
+  if (!isAssertionMethod(didDoc, method.id)) {
+    return { ok: false, reason: `${T.vNotAuthorised} ${method.id}`, notes };
+  }
+
+  // The key must be controlled by the document that publishes it.
+  if (method.controller && didDoc?.id && method.controller !== didDoc.id) {
+    return { ok: false, reason: `${T.vBadController} ${method.controller} ≠ ${didDoc.id}`, notes };
+  }
 
   let key;
   try {

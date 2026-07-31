@@ -150,6 +150,46 @@ test("round trip — a signed credential verifies against its DID document", asy
   return null;
 });
 
+test("a key not authorised for assertions is rejected", async () => {
+  const pair = await ephemeralKeyPair();
+  const did = "did:web:example.org";
+  const signed = await signCredential(
+    buildCredential({ issuerDid: did, subjectId: newSubjectId(), claims: { a: { value: "1" } } }),
+    pair, did + "#key-1");
+
+  // Exactly the defect found in review: assertionMethod misspelled, so the
+  // document publishes the key without authorising it for assertions.
+  const doc = await buildDidDocument(pair, did);
+  doc.asssertionMethod = doc.assertionMethod;
+  delete doc.assertionMethod;
+
+  const r = await verifyCredential(signed, doc);
+  return r.ok ? "a credential verified against a document that authorises nothing" : null;
+});
+
+test("a proof made for another purpose is rejected", async () => {
+  const pair = await ephemeralKeyPair();
+  const did = "did:web:example.org";
+  const signed = await signCredential(
+    buildCredential({ issuerDid: did, subjectId: newSubjectId(), claims: { a: { value: "1" } } }),
+    pair, did + "#key-1");
+  signed.proof.proofPurpose = "authentication";
+  const r = await verifyCredential(signed, await buildDidDocument(pair, did));
+  return r.ok ? "a proof declared for authentication was accepted as an assertion" : null;
+});
+
+test("a key belonging to another controller is rejected", async () => {
+  const pair = await ephemeralKeyPair();
+  const did = "did:web:example.org";
+  const signed = await signCredential(
+    buildCredential({ issuerDid: did, subjectId: newSubjectId(), claims: { a: { value: "1" } } }),
+    pair, did + "#key-1");
+  const doc = await buildDidDocument(pair, did);
+  doc.verificationMethod[0].controller = "did:web:elsewhere.example";
+  const r = await verifyCredential(signed, doc);
+  return r.ok ? "a key controlled by another party was accepted" : null;
+});
+
 test("did:web resolves to the right URL", () => {
   if (didWebUrl("did:web:guygold.com") !== "https://guygold.com/.well-known/did.json")
     return "apex form wrong: " + didWebUrl("did:web:guygold.com");
