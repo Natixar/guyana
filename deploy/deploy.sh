@@ -61,8 +61,14 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$ENV_NAME" ]; then
-    avail=$(ls -1 "$HERE"/inventory/hosts.d/*.env 2>/dev/null \
-            | xargs -r -n1 basename | sed 's/\.env$//' | tr '\n' ' ')
+    # Glob plutôt qu'analyse de `ls` : un nom de fichier contenant une espace
+    # ou un retour à la ligne casserait le découpage (shellcheck SC2011).
+    _envs=()
+    for _f in "$HERE"/inventory/hosts.d/*.env; do
+        [ -e "$_f" ] || continue
+        _b="${_f##*/}"; _envs+=("${_b%.env}")
+    done
+    avail="${_envs[*]}"
     die "--env est obligatoire." "environnements disponibles : ${avail:-aucun}" \
         "$0 --env <nom>"
 fi
