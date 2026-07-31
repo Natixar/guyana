@@ -15,6 +15,7 @@ import { verifyCredential, didWebUrl } from "./verify.js";
 import { buildDidDocument } from "./did.js";
 import { signBlocker, signView } from "./sign-state.js";
 import { aggregate } from "./engine.js";
+import { runVectors } from "./vectors.js";
 
 
 const cases = [];
@@ -188,30 +189,11 @@ test("moteur — vecteurs et taxonomie servie parlent de la même version", asyn
 });
 
 test("moteur — chaque vecteur redonne le profil attendu", async () => {
-  const v = await loadVectors();
-  const taxonomy = await loadTaxonomy();
-
-  const failures = [];
-  for (const c of v.cases) {
-    try {
-      const got = aggregate(c.cells, taxonomy);
-      if (c.expect.error) { failures.push(`${c.name} : aurait dû lever ${c.expect.error}`); continue; }
-      for (const [line, want] of Object.entries(c.expect.lines)) {
-        // Les facteurs sont décimaux : on compare à la tolérance du flottant,
-        // pas à l'égalité stricte, qui échouerait sur 0.61 + 2.68.
-        if (Math.abs((got.lines?.[line] ?? 0) - want) > 1e-9) {
-          failures.push(`${c.name} : ligne ${line} attendue ${want}, obtenue ${got.lines?.[line]}`);
-        }
-      }
-      if (got.origin !== c.expect.origin) failures.push(`${c.name} : origine ${got.origin}, attendue ${c.expect.origin}`);
-      if (Math.abs((got.unallocated ?? 0) - c.expect.unallocated) > 1e-9) {
-        failures.push(`${c.name} : non-alloué ${got.unallocated}, attendu ${c.expect.unallocated}`);
-      }
-    } catch (err) {
-      if (c.expect.error && String(err.message).includes(c.expect.error)) continue;
-      failures.push(`${c.name} : ${err.message ?? err}`);
-    }
-  }
+  const [v, taxonomy] = await Promise.all([loadVectors(), loadTaxonomy()]);
+  // Ni les cas ni la comparaison ne sont écrits ici : les deux sont partagés
+  // avec la suite du signataire, sans quoi « un moteur, deux hôtes » ne serait
+  // qu'une intention.
+  const failures = runVectors(aggregate, v, taxonomy);
   return failures.length ? failures.join(" | ") : null;
 });
 

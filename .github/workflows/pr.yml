@@ -68,6 +68,13 @@ jobs:
       - name: libellés d'interface résolus
         run: python3 site/check-labels.py
 
+      # « Un moteur, deux hôtes » : le navigateur et le signataire exécutent le
+      # même fichier source, les mêmes vecteurs et le même comparateur. Ce job
+      # est l'hôte Node. Sans lui, la propriété est une intention — rien
+      # n'empêcherait les deux côtés de diverger entre deux revues.
+      - name: moteur — vecteurs partagés, hôte Node
+        run: node services/run-vectors.mjs
+
   codeql:
     name: codeql
     runs-on: ubuntu-latest

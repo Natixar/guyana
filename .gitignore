@@ -5,3 +5,8 @@ audit-*
 # Local Claude Code state stays out; shared skills are versioned.
 .claude/*
 !.claude/skills/
+
+# Données AGM sous clause 9 de l'accord de collaboration : quantités physiques,
+# départements, registre d'équipements. Elles ne quittent pas ce poste. La
+# taxonomie pivot, elle, est publiée — c'est site/static/engine/taxonomy.json.
+poc-data/

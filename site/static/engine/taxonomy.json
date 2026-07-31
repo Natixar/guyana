@@ -54,7 +54,9 @@
       { "id": 3, "key": "Fuites" },
       { "id": 4, "key": "EmissionsFugitives" }
     ],
-    "excluded": ["Fabrication"],
+    "excluded": [
+      { "id": 5, "key": "Fabrication" }
+    ],
     "fabricationExclusion": {
       "decision": "Amortisation of durable-goods construction is out of PoC scope (product owner, 31 July 2026). Sub-post 3.2 (capital goods) is empty by decision, not by absence of data.",
       "convergence": "Coincides with the reference engine: exports.ts drops Fabrication parts under Operated in its GHGP branch. Under operational control the exclusion is the standard's own behaviour, not a PoC shortcut.",

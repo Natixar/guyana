@@ -2,75 +2,330 @@
   "_": "Vecteurs partagés du moteur de calcul. Exécutés dans le navigateur par la page d'auto-test ET dans Node par la suite du signataire. Si les deux hôtes s'accordent ici, ils s'accordent en pratique. Voir services/README.md et l'issue #66.",
   "version": "1",
   "taxonomy": "agm-h1-v2",
-  "conditions": { "export": "GHGP", "control": "Operational", "level": "Standard" },
-
+  "conditions": {
+    "export": "GHGP",
+    "control": "Operational",
+    "level": "Standard"
+  },
   "cases": [
     {
       "name": "combustion fixe — le gazole des groupes va en 1.1",
       "why": "Cas nominal. 59,19 % du gazole d'Aurora est brûlé par Power Generation et UG-Power Gen.",
       "cells": [
-        { "subPost": 1000, "partType": 1, "caracterisation": 1, "value": 1000, "unit": "L", "factor": 2.68, "origin": "MEASURED" }
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": 1,
+          "value": 1000,
+          "unit": "L",
+          "factor": 2.68,
+          "origin": "MEASURED",
+          "factorUnit": "kgCO2e/L"
+        }
       ],
-      "expect": { "lines": { "1.1": 2.68 }, "origin": "MEASURED", "unallocated": 0 }
+      "expect": {
+        "lines": {
+          "1.1": 2.68
+        },
+        "origin": "MEASURED",
+        "unallocated": 0
+      }
     },
     {
       "name": "amont du carburant — le même litre porte aussi du 3.3",
       "why": "C'est le terme qu'un modèle naïf perd entièrement : il vaut 22,8 % de la combustion.",
       "cells": [
-        { "subPost": 1000, "partType": 1, "caracterisation": 1, "value": 1000, "unit": "L", "factor": 2.68, "origin": "MEASURED" },
-        { "subPost": 1000, "partType": 2, "caracterisation": 1, "value": 1000, "unit": "L", "factor": 0.61, "origin": "MEASURED" }
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": 1,
+          "value": 1000,
+          "unit": "L",
+          "factor": 2.68,
+          "origin": "MEASURED",
+          "factorUnit": "kgCO2e/L"
+        },
+        {
+          "subPost": 1000,
+          "partType": 2,
+          "caracterisation": 1,
+          "value": 1000,
+          "unit": "L",
+          "factor": 0.61,
+          "origin": "MEASURED",
+          "factorUnit": "kgCO2e/L"
+        }
       ],
-      "expect": { "lines": { "1.1": 2.68, "3.3": 0.61 }, "origin": "MEASURED", "unallocated": 0 }
+      "expect": {
+        "lines": {
+          "1.1": 2.68,
+          "3.3": 0.61
+        },
+        "origin": "MEASURED",
+        "unallocated": 0
+      }
     },
     {
       "name": "combustion mobile — la flotte va en 1.2, pas en 1.1",
       "why": "Même carburant, même facteur, ligne différente. La distinction fixe/mobile est une exigence GHGP, pas un détail de présentation.",
       "cells": [
-        { "subPost": 1002, "partType": 1, "caracterisation": 1, "value": 1000, "unit": "L", "factor": 2.68, "origin": "MEASURED" }
+        {
+          "subPost": 1002,
+          "partType": 1,
+          "caracterisation": 1,
+          "value": 1000,
+          "unit": "L",
+          "factor": 2.68,
+          "origin": "MEASURED",
+          "factorUnit": "kgCO2e/L"
+        }
       ],
-      "expect": { "lines": { "1.2": 2.68 }, "origin": "MEASURED", "unallocated": 0 }
+      "expect": {
+        "lines": {
+          "1.2": 2.68
+        },
+        "origin": "MEASURED",
+        "unallocated": 0
+      }
     },
     {
       "name": "détonation — émission de procédé en 1.3",
       "why": "L'explosif occupe deux sous-postes ; celui-ci est la détonation sur site, distincte de la fabrication en amont.",
       "cells": [
-        { "subPost": 1005, "partType": null, "caracterisation": 2, "value": 1000, "unit": "kg", "factor": 0.17, "origin": "MEASURED" }
+        {
+          "subPost": 1005,
+          "partType": null,
+          "caracterisation": 2,
+          "value": 1000,
+          "unit": "kg",
+          "factor": 0.17,
+          "origin": "MEASURED",
+          "factorUnit": "kgCO2e/kg"
+        }
       ],
-      "expect": { "lines": { "1.3": 0.17 }, "origin": "MEASURED", "unallocated": 0 }
+      "expect": {
+        "lines": {
+          "1.3": 0.17
+        },
+        "origin": "MEASURED",
+        "unallocated": 0
+      }
     },
     {
       "name": "propagation d'origine — un agrégat ne vaut pas mieux que sa pire entrée",
       "why": "Règle d'#46. Sans elle, KPI 1 devient ininterprétable ou accidentellement flatteur.",
       "cells": [
-        { "subPost": 1000, "partType": 1, "caracterisation": 1, "value": 1000, "unit": "L", "factor": 2.68, "origin": "MEASURED" },
-        { "subPost": 1000, "partType": 1, "caracterisation": 1, "value": 1000, "unit": "L", "factor": 2.68, "origin": "ESTIMATED" }
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": 1,
+          "value": 1000,
+          "unit": "L",
+          "factor": 2.68,
+          "origin": "MEASURED",
+          "factorUnit": "kgCO2e/L"
+        },
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": 1,
+          "value": 1000,
+          "unit": "L",
+          "factor": 2.68,
+          "origin": "ESTIMATED",
+          "factorUnit": "kgCO2e/L"
+        }
       ],
-      "expect": { "lines": { "1.1": 5.36 }, "origin": "ESTIMATED", "unallocated": 0 }
+      "expect": {
+        "lines": {
+          "1.1": 5.36
+        },
+        "origin": "ESTIMATED",
+        "unallocated": 0
+      }
     },
     {
       "name": "non-alloué — il se déclare, il ne se répartit pas",
       "why": "Le seau non-alloué est un objet de plein droit. Répartir silencieusement produirait un total complet et faux.",
       "cells": [
-        { "subPost": 1000, "partType": 1, "caracterisation": 1, "value": 1000, "unit": "L", "factor": 2.68, "origin": "MEASURED" },
-        { "subPost": null, "partType": null, "caracterisation": 1, "value": 500, "unit": "L", "factor": 2.68, "origin": "MEASURED" }
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": 1,
+          "value": 1000,
+          "unit": "L",
+          "factor": 2.68,
+          "origin": "MEASURED",
+          "factorUnit": "kgCO2e/L"
+        },
+        {
+          "subPost": null,
+          "partType": null,
+          "caracterisation": 1,
+          "value": 500,
+          "unit": "L",
+          "factor": 2.68,
+          "origin": "MEASURED",
+          "factorUnit": "kgCO2e/L"
+        }
       ],
-      "expect": { "lines": { "1.1": 2.68 }, "origin": "MEASURED", "unallocated": 1.34 }
+      "expect": {
+        "lines": {
+          "1.1": 2.68
+        },
+        "origin": "MEASURED",
+        "unallocated": 1.34
+      }
     },
     {
       "name": "amortissements — une part Fabrication est refusée, pas ignorée",
       "why": "Hors périmètre du PoC par décision du 31 juillet 2026, et déjà écartée par GHGP sous contrôle opérationnel. Une part silencieusement ignorée produirait un écart BEGES/GHGP sans cause visible.",
       "cells": [
-        { "subPost": 1002, "partType": 5, "caracterisation": 1, "value": 1000, "unit": "L", "factor": 1.0, "origin": "MEASURED" }
+        {
+          "subPost": 1002,
+          "partType": 5,
+          "caracterisation": 1,
+          "value": 1000,
+          "unit": "L",
+          "factor": 1.0,
+          "origin": "MEASURED",
+          "factorUnit": "kgCO2e/L"
+        }
       ],
-      "expect": { "error": "PART_TYPE_EXCLUDED" }
+      "expect": {
+        "error": "PART_TYPE_EXCLUDED"
+      }
     },
     {
       "name": "condition absente — sans caractérisation, aucune ligne n'est dérivable",
       "why": "La traduction est une fonction totale du triplet. Deviner la caractérisation reviendrait à choisir la ligne GHGP à la main, ce que §19.1 interdit.",
       "cells": [
-        { "subPost": 1000, "partType": 1, "caracterisation": null, "value": 1000, "unit": "L", "factor": 2.68, "origin": "MEASURED" }
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": null,
+          "value": 1000,
+          "unit": "L",
+          "factor": 2.68,
+          "origin": "MEASURED",
+          "factorUnit": "kgCO2e/L"
+        }
       ],
-      "expect": { "error": "CARACTERISATION_REQUIRED" }
+      "expect": {
+        "error": "CARACTERISATION_REQUIRED"
+      }
+    },
+    {
+      "name": "unités — un facteur déjà en tCO2e n'est pas divisé une seconde fois",
+      "why": "Supposer le kilogramme donnerait un facteur mille silencieux sur un chiffre signé.",
+      "cells": [
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": 1,
+          "value": 3,
+          "unit": "L",
+          "factor": 2.0,
+          "factorUnit": "tCO2e/L",
+          "origin": "MEASURED"
+        }
+      ],
+      "expect": {
+        "lines": {
+          "1.1": 6.0
+        },
+        "origin": "MEASURED",
+        "unallocated": 0
+      }
+    },
+    {
+      "name": "unités — une unité de facteur inconnue est refusée, jamais devinée",
+      "why": "Deviner produirait un chiffre plausible et faux, que la signature figerait.",
+      "cells": [
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": 1,
+          "value": 3,
+          "unit": "L",
+          "factor": 2.0,
+          "factorUnit": "lbCO2e/gal",
+          "origin": "MEASURED"
+        }
+      ],
+      "expect": {
+        "error": "FACTOR_UNIT_UNKNOWN"
+      }
+    },
+    {
+      "name": "agrégation — deux cellules du même groupe ne font qu'une traduction",
+      "why": "On agrège d'abord, on traduit ensuite : la recherche se fait une fois par groupe et non par cellule.",
+      "cells": [
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": 1,
+          "value": 600,
+          "unit": "L",
+          "factor": 2.68,
+          "factorUnit": "kgCO2e/L",
+          "origin": "MEASURED"
+        },
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": 1,
+          "value": 400,
+          "unit": "L",
+          "factor": 2.68,
+          "factorUnit": "kgCO2e/L",
+          "origin": "MEASURED"
+        }
+      ],
+      "expect": {
+        "lines": {
+          "1.1": 2.68
+        },
+        "origin": "MEASURED",
+        "unallocated": 0,
+        "groups": 1
+      }
+    },
+    {
+      "name": "agrégation — des unités d'activité différentes somment quand même leurs émissions",
+      "why": "Ce qui se somme dans un groupe est l'émission, pas la donnée d'activité : additionner des litres et des kilogrammes n'aurait aucun sens.",
+      "cells": [
+        {
+          "subPost": 1005,
+          "partType": null,
+          "caracterisation": 2,
+          "value": 1000,
+          "unit": "kg",
+          "factor": 0.17,
+          "factorUnit": "kgCO2e/kg",
+          "origin": "MEASURED"
+        },
+        {
+          "subPost": 1005,
+          "partType": null,
+          "caracterisation": 2,
+          "value": 1000,
+          "unit": "t",
+          "factor": 0.17,
+          "factorUnit": "kgCO2e/t",
+          "origin": "MEASURED"
+        }
+      ],
+      "expect": {
+        "lines": {
+          "1.3": 0.34
+        },
+        "origin": "MEASURED",
+        "unallocated": 0,
+        "groups": 1
+      }
     }
-  ]
+  ],
+  "resultUnit": "tCO2e",
+  "_resultUnit": "Le profil est publié en tCO2e (§4.5) alors que les facteurs sont en kgCO2e : la conversion est dans le moteur et une unité de facteur inconnue est refusée."
 }
