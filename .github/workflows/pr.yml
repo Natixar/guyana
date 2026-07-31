@@ -14,6 +14,20 @@ jobs:
   lint:
     name: lint
     runs-on: ubuntu-latest
+    # Les tests du magasin s'exécutent contre un VRAI PostgreSQL. L'essentiel de
+    # ce qu'ils vérifient est du comportement de la base — recouvrement
+    # tstzrange, index GiST, contrainte d'intervalle non vide — et un bouchon
+    # confirmerait mes hypothèses au lieu de les éprouver.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: aurora
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
         with: { submodules: recursive }
@@ -95,10 +109,12 @@ jobs:
       - name: sérialisation canonique — hôte JavaScript
         run: node services/run-jcs-vectors.mjs
 
-      - name: sérialisation canonique — hôte Python
+      - name: magasin — sérialisation, signature, et la base
         working-directory: services/store
+        env:
+          STORE_DSN: postgresql://postgres:test@localhost:5432/aurora
         run: |
-          python3 -m pip install --quiet pytest cryptography
+          python3 -m pip install --quiet pytest cryptography 'psycopg[binary]'
           python3 -m pytest -q
 
       # Les deux moitiés d'un seul contrôle. Python signe, JavaScript vérifie —

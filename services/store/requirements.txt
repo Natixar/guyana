@@ -1,0 +1,6 @@
+# Épinglé : le déploiement se fait par digest, et un digest reproductible
+# suppose des dépendances qui ne bougent pas entre deux constructions.
+fastapi==0.121.2
+uvicorn==0.38.0
+psycopg[binary]==3.2.10
+cryptography==46.0.3
