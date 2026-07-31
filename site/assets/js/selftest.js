@@ -13,6 +13,7 @@ import { fetchPour, operatorClaims } from "./pour.js";
 import { fetchMe, issuerDid } from "./me.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
 import { buildDidDocument } from "./did.js";
+import { signBlocker, signView } from "./sign-state.js";
 
 
 const cases = [];
@@ -32,6 +33,50 @@ test("JCS — sorted by UTF-16 code units", () =>
 
 test("JCS — rejects NaN", () => {
   try { canonicalize({ a: NaN }); return "aurait dû lever"; } catch { return null; }
+});
+
+// --- L'état du bouton de signature (#64) ---------------------------------
+// La faute était une transition, pas une valeur : « créez d'abord une clé »
+// survivait à la création de la clé. Ces cas exercent donc des couples avant /
+// après, et non des points isolés.
+
+const ready = { pair: {}, did: "did:web:example.com", pour: {}, signed: null };
+
+test("signature — sans clé, l'obstacle est la clé", () =>
+  expect(signBlocker({ ...ready, pair: null }), T.signNeedsKey));
+
+test("signature — la clé créée lève l'obstacle", () => {
+  const before = signView({ ...ready, pair: null });
+  const after = signView(ready);
+  if (before.text !== T.signNeedsKey) return "l'obstacle initial n'est pas la clé";
+  if (!before.disabled) return "le bouton devrait être inactif sans clé";
+  if (after.text !== "") return `message périmé après création : ${after.text}`;
+  if (after.disabled) return "le bouton devrait être actif une fois tout réuni";
+  return null;
+});
+
+test("signature — sans identité d'émetteur, l'obstacle est l'identité", () =>
+  expect(signBlocker({ ...ready, did: null }), T.issuerUnknown));
+
+test("signature — sans coulée, l'obstacle est la coulée", () =>
+  expect(signBlocker({ ...ready, pour: null }), T.signNoPour));
+
+test("signature — sans coulée, le bouton reste inactif", () => {
+  const v = signView({ ...ready, pour: null });
+  return v.disabled ? null : "le bouton était actif sans coulée à confirmer";
+});
+
+test("signature — un seul obstacle à la fois, le premier remédiable", () =>
+  expect(signBlocker({ pair: null, did: null, pour: null }), T.signNeedsKey));
+
+test("signature — tout est réuni : aucun obstacle", () =>
+  expect(signBlocker(ready), null));
+
+test("signature — une coulée signée ne se resigne pas", () => {
+  const v = signView({ ...ready, signed: { proof: {} } });
+  if (!v.disabled) return "le bouton restait actif après signature";
+  if (v.text !== T.signDone) return `statut inattendu : ${v.text}`;
+  return null;
 });
 
 test("JCS — rejects undefined", () => {
