@@ -6,6 +6,7 @@ import { buildDidDocument, downloadJson } from "./did.js";
 import { fetchMe, issuerDid, isDemo } from "./me.js";
 import { fetchPour, renderPour, operatorClaims } from "./pour.js";
 import { buildCredential, signCredential, newSubjectId } from "./credential.js";
+import { signView } from "./sign-state.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -47,9 +48,20 @@ async function showFingerprint(pair) {
  * restaure le DOM depuis son cache de session sans réexécuter les scripts, et
  * la page affiche un état périmé — un bouton de création actif alors qu'une clé
  * existe, ou l'inverse. C'est une classe de bug, pas un cas particulier.
+ *
+ * Elle doit donc recevoir TOUT l'état dont dépend l'affichage. Elle n'a
+ * longtemps connu ni la coulée ni la signature déjà produite, si bien que deux
+ * des cinq contrôles qu'elle gouverne étaient écrits ailleurs, sans ordre
+ * garanti : « créez d'abord une clé » survivait à la création de la clé, le
+ * bouton s'activait sans coulée, et un retour arrière permettait de signer deux
+ * fois la même coulée sous deux identifiants de sujet différents (#64).
+ *
+ * D'où la règle : cette fonction est le seul écrivain du bouton de signature et
+ * de son statut. Si un état nouveau apparaît, il entre dans `ctx`, il n'est pas
+ * écrit à côté.
  */
 async function refreshState(ctx) {
-  const { status, createBtn, signBtn, signStatus, did } = ctx;
+  const { status, createBtn, signBtn, signStatus, did, pour, signed } = ctx;
   const pair = await loadKeyPair();
 
   setBadge(status, pair ? T.envKeyPresent : T.envKeyMissing, pair ? "verified" : "pending");
@@ -57,15 +69,16 @@ async function refreshState(ctx) {
   if (createBtn) {
     createBtn.disabled = Boolean(pair);
     const why = $("[data-create-why]");
-    if (why) why.textContent = pair ? T.keyAlreadyThere : "";
+    if (why) why.textContent = pair ? T.keyAvailableHere : "";
   }
 
   const result = $("[data-setup-result]");
   if (pair) await showFingerprint(pair);
   else if (result) { result.hidden = true; $("[data-fingerprint]").textContent = "—"; }
 
-  if (signBtn) signBtn.disabled = !pair || !did;
-  if (signStatus && !pair) signStatus.textContent = T.signNeedsKey;
+  const view = signView({ pair, did, pour, signed });
+  if (signBtn) signBtn.disabled = view.disabled;
+  if (signStatus) signStatus.textContent = view.text;
 
   return pair;
 }
@@ -89,8 +102,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   const setup = $("[data-setup]");
   if (setup) setup.hidden = false;
 
+  // La coulée est un état de l'affichage, donc elle est connue AVANT le premier
+  // calcul. La chercher après obligeait à corriger le statut de signature juste
+  // derrière, ce qui est précisément la double écriture supprimée ici.
+  const pour = await fetchPour();
+
   const ctx = { status, createBtn: $("[data-create-key]"), signBtn: $("[data-sign]"),
-                signStatus: $("[data-sign-status]"), did };
+                signStatus: $("[data-sign-status]"), did,
+                pour: pour && renderPour(pour) ? pour : null, signed: null };
+
+  if (ctx.pour?.dataOrigin && ctx.pour.dataOrigin !== "MEASURED") {
+    const tag = $("[data-pour-origin]");
+    if (tag) { tag.textContent = ctx.pour.dataOrigin.toLowerCase(); tag.hidden = false; }
+  }
 
   await refreshState(ctx);
 
@@ -111,19 +135,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // --- La coulée en attente -------------------------------------------
-  const pour = await fetchPour();
   const signBtn = ctx.signBtn;
   const signStatus = ctx.signStatus;
-  let signed = null;
-
-  if (pour && renderPour(pour)) {
-    if (pour.dataOrigin && pour.dataOrigin !== "MEASURED") {
-      const tag = $("[data-pour-origin]");
-      if (tag) { tag.textContent = pour.dataOrigin.toLowerCase(); tag.hidden = false; }
-    }
-  } else if (signStatus) {
-    signStatus.textContent = T.signNoPour;
-  }
 
   signBtn?.addEventListener("click", async () => {
     signBtn.disabled = true;
@@ -133,22 +146,26 @@ document.addEventListener("DOMContentLoaded", async () => {
       const cred = buildCredential({
         issuerDid: did,
         subjectId,
-        claims: operatorClaims(pour),
+        claims: operatorClaims(ctx.pour),
         confirmedBy: me.person ? { id: me.person.id, name: me.person.name } : null,
       });
-      signed = await signCredential(cred, pair, `${did}#${me.keyPolicy?.keyName ?? "key-1"}`);
+      ctx.signed = await signCredential(cred, pair, `${did}#${me.keyPolicy?.keyName ?? "key-1"}`);
       $("[data-signed-subject]").textContent = subjectId;
       $("[data-signed-by]").textContent = me.person?.name ?? T.operatorUnknown;
       $("[data-signed]").hidden = false;
-      if (signStatus) signStatus.textContent = T.signDone;
+      // L'état est dans ctx : c'est refreshState qui écrit le bouton et son
+      // statut, ici comme au retour arrière.
+      await refreshState(ctx);
     } catch (err) {
+      // L'échec est la seule écriture directe : il porte un texte que
+      // refreshState ne peut pas reconstruire depuis l'état.
       if (signStatus) signStatus.textContent = `${T.signFailed} — ${err.message ?? err}`;
       signBtn.disabled = false;
     }
   });
 
   $("[data-download-credential]")?.addEventListener("click", () => {
-    if (signed) downloadJson(signed, demo ? "credential.demo.json" : "credential.json");
+    if (ctx.signed) downloadJson(ctx.signed, demo ? "credential.demo.json" : "credential.json");
   });
 
   $("[data-download-did]")?.addEventListener("click", async () => {
