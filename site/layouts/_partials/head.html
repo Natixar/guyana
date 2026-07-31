@@ -1,0 +1,26 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>{{ if .IsHome }}{{ site.Title }}{{ else }}{{ .Title }} — {{ site.Title }}{{ end }}</title>
+{{ with .Description }}<meta name="description" content="{{ . }}">{{ end }}
+
+{{/* Cette page signe : si son JavaScript est altéré, la signature couvre autre
+     chose que ce que l'opérateur croit approuver, et reste valide. D'où une
+     politique qui interdit toute origine externe, sans exception. */}}
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'none'; base-uri 'none'">
+
+{{ $css := resources.Get "css/main.css" | resources.ExecuteAsTemplate "css/main.css" . | minify | fingerprint "sha384" }}
+<link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
+
+{{ $entry := .Params.jsEntry | default "js/app.js" }}
+{{/* Les libellés sont injectés dans le module à la construction (import
+     "@params"), et non lus dans le DOM : ils sont ainsi couverts par
+     l'empreinte SRI comme le reste du code. */}}
+{{/* La table entière est lue depuis i18n/en.toml et passée telle quelle.
+     Elle était recopiée clé par clé, et j'ai ajouté des libellés sans les y
+     reporter : une dizaine de chaînes arrivaient vides dans le module, en
+     silence. Une source unique supprime la classe d'erreur plutôt qu'une
+     occurrence. */}}
+{{ $i18n := index site.Data.ui site.Language.Lang }}
+{{ $js := resources.Get $entry | js.Build (dict "format" "esm" "minify" true "target" "es2020" "params" $i18n) | fingerprint "sha384" }}
+<script type="module" src="{{ $js.RelPermalink }}" integrity="{{ $js.Data.Integrity }}" defer></script>

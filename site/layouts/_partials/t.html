@@ -1,0 +1,5 @@
+{{- /* Un libellé. Source unique : data/ui/<langue>.toml, qui alimente aussi
+       le module JavaScript. Une clé absente rend visiblement plutôt que vide :
+       une chaîne manquante ne doit jamais passer inaperçue. */ -}}
+{{- $table := index site.Data.ui site.Language.Lang -}}
+{{- with index $table . }}{{ . }}{{ else }}[missing: {{ . }}]{{ end -}}

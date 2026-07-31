@@ -1,0 +1,18 @@
+{{/* Installation : opération unique, faite une fois avec Natixar en visio. */}}
+<div class="card" data-setup hidden>
+  <h2>{{ partial "t" "setup" }}</h2>
+  <p>{{ partial "t" "setupOnce" }}</p>
+
+  <p class="actions"><button class="btn btn--primary" data-create-key>{{ partial "t" "createKey" }}</button>
+     <span data-create-why class="muted"></span></p>
+
+  <div data-setup-result hidden>
+    <dl class="facts">
+      <div><dt>{{ partial "t" "fingerprint" }}</dt><dd data-fingerprint>—</dd></div>
+    </dl>
+    <p class="muted">{{ partial "t" "readAloud" }}</p>
+    <p><button class="btn btn--primary" data-download-did>{{ partial "t" "downloadDid" }}</button></p>
+    <p class="muted">{{ partial "t" "thenPublish" }}
+       <a href="{{ (site.GetPage "/installation").RelPermalink }}">{{ (site.GetPage "/installation").Title }}</a>.</p>
+  </div>
+</div>

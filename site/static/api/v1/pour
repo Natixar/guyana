@@ -1,0 +1,22 @@
+{
+  "pourId": "pour-2026-0417-03",
+  "status": "pending",
+
+  "attestedByOperator": {
+    "barId":    { "label": "Bar identifier", "value": "AUR-2026-0417-03", "origin": "MEASURED" },
+    "pourDate": { "label": "Pour date",      "value": "2026-04-17",       "origin": "MEASURED" },
+    "weight":   { "label": "Gross weight",   "value": "13.028 kg",        "origin": "MEASURED" },
+    "assay":    { "label": "Assay",          "value": "91.95 % Au",       "origin": "MEASURED" }
+  },
+
+  "computedByCalculator": {
+    "issuer": "did:web:natixar.pro",
+    "status": "pending",
+    "note": "Issued separately once the monthly allocation closes. Not signed by the mine.",
+    "carbonIntensity": { "label": "Carbon intensity", "value": null, "origin": "DERIVED",
+                         "method": null, "factorSetVersion": null }
+  },
+
+  "dataOrigin": "SAMPLE",
+  "basis": "Figures follow AGM's confirmed 2025 averages: 378 bars, 13.03 kg gross per bar, 91.95 % assay."
+}

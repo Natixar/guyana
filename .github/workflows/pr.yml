@@ -92,17 +92,27 @@ jobs:
       # branche h1, il doit construire site/ avec Hugo et exécuter
       # deploy/verify/*.bats contre l'instance éphémère, ce qui est le seul
       # moyen d'exercer les invariants sans toucher à kubb.
-      - name: construire l'image du squelette
-        run: docker build -t aurora-skeleton:ci deploy/skeleton
+      - name: construire le site
+        run: |
+          # deploy/skeleton n'existe plus : le lanceur déploie site/. Ce job
+          # doit faire de même — suivi en #58. En attendant il construit le
+          # site avec Hugo et l'interroge, ce qui exerce au moins l'image
+          # réellement déployée.
+          curl -sSL -o /tmp/hugo.deb https://github.com/gohugoio/hugo/releases/download/v0.164.0/hugo_extended_0.164.0_linux-amd64.deb
+          sudo dpkg -i /tmp/hugo.deb
+          (cd site && hugo --logLevel error)
+          printf 'FROM ghcr.io/static-web-server/static-web-server:2\nCOPY public/ /public/\n' > site/Dockerfile
+          docker build -t aurora-site:ci site
 
       - name: la lancer et l'interroger
         run: |
-          docker run -d --name skel -p 127.0.0.1:8080:80 aurora-skeleton:ci \
+          docker run -d --name skel -p 127.0.0.1:8080:80 aurora-site:ci \
             --root=/public --port=80 --page-fallback=/public/index.html
           for _ in $(seq 20); do
             curl -sf http://127.0.0.1:8080/ >/dev/null && break || sleep 1
           done
-          curl -sf http://127.0.0.1:8080/ | grep -q 'Hello world!'
+          curl -sf http://127.0.0.1:8080/ | grep -q 'Natixar Gold Trace'
+          curl -sf http://127.0.0.1:8080/api/v1/me | grep -q 'did:web'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/inconnu)" = 200
 
       - name: démonter

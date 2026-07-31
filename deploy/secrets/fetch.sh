@@ -22,9 +22,24 @@ set -euo pipefail
 
 sec_die() { printf '[ERREUR] %s\n' "$*" >&2; exit 1; }
 
+# Où vivent les secrets aujourd'hui : un répertoire local, hors du dépôt.
+# La décision SOPS/coffre reste ouverte ; quand elle sera prise, seule cette
+# fonction change.
+SEC_DIR="${SEC_DIR:-${BASH_SOURCE%/*}/local}"
+
+sec_read() {
+  local f="$SEC_DIR/$1"
+  [ -r "$f" ] || sec_die "secret absent : $f"
+  cat "$f"
+}
+
 case "${1-}" in
   --list)
-    # Aucun secret requis à ce stade.
+    echo basicauth
+    ;;
+  basicauth)
+    # Fichier htpasswd : lignes utilisateur:empreinte, jamais de mot de passe.
+    sec_read htpasswd
     ;;
   --ephemeral)
     [ $# -ge 2 ] || sec_die "--ephemeral exige un nom logique"
@@ -35,6 +50,6 @@ case "${1-}" in
     sec_die "usage: fetch.sh [--ephemeral|--list] <nom-logique>"
     ;;
   *)
-    sec_die "secret inconnu : '$1'. Le squelette n'en requiert aucun ; ajoutez-le à --list avant de le demander."
+    sec_die "unknown secret: '$1'. Declare it in --list before requesting it."
     ;;
 esac
