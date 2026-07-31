@@ -27,16 +27,24 @@ mw="${ROUTER_PREFIX}-auth@docker,${ROUTER_PREFIX}-sec@docker"
 
 # Les secrets arrivent par stdin et ne touchent jamais le disque de la cible.
 # Un fichier déposé sur l'hôte survivrait au conteneur et à notre attention.
-secret_put() {
-  local name="$1"
-  docker secret rm "$name" >/dev/null 2>&1 || true
-  docker secret create "$name" - >/dev/null
+#
+# Écrits DEPUIS L'IMAGE QUI LES LIRA, et non depuis une image quelconque. Les
+# conteneurs tournent sans privilège — `node` pour le signataire, `store` pour
+# le magasin — et un secret écrit en 0600 par root est illisible pour eux : le
+# service redémarre en boucle sur EACCES, ce qui ressemble à une clé mal formée
+# bien plus qu'à un problème de permissions.
+#
+# Passer par l'image du consommateur laisse le nom d'utilisateur se résoudre là
+# où il existe. Le Dockerfile reste ainsi la seule source de vérité sur l'UID :
+# le changer là-bas n'oblige à rien changer ici.
+secret_put() { # $1 = image, $2 = utilisateur, $3 = volume, $4 = nom de fichier
+  docker run -i --rm --user 0 -v "$3:/s" "$1" \
+    sh -c "umask 077; cat > /s/$4 && chown \$(id -u $2):\$(id -g $2) /s/$4 && chmod 400 /s/$4"
 }
 
 # --- le magasin : la base, aucune clé d'attestation ------------------------
 docker rm -f "$STORE_CONTAINER" >/dev/null 2>&1 || true
-printf '%s' "$STORE_KEY" | docker run -i --rm -v "${STORE_CONTAINER}-secrets:/s" alpine \
-  sh -c 'umask 077; cat > /s/store_key.pem'
+printf '%s' "$STORE_KEY" | secret_put "$STORE_IMAGE" store "${STORE_CONTAINER}-secrets" store_key.pem
 
 docker run -d --name "$STORE_CONTAINER" \
   --network "$DB_NETWORK" \
@@ -62,10 +70,8 @@ docker network connect "$PROXY_NETWORK" "$STORE_CONTAINER"
 
 # --- le signataire : une clé, aucune base ----------------------------------
 docker rm -f "$SIGNER_CONTAINER" >/dev/null 2>&1 || true
-printf '%s' "$SIGNER_KEY" | docker run -i --rm -v "${SIGNER_CONTAINER}-secrets:/s" alpine \
-  sh -c 'umask 077; cat > /s/signer_key'
-printf '%s' "$STORE_PUBKEY" | docker run -i --rm -v "${SIGNER_CONTAINER}-secrets:/s" alpine \
-  sh -c 'umask 077; cat > /s/store_pubkey'
+printf '%s' "$SIGNER_KEY"   | secret_put "$SIGNER_IMAGE" node "${SIGNER_CONTAINER}-secrets" signer_key
+printf '%s' "$STORE_PUBKEY" | secret_put "$SIGNER_IMAGE" node "${SIGNER_CONTAINER}-secrets" store_pubkey
 
 docker run -d --name "$SIGNER_CONTAINER" \
   --network "$PROXY_NETWORK" \
@@ -103,6 +109,19 @@ for c in "$STORE_CONTAINER" "$SIGNER_CONTAINER"; do
   case "$published" in
     *':['*) echo "[ERREUR] $c publie des ports : $published" >&2; exit 1 ;;
   esac
+done
+
+# Un service qui redémarre en boucle se constate ici. Sans ce contrôle, le
+# déploiement s'annonce réussi et la panne n'apparaît qu'à la vérification
+# suivante — un secret illisible ressemble alors à une clé mal formée.
+sleep 3
+for c in "$STORE_CONTAINER" "$SIGNER_CONTAINER"; do
+  state=$(docker inspect "$c" --format '{{.State.Status}}')
+  if [ "$state" != running ]; then
+    echo "[ERREUR] $c n'est pas en marche (état : $state)" >&2
+    docker logs --tail 15 "$c" >&2 2>&1 || true
+    exit 1
+  fi
 done
 
 echo "magasin sur ${PROXY_NETWORK}+${DB_NETWORK}, signataire sur ${PROXY_NETWORK} seul"
