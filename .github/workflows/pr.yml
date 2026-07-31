@@ -28,13 +28,28 @@ jobs:
 
       - name: commandes externes non gardées
         run: |
-          # Gate hérité de bash-deploy-libs, désormais câblé en sous-module.
+          # detect_unguarded_calls.sh prend UN fichier, et il l'analyse en le
+          # SOURÇANT avec PATH vidé. C'est un outil pour bibliothèques. Nos
+          # scripts de deploy/ sont des exécutables : les sourcer les
+          # exécuterait, ce qui n'est pas un contrôle mais un accident.
+          #
+          # Le gate deviendra applicable quand deploy/ passera par rr_run et
+          # cg_guard — écart 25 de GAPS.md. D'ici là on le dit plutôt que de
+          # forcer un contrôle inadapté ou de laisser un TODO muet.
           scan=deploy/lib/.claude/commands/software-configuration-management/scripts/detect_unguarded_calls.sh
-          if [ -x "$scan" ]; then
-            bash "$scan" deploy/deploy.sh deploy/steps/*.sh deploy/secrets/*.sh
-          else
-            echo "::warning::detect_unguarded_calls.sh introuvable dans le sous-module ($scan)"
+          if [ ! -x "$scan" ]; then
+            echo "::error::sous-module bash-deploy-libs absent ou incomplet"
+            exit 1
           fi
+          echo "::notice::detect_unguarded_calls.sh disponible ; inapplicable tant que deploy/ n'emploie pas command_guard (GAPS.md, écart 25)"
+          # Ce qui EST vérifiable aujourd'hui : qu'aucun script n'appelle une
+          # commande par un chemin absolu codé en dur, ce qui contournerait le
+          # garde le jour où il sera en place.
+          if grep -nE '(^|[^[:alnum:]_/])/(usr/)?s?bin/[a-z]' deploy/deploy.sh deploy/steps/*.sh deploy/secrets/*.sh; then
+            echo "::error::chemin absolu codé en dur vers une commande"
+            exit 1
+          fi
+          echo "aucun chemin de commande codé en dur"
 
       - name: syntaxe bats
         run: |
