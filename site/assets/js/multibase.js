@@ -24,3 +24,29 @@ export function base58btcEncode(bytes) {
 
 /** Préfixe multibase « z » = base58btc. */
 export const multibase58 = (bytes) => "z" + base58btcEncode(bytes);
+
+const INDEX = Object.fromEntries([...ALPHABET].map((c, i) => [c, i]));
+
+export function base58btcDecode(str) {
+  const bytes = [0];
+  for (const ch of str) {
+    const v = INDEX[ch];
+    if (v === undefined) throw new Error("invalid base58 character: " + ch);
+    let carry = v;
+    for (let i = 0; i < bytes.length; i++) {
+      carry += bytes[i] * 58;
+      bytes[i] = carry & 0xff;
+      carry >>= 8;
+    }
+    while (carry > 0) { bytes.push(carry & 0xff); carry >>= 8; }
+  }
+  // Chaque « 1 » de tête est un octet nul.
+  for (let i = 0; i < str.length && str[i] === ALPHABET[0]; i++) bytes.push(0);
+  return new Uint8Array(bytes.reverse());
+}
+
+/** Décode une valeur multibase « z… ». */
+export function multibase58Decode(str) {
+  if (!str?.startsWith("z")) throw new Error("not a base58btc multibase value");
+  return base58btcDecode(str.slice(1));
+}

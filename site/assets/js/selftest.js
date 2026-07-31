@@ -11,6 +11,8 @@ import { ephemeralKeyPair, loadKeyPair, publicJwk, thumbprint, readable, sign, v
 import { buildCredential, signCredential, newSubjectId } from "./credential.js";
 import { fetchPour, operatorClaims } from "./pour.js";
 import { fetchMe, issuerDid } from "./me.js";
+import { verifyCredential, didWebUrl } from "./verify.js";
+import { buildDidDocument } from "./did.js";
 
 
 const cases = [];
@@ -124,6 +126,35 @@ test("end to end — identity, pour, signed credential", async () => {
   // pas un chiffre qu'elle n'a pas produit.
   if ("carbonIntensity" in out.credentialSubject) return "carbon intensity must not be signed by the mine";
   if (!out.proof?.proofValue?.startsWith("z")) return "proof missing or not multibase";
+  return null;
+});
+
+test("round trip — a signed credential verifies against its DID document", async () => {
+  const pair = await ephemeralKeyPair();
+  const did = "did:web:example.org";
+  const cred = buildCredential({
+    issuerDid: did, subjectId: newSubjectId(),
+    claims: { barId: { value: "X-1", origin: "MEASURED" } },
+  });
+  const signed = await signCredential(cred, pair, did + "#key-1");
+  const didDoc = await buildDidDocument(pair, did);
+
+  const r = await verifyCredential(signed, didDoc);
+  if (!r.ok) return "valid credential rejected: " + r.reason;
+
+  // Altering a single character must break it, otherwise the check proves nothing.
+  const tampered = structuredClone(signed);
+  tampered.credentialSubject.barId.value = "X-2";
+  const t = await verifyCredential(tampered, didDoc);
+  if (t.ok) return "a tampered credential was accepted";
+  return null;
+});
+
+test("did:web resolves to the right URL", () => {
+  if (didWebUrl("did:web:guygold.com") !== "https://guygold.com/.well-known/did.json")
+    return "apex form wrong: " + didWebUrl("did:web:guygold.com");
+  if (didWebUrl("did:web:example.org:a:b") !== "https://example.org/a/b/did.json")
+    return "path form wrong: " + didWebUrl("did:web:example.org:a:b");
   return null;
 });
 
