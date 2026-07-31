@@ -4,7 +4,7 @@
 // affirmer que ce code fonctionne, seulement le rendre vérifiable par qui
 // ouvre la page. Les vecteurs de canonicalisation viennent de la RFC 8785.
 
-import T from "@params";
+import T from "./labels.js";
 import { canonicalize } from "./canonical.js";
 import { base58btcEncode } from "./multibase.js";
 import { ephemeralKeyPair, loadKeyPair, publicJwk, thumbprint, readable, sign, verify } from "./keys.js";
@@ -302,7 +302,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const s = document.querySelector("[data-selftest-summary]");
   if (s) {
-    s.textContent = failed ? `${failed} ${T.failed} / ${cases.length}` : `${cases.length} ${T.passed}`;
+    s.textContent = failed ? `${failed} ${T.selftestFailed} / ${cases.length}` : `${cases.length} ${T.selftestPassed}`;
     s.className = "badge badge--" + (failed ? "warning" : "verified");
   }
 });
