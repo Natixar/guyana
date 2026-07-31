@@ -1,6 +1,6 @@
 // Écran de signature. Sans dépendance : WebCrypto est natif.
 
-import T from "@params";
+import T from "./labels.js";
 import { loadKeyPair, createKeyPair, thumbprint, readable } from "./keys.js";
 import { buildDidDocument, downloadJson } from "./did.js";
 import { fetchMe, issuerDid, isDemo } from "./me.js";
@@ -13,10 +13,15 @@ const $ = (s) => document.querySelector(s);
  * Écrit dans une pastille. Refuse le vide : une pastille sans texte a été
  * observée deux fois sans être reproductible, et je n'ai pas d'explication.
  * Plutôt que de laisser le symptôme muet, on le rend visible.
+ *
+ * Le garde nommait auparavant la sorte de pastille — « libellé manquant:
+ * pending » — c'est-à-dire sa couleur, pas ce qu'il fallait corriger. Nommer la
+ * clé introuvable revient désormais à `labels.js`, qui la connaît ; ce garde-ci
+ * ne couvre plus que le texte absent pour une autre raison (#62).
  */
 function setBadge(el, text, kind) {
   if (!el) return;
-  el.textContent = text || `[libellé manquant: ${kind}]`;
+  el.textContent = text || `[texte absent: ${kind}]`;
   el.className = "badge badge--" + (kind === "warning" ? "warning" : kind);
 }
 
@@ -24,9 +29,9 @@ function setBadge(el, text, kind) {
 
 
 async function environmentOk() {
-  if (!globalThis.isSecureContext) return T.notSecure;
-  if (!globalThis.crypto?.subtle) return T.noWebCrypto;
-  if (!globalThis.indexedDB) return T.noIndexedDb;
+  if (!globalThis.isSecureContext) return T.envNotSecure;
+  if (!globalThis.crypto?.subtle) return T.envNoWebCrypto;
+  if (!globalThis.indexedDB) return T.envNoIndexedDb;
   return null;
 }
 
@@ -47,7 +52,7 @@ async function refreshState(ctx) {
   const { status, createBtn, signBtn, signStatus, did } = ctx;
   const pair = await loadKeyPair();
 
-  setBadge(status, pair ? T.keyPresent : T.keyMissing, pair ? "verified" : "pending");
+  setBadge(status, pair ? T.envKeyPresent : T.envKeyMissing, pair ? "verified" : "pending");
 
   if (createBtn) {
     createBtn.disabled = Boolean(pair);
@@ -98,9 +103,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       await createKeyPair();
       await refreshState(ctx);
-      setBadge(status, T.keyCreated, "verified");
+      setBadge(status, T.envKeyCreated, "verified");
     } catch (err) {
-      setBadge(status, err.code === "KEY_EXISTS" ? T.keyExists : String(err.message ?? err), "warning");
+      setBadge(status, err.code === "KEY_EXISTS" ? T.envKeyExists : String(err.message ?? err), "warning");
       await refreshState(ctx);
     }
   });

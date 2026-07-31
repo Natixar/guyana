@@ -60,6 +60,14 @@ jobs:
           sudo apt-get install -y -qq bats
           for f in deploy/verify/*.bats; do bats --count "$f" >/dev/null; done
 
+      # Hugo passe la table de libellés au module par « @params ». Rien ne relie
+      # une clé demandée à une clé définie : renommer une entrée casse son
+      # consommateur sans erreur de construction. C'est la faute #62, neuf
+      # libellés muets. Le contrôle est ici et non dans le job « ephemeral »
+      # parce qu'il ne demande ni Hugo ni Docker — il doit échouer vite.
+      - name: libellés d'interface résolus
+        run: python3 site/check-labels.py
+
   codeql:
     name: codeql
     runs-on: ubuntu-latest

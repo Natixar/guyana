@@ -10,7 +10,7 @@
 // been altered since signing. What it does not prove: that the figures are
 // true. That is audit, not cryptography — and the page says so.
 
-import T from "@params";
+import T from "./labels.js";
 import { canonicalBytes } from "./canonical.js";
 import { multibase58Decode } from "./multibase.js";
 
