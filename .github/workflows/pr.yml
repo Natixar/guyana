@@ -81,7 +81,10 @@ jobs:
       # redonne pas. Un contrôle qui ne peut pas faire échouer un test est
       # décoratif — la règle de deploy/verify/ vaut ici aussi.
       - name: signataire — ce qu'il refuse
-        run: node --test "services/signer/*.test.mjs"
+        working-directory: services/signer
+        run: |
+          npm ci --omit=optional
+          node --test "*.test.mjs"
 
   codeql:
     name: codeql
