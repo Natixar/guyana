@@ -1,0 +1,110 @@
+name: PR
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: recursive }
+
+      - name: shellcheck
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck --severity=warning deploy/deploy.sh deploy/steps/*.sh deploy/secrets/*.sh
+
+      - name: syntaxe bash
+        run: for f in deploy/deploy.sh deploy/steps/*.sh deploy/secrets/*.sh; do bash -n "$f"; done
+
+      - name: commandes externes non gardées
+        run: |
+          # detect_unguarded_calls.sh prend UN fichier, et il l'analyse en le
+          # SOURÇANT avec PATH vidé. C'est un outil pour bibliothèques. Nos
+          # scripts de deploy/ sont des exécutables : les sourcer les
+          # exécuterait, ce qui n'est pas un contrôle mais un accident.
+          #
+          # Le gate deviendra applicable quand deploy/ passera par rr_run et
+          # cg_guard — écart 25 de GAPS.md. D'ici là on le dit plutôt que de
+          # forcer un contrôle inadapté ou de laisser un TODO muet.
+          scan=deploy/lib/.claude/commands/software-configuration-management/scripts/detect_unguarded_calls.sh
+          if [ ! -x "$scan" ]; then
+            echo "::error::sous-module bash-deploy-libs absent ou incomplet"
+            exit 1
+          fi
+          echo "::notice::detect_unguarded_calls.sh disponible ; inapplicable tant que deploy/ n'emploie pas command_guard (GAPS.md, écart 25)"
+          # Ce qui EST vérifiable aujourd'hui : qu'aucun script n'appelle une
+          # commande par un chemin absolu codé en dur, ce qui contournerait le
+          # garde le jour où il sera en place.
+          # Le shebang est exclu : c'est le seul chemin absolu légitime, et il
+          # ne passe par aucun garde puisqu'il précède l'interpréteur.
+          if grep -nE '(^|[^[:alnum:]_/])/(usr/)?s?bin/[a-z]' \
+               deploy/deploy.sh deploy/steps/*.sh deploy/secrets/*.sh \
+             | grep -v ':1:#!'; then
+            echo "::error::chemin absolu codé en dur vers une commande"
+            exit 1
+          fi
+          echo "aucun chemin de commande codé en dur"
+
+      - name: syntaxe bats
+        run: |
+          sudo apt-get install -y -qq bats
+          for f in deploy/verify/*.bats; do bats --count "$f" >/dev/null; done
+
+  codeql:
+    name: codeql
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # CodeQL ne sait pas analyser Bash. Sur cette branche le dépôt ne
+        # contient que du shell, donc 'actions' — qui couvre les workflows
+        # eux-mêmes — est le seul langage analysable.
+        # APRÈS LA FUSION DE h1 : ajouter 'javascript-typescript', le site
+        # apporte des modules ES qui signent des documents et méritent
+        # l'analyse bien plus que les workflows.
+        language: [actions]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          language: ${{ matrix.language }}
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}
+
+  ephemeral:
+    name: ephemeral
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: recursive }
+
+      # NOTE — ce job exerce encore le squelette v0. Après la fusion de la
+      # branche h1, il doit construire site/ avec Hugo et exécuter
+      # deploy/verify/*.bats contre l'instance éphémère, ce qui est le seul
+      # moyen d'exercer les invariants sans toucher à kubb.
+      - name: construire l'image du squelette
+        run: docker build -t aurora-skeleton:ci deploy/skeleton
+
+      - name: la lancer et l'interroger
+        run: |
+          docker run -d --name skel -p 127.0.0.1:8080:80 aurora-skeleton:ci \
+            --root=/public --port=80 --page-fallback=/public/index.html
+          for _ in $(seq 20); do
+            curl -sf http://127.0.0.1:8080/ >/dev/null && break || sleep 1
+          done
+          curl -sf http://127.0.0.1:8080/ | grep -q 'Hello world!'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/inconnu)" = 200
+
+      - name: démonter
+        if: always()
+        run: docker rm -f skel || true
