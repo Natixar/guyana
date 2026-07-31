@@ -1,6 +1,6 @@
 // Wiring for the verification page. Two inputs, one verdict.
 
-import T from "@params";
+import T from "./labels.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
 
 const $ = (s) => document.querySelector(s);
