@@ -86,6 +86,21 @@ jobs:
           npm ci --omit=optional
           node --test "*.test.mjs"
 
+      # Le magasin signe ce qu'il sert, en Python ; le signataire vérifie cette
+      # signature, en JavaScript. Ce qui est signé, ce sont des octets : si les
+      # deux langages ne sérialisent pas identiquement, rien ne se vérifie et la
+      # panne est muette — une signature qui ne correspond pas ressemble à une
+      # signature invalide, pas à un désaccord d'encodage. Les deux hôtes
+      # exécutent donc les MÊMES vecteurs.
+      - name: sérialisation canonique — hôte JavaScript
+        run: node services/run-jcs-vectors.mjs
+
+      - name: sérialisation canonique — hôte Python
+        working-directory: services/store
+        run: |
+          python3 -m pip install --quiet pytest
+          python3 -m pytest test_jcs.py -q
+
   codeql:
     name: codeql
     runs-on: ubuntu-latest
