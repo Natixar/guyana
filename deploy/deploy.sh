@@ -83,6 +83,8 @@ APP_CONTAINER="${APP_CONTAINER:-${ROUTER_PREFIX}-site}"
 COMMIT="$(git -C "$REPO" rev-parse HEAD 2>/dev/null || echo inconnu)"
 SHORT="$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo dev)"
 APP_IMAGE="${ROUTER_PREFIX}-site:${SHORT}"
+SIGNER_IMAGE="${ROUTER_PREFIX}-signer:${SHORT}"
+STORE_IMAGE="${ROUTER_PREFIX}-store:${SHORT}"
 DIRTY=""
 git -C "$REPO" diff --quiet 2>/dev/null || DIRTY=" (arbre de travail modifié)"
 
@@ -147,6 +149,14 @@ preview() {
   domaines        $APP_DOMAINS
   routeurs        ${ROUTER_PREFIX}-r1…  plus  ${ROUTER_PREFIX}-any (priorité 1)
 
+  Le back-office, en deux processus qui ne se font pas confiance :
+    magasin         ${STORE_CONTAINER:-—}   sur $PROXY_NETWORK et ${DB_NETWORK:-—}
+    signataire      ${SIGNER_CONTAINER:-—}   sur $PROXY_NETWORK SEULEMENT
+    base            ${DB_CONTAINER:-—}   volume ${DB_VOLUME:-—}, aucun port publié
+    routage         /api/v1/sign -> signataire (20), /api/v1 -> magasin (10)
+    clés            celle qui atteste au signataire ; celle qui authentifie les
+                    extractions au magasin ; seulement sa publique au signataire
+
   Ce qui n'est PAS touché :
     la configuration de Traefik, gérée par un autre projet
     $PROXY_NETWORK, qui appartient au projet Compose de Traefik
@@ -166,12 +176,23 @@ confirm() {
 # --- exécution -------------------------------------------------------------
 # Le secret est lu à l'exécution et passé en variable d'environnement à la
 # commande distante. Il ne touche jamais le système de fichiers de la cible.
-BASICAUTH_USERS=""
+BASICAUTH_USERS="" ; SIGNER_KEY="" ; STORE_KEY="" ; STORE_PUBKEY="" ; DB_PASSWORD=""
 load_secrets() {
     [ "$APPLY" -eq 1 ] || return 0
-    BASICAUTH_USERS="$("$HERE/secrets/fetch.sh" basicauth | paste -sd,)" \
-        || die "impossible d'obtenir le secret 'basicauth'" \
-               "$HERE/secrets/fetch.sh --list   # secrets déclarés"
+    local name
+    for name in basicauth signer_key store_key store_pubkey db_password; do
+        "$HERE/secrets/fetch.sh" "$name" >/dev/null \
+            || die "impossible d'obtenir le secret '$name'" \
+                   "$HERE/secrets/fetch.sh --list   # secrets déclarés"
+    done
+    BASICAUTH_USERS="$("$HERE/secrets/fetch.sh" basicauth | paste -sd,)"
+    # Les trois clés voyagent telles quelles : leur répartition EST l'invariant
+    # de services/ — celle qui atteste au signataire, celle qui authentifie les
+    # extractions au magasin, et seulement la publique de celle-ci au signataire.
+    SIGNER_KEY="$("$HERE/secrets/fetch.sh" signer_key)"
+    STORE_KEY="$("$HERE/secrets/fetch.sh" store_key)"
+    STORE_PUBKEY="$("$HERE/secrets/fetch.sh" store_pubkey)"
+    DB_PASSWORD="$("$HERE/secrets/fetch.sh" db_password)"
 }
 
 run_step() { # $1 = fichier de step ; le script voyage par stdin, rien n'est écrit sur la cible
@@ -181,7 +202,16 @@ run_step() { # $1 = fichier de step ; le script voyage par stdin, rien n'est éc
     rsh "PROXY_NETWORK='$PROXY_NETWORK' APP_CONTAINER='$APP_CONTAINER' \
          APP_IMAGE='$APP_IMAGE' APP_IMAGE_ID='${APP_IMAGE_ID:-}' \
          APP_DOMAINS='$APP_DOMAINS' ROUTER_PREFIX='$ROUTER_PREFIX' \
-         BASICAUTH_USERS='$BASICAUTH_USERS' bash -s" < "$step" \
+         BASICAUTH_USERS='$BASICAUTH_USERS' \
+         SIGNER_CONTAINER='${SIGNER_CONTAINER:-}' SIGNER_IMAGE='$SIGNER_IMAGE' \
+         SIGNER_PORT='${SIGNER_PORT:-}' \
+         STORE_CONTAINER='${STORE_CONTAINER:-}' STORE_IMAGE='$STORE_IMAGE' \
+         STORE_PORT='${STORE_PORT:-}' \
+         DB_CONTAINER='${DB_CONTAINER:-}' DB_NETWORK='${DB_NETWORK:-}' \
+         DB_IMAGE='${DB_IMAGE:-}' DB_VOLUME='${DB_VOLUME:-}' \
+         DB_NAME='${DB_NAME:-}' DB_USER='${DB_USER:-}' \
+         DB_PASSWORD='$DB_PASSWORD' SIGNER_KEY='$SIGNER_KEY' \
+         STORE_KEY='$STORE_KEY' STORE_PUBKEY='$STORE_PUBKEY' bash -s" < "$step" \
       || die "$name a échoué sur ${DEPLOY_HOST}" \
              "le message ci-dessus vient de la cible" \
              "rien n'a été laissé sur son système de fichiers : les scripts passent par stdin"
@@ -244,11 +274,26 @@ if [ "$APPLY" -eq 1 ]; then
         || die "la construction de l'image a échoué"
     export APP_IMAGE_ID
     ok "image $APP_IMAGE_ID"
+    # Les deux services. Contexte par stdin comme le site : rien ne s'écrit sur
+    # la cible, et l'image du signataire est construite depuis la RACINE du
+    # dépôt pour embarquer les fichiers source mêmes que la page importe —
+    # copier une variante romprait « un moteur, deux hôtes » sans le signaler.
+    say "  · image du signataire, contexte envoyé par stdin"
+    tar -C "$REPO" -cf - services/signer site/assets/js site/static/engine \
+        | rsh "docker build -q -f services/signer/Dockerfile -t '$SIGNER_IMAGE' -" >/dev/null \
+        || die "la construction de l'image du signataire a échoué"
+
+    say "  · image du magasin, contexte envoyé par stdin"
+    tar -C "$REPO/services/store" -cf - . \
+        | rsh "docker build -q -t '$STORE_IMAGE' -" >/dev/null \
+        || die "la construction de l'image du magasin a échoué"
 else
-    say "  · hugo construirait $SRC, puis l'image (simulation)"
+    say "  · hugo construirait $SRC, puis les trois images (simulation)"
 fi
 
 title "Lancement"
+run_step "$HERE/steps/40-data.sh"
+run_step "$HERE/steps/50-services.sh"
 run_step "$HERE/steps/60-app.sh"
 
 if [ "$APPLY" -eq 1 ]; then
