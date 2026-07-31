@@ -14,6 +14,8 @@ import { fetchMe, issuerDid } from "./me.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
 import { buildDidDocument } from "./did.js";
 import { signBlocker, signView } from "./sign-state.js";
+import { aggregate } from "./engine.js";
+import { runVectors } from "./vectors.js";
 
 
 const cases = [];
@@ -144,6 +146,55 @@ test("self-check leaves no key behind", async () => {
   const a = await ephemeralKeyPair(), b = await ephemeralKeyPair();
   const ta = await thumbprint(a), tb = await thumbprint(b);
   return ta === tb ? "ephemeral pairs are not distinct — they are being persisted" : null;
+});
+
+// --- Le moteur, côté navigateur (#66) -------------------------------------
+// Ces cas ne sont pas écrits ici : ils viennent de `/engine/vectors.json`, le
+// même fichier que la suite du signataire exécute dans Node. C'est ce qui rend
+// vérifiable la propriété « un moteur, deux hôtes » — deux copies de cas de
+// test qu'on garde synchrones à la main ne prouveraient rien.
+//
+// TÂCHE 4 : le moteur est un squelette qui lève. Ces cas DOIVENT échouer.
+
+let vectors = null;
+
+async function loadVectors() {
+  if (vectors) return vectors;
+  const r = await fetch("/engine/vectors.json", { headers: { accept: "application/json" } });
+  if (!r.ok) throw new Error(`vecteurs introuvables : HTTP ${r.status}`);
+  vectors = await r.json();
+  return vectors;
+}
+
+async function loadTaxonomy() {
+  const r = await fetch("/engine/taxonomy.json", { headers: { accept: "application/json" } });
+  if (!r.ok) throw new Error(`taxonomie introuvable : HTTP ${r.status}`);
+  return r.json();
+}
+
+test("moteur — les vecteurs partagés sont servis et lisibles", async () => {
+  const v = await loadVectors();
+  if (!Array.isArray(v.cases) || v.cases.length === 0) return "aucun cas dans les vecteurs";
+  return null;
+});
+
+// Les vecteurs déclarent la version de taxonomie qu'ils supposent. Servir une
+// autre version rendrait les attentes fausses sans rien casser de visible : la
+// dérive se déclare ici plutôt que de se découvrir sur un chiffre signé.
+test("moteur — vecteurs et taxonomie servie parlent de la même version", async () => {
+  const [v, taxonomy] = await Promise.all([loadVectors(), loadTaxonomy()]);
+  return v.taxonomy === taxonomy.version
+    ? null
+    : `vecteurs pour ${v.taxonomy}, taxonomie servie en ${taxonomy.version}`;
+});
+
+test("moteur — chaque vecteur redonne le profil attendu", async () => {
+  const [v, taxonomy] = await Promise.all([loadVectors(), loadTaxonomy()]);
+  // Ni les cas ni la comparaison ne sont écrits ici : les deux sont partagés
+  // avec la suite du signataire, sans quoi « un moteur, deux hôtes » ne serait
+  // qu'une intention.
+  const failures = runVectors(aggregate, v, taxonomy);
+  return failures.length ? failures.join(" | ") : null;
 });
 
 // Chaîne complète : identité, coulée, attestation signée. C'est le seul

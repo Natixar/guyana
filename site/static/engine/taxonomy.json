@@ -1,0 +1,178 @@
+{
+  "$schema": "https://natixar.pro/schemas/aurora/taxonomy-2.json",
+  "version": "agm-h1-v2",
+  "supersedes": "agm-h1-v1 (flat sub-post list, GHGP line frozen into the cell)",
+
+  "model": {
+    "notes": "A category is an ID in a taxonomy. Taxonomies are append-only: new IDs may be added, existing IDs never change meaning. A cell stores the PIVOT id and nothing else; every framework line is derived on the fly.",
+    "levels": ["impact", "taxonomy@version", "poste", "subPost"],
+    "idPolicy": {
+      "stable": "an ID, once issued, keeps its meaning forever",
+      "appendOnly": "new IDs may be added at any level, including new impacts",
+      "retention": "an old taxonomy version is retained as long as any cell references it",
+      "factTable": "cells carry the numeric id only — never the key, never the label"
+    },
+    "whyNotFreezeTheFrameworkLine": "BEGES changes regularly. Comparisons and trends require recomputing past inventories in the new framework, which is only possible if the cell holds the pivot category and the translation is applied at read time. A frozen GHGP line in a signed credential cannot be recomputed — it would pin every past inventory to a superseded framework."
+  },
+
+  "impacts": [
+    {
+      "id": 1,
+      "key": "climate-change",
+      "label": "Climate Change",
+      "status": "active",
+      "notes": "The only impact populated in the PoC. Water use and other ESG impacts attach here as siblings, with their own taxonomies, without touching anything below."
+    }
+  ],
+
+  "taxonomies": [
+    { "id": 10, "impact": 1, "key": "bilan-carbone", "version": "v9", "role": "PIVOT", "source": "ABC-TransitionBasCarbone, commit 7c966a649fe9", "status": "active" },
+    { "id": 11, "impact": 1, "key": "ghgp", "version": "2015", "role": "target", "status": "active" },
+    { "id": 12, "impact": 1, "key": "beges", "version": "v5", "role": "target", "status": "not implemented in H1" }
+  ],
+
+  "conditions": {
+    "notes": "The pivot-to-target translation is a total function only under these conditions. They travel with the data, because changing one moves every derived line.",
+    "control": "Operational",
+    "level": "Standard",
+    "defaultCaracterisation": "Operated",
+    "consequence": "Operational control means AGM accounts 100% of what it operates at Aurora regardless of equity share, and the caracterisation set collapses from 18 values to the 4 below."
+  },
+
+  "caracterisations": [
+    { "id": 1, "key": "Operated", "label": "AGM operates the source. Default for everything on site." },
+    { "id": 2, "key": "OperatedProcedeed", "label": "Non-energy emission from a process AGM operates (detonation)." },
+    { "id": 3, "key": "OperatedFugitive", "label": "Non-energy fugitive emission from equipment AGM operates (refrigerant leaks)." },
+    { "id": 4, "key": "NotOperatedSupported", "label": "Third party operates, AGM pays. Contracted freight." }
+  ],
+
+  "partTypes": {
+    "notes": "Retained subset of EmissionFactorPartType. The Amont/Combustion split is the most valuable thing kept from the pivot: a naive model puts 100% of diesel in scope 1 and silently loses the upstream term.",
+    "retained": [
+      { "id": 1, "key": "Combustion" },
+      { "id": 2, "key": "Amont" },
+      { "id": 3, "key": "Fuites" },
+      { "id": 4, "key": "EmissionsFugitives" }
+    ],
+    "excluded": [
+      { "id": 5, "key": "Fabrication" }
+    ],
+    "fabricationExclusion": {
+      "decision": "Amortisation of durable-goods construction is out of PoC scope (product owner, 31 July 2026). Sub-post 3.2 (capital goods) is empty by decision, not by absence of data.",
+      "convergence": "Coincides with the reference engine: exports.ts drops Fabrication parts under Operated in its GHGP branch. Under operational control the exclusion is the standard's own behaviour, not a PoC shortcut.",
+      "consequence": "Solar panels carry no embodied emissions in the PoC. The microgrid only lowers the carbon intensity of site electricity; it never adds a line."
+    }
+  },
+
+  "modes": {
+    "notes": "The impact mode. ONE annotation field per cell, not seven columns. Normally empty, meaning the cell carries the aggregate in the taxonomy's own unit. Populated only where a factor is actually decomposed — rare in practice, because per-gas emission factors are uncommon in the bases. In that rare case the same activity datum yields seven cells, one per gas, each with its mode. Repeating the base measurement across those cells is acceptable precisely because the case is rare.",
+    "alsoUsedFor": [
+      "naming the refrigerant in a direct-leak cell (R-410A, R-134a, …)",
+      "carrying non-climate impacts once water use and other ESG dimensions attach to impact 2, 3, …"
+    ],
+    "values": [
+      { "id": 0, "key": "aggregate", "label": "no decomposition; the cell is the total in the taxonomy's unit" },
+      { "id": 1, "key": "co2f", "label": "fossil CO2" },
+      { "id": 2, "key": "ch4f", "label": "fossil CH4" },
+      { "id": 3, "key": "ch4b", "label": "biogenic CH4" },
+      { "id": 4, "key": "n2o", "label": "N2O" },
+      { "id": 5, "key": "co2b", "label": "biogenic CO2" },
+      { "id": 6, "key": "sf6", "label": "SF6" },
+      { "id": 7, "key": "hfc", "label": "HFC — refrigerant identified by a sibling id when known" },
+      { "id": 8, "key": "pfc", "label": "PFC" },
+      { "id": 9, "key": "otherGES", "label": "other greenhouse gases" }
+    ]
+  },
+
+  "postes": [
+    { "id": 100, "taxonomy": 10, "key": "Energies" },
+    { "id": 101, "taxonomy": 10, "key": "AutresEmissionsNonEnergetiques" },
+    { "id": 102, "taxonomy": 10, "key": "IntrantsBiensEtMatieres" },
+    { "id": 103, "taxonomy": 10, "key": "DechetsDirects" },
+    { "id": 104, "taxonomy": 10, "key": "Fret" }
+  ],
+
+  "subPosts": [
+    { "id": 1000, "poste": 100, "key": "CombustiblesFossiles", "label": "Fossil fuels", "agm": "Diesel to fixed generators, camp boilers, plant heating", "h1": "withData" },
+    { "id": 1001, "poste": 100, "key": "Electricite", "label": "Electricity", "agm": "Grid import — expected nil at Aurora, which is self-powered. Retained so the zero is stated rather than absent.", "h1": "documentedNotUsed" },
+    { "id": 1002, "poste": 104, "key": "FretInterne", "label": "Internal freight", "agm": "Haul trucks, loaders, light vehicles moving ore and waste on site", "h1": "withData", "renamed": "carries mobile plant, not freight services. §4.5 permits renaming a sub-post with a recorded justification." },
+    { "id": 1003, "poste": 104, "key": "FretEntrant", "label": "Inbound freight", "agm": "Fuel deliveries, reagents, consumables reaching site", "h1": "documentedNotUsed" },
+    { "id": 1004, "poste": 104, "key": "FretSortant", "label": "Outbound freight", "agm": "Doré shipped out. Dataset G-02 is NOT MEASURED.", "h1": "documentedNotUsed" },
+    { "id": 1005, "poste": 101, "key": "EmissionsLieesAuxProcedesIndustriels", "label": "Industrial process emissions", "agm": "Detonation of explosives. Dataset X-02 is NOT MEASURED.", "h1": "withData" },
+    { "id": 1006, "poste": 101, "key": "EmissionsLieesALaProductionDeFroid", "label": "Refrigeration and air conditioning", "agm": "Refrigerant leaks. Dataset F-01 is NOT MEASURED.", "h1": "notMeasuredButInScope" },
+    { "id": 1007, "poste": 102, "key": "ProduitsChimiquesEtHydrogene", "label": "Chemicals", "agm": "Process reagents (R-01, NOT MEASURED) and purchased explosives — the upstream term, distinct from detonation.", "h1": "notMeasuredButInScope" },
+    { "id": 1008, "poste": 102, "key": "MatiereDestineeAuxEmballages", "label": "Packaging materials", "agm": "Doré packaging", "h1": "documentedNotUsed" },
+    { "id": 1009, "poste": 103, "key": "DechetsDangereux", "label": "Hazardous waste", "agm": "Used oil, workshop waste, spent reagents", "h1": "documentedNotUsed" },
+    { "id": 1010, "poste": 103, "key": "DechetsOrduresMenageres", "label": "General waste", "agm": "Camp waste", "h1": "documentedNotUsed" }
+  ],
+
+  "translations": [
+    {
+      "from": 10,
+      "to": 11,
+      "notes": "Applied at read time, never stored. Keyed (subPost, partType, caracterisation) -> target line, per ExportRule @@unique([export, subPost, type]). partType null is the default rule.",
+      "rules": [
+        { "subPost": 1000, "partType": null, "1": "1.1" },
+        { "subPost": 1000, "partType": 1, "1": "1.1" },
+        { "subPost": 1000, "partType": 2, "1": "3.3" },
+        { "subPost": 1000, "partType": 3, "1": "1.4" },
+        { "subPost": 1000, "partType": 4, "1": "1.4" },
+        { "subPost": 1001, "partType": null, "1": "2.1" },
+        { "subPost": 1001, "partType": 2, "1": "3.3" },
+        { "subPost": 1002, "partType": null, "1": "1.2" },
+        { "subPost": 1002, "partType": 1, "1": "1.2" },
+        { "subPost": 1002, "partType": 2, "1": "3.3" },
+        { "subPost": 1002, "partType": 4, "1": "1.4" },
+        { "subPost": 1003, "partType": null, "1": "1.2", "4": "3.4" },
+        { "subPost": 1003, "partType": 1, "1": "1.2", "4": "3.4" },
+        { "subPost": 1003, "partType": 2, "1": "3.3", "4": "3.4" },
+        { "subPost": 1004, "partType": null, "1": "1.2", "4": "3.4" },
+        { "subPost": 1004, "partType": 1, "1": "1.2", "4": "3.4" },
+        { "subPost": 1004, "partType": 2, "1": "3.3", "4": "3.4" },
+        { "subPost": 1005, "partType": null, "1": "1.3", "2": "1.3" },
+        { "subPost": 1006, "partType": null, "1": "1.4", "3": "1.4" },
+        { "subPost": 1007, "partType": null, "1": "3.1" },
+        { "subPost": 1008, "partType": null, "1": "3.1" },
+        { "subPost": 1009, "partType": null, "1": "3.5" },
+        { "subPost": 1010, "partType": null, "1": "3.5" }
+      ],
+      "lines": {
+        "1.1": "Scope 1 — stationary combustion",
+        "1.2": "Scope 1 — mobile combustion",
+        "1.3": "Scope 1 — process emissions",
+        "1.4": "Scope 1 — fugitive emissions",
+        "2.1": "Scope 2 — purchased electricity",
+        "3.1": "Scope 3 upstream — purchased goods and services",
+        "3.3": "Scope 3 upstream — fuel and energy related, not in scope 1 or 2",
+        "3.4": "Scope 3 upstream — upstream transportation and distribution",
+        "3.5": "Scope 3 upstream — waste generated in operations"
+      }
+    }
+  ],
+
+  "resourceMapping": {
+    "notes": "AGM's data pack is expressed by department and month. Each resource resolves to exactly one sub-post — §4.5 exclusivity. Whatever does not resolve stays unallocated.",
+    "entries": [
+      { "resource": "diesel", "unit": "L", "subPost": [1000, 1002], "discriminator": "consuming equipment class: fixed plant 1000, mobile fleet 1002" },
+      { "resource": "electricity purchased", "unit": "kWh", "subPost": [1001] },
+      { "resource": "explosives", "unit": "kg", "subPost": [1007, 1005], "notes": "manufacture upstream and detonation on site: two emissions, no double count" },
+      { "resource": "process reagents", "unit": "kg", "subPost": [1007], "origin": "NOT_MEASURED" },
+      { "resource": "refrigerants", "unit": "kg", "subPost": [1006], "origin": "NOT_MEASURED", "modeUse": "the refrigerant is named in the cell's mode field" },
+      { "resource": "packaging", "unit": "kg", "subPost": [1008] },
+      { "resource": "waste", "unit": "kg", "subPost": [1009, 1010], "discriminator": "hazardous or not" },
+      { "resource": "outbound shipment", "unit": "t.km", "subPost": [1004], "origin": "NOT_MEASURED" }
+    ]
+  },
+
+  "unallocated": {
+    "notes": "Not an error state. A first-class bucket, per #6. Emissions land here when the department line does not resolve to an operation, or when the resource does not resolve to a sub-post. Expected to be large at first and to shrink as the mapping of #47 improves.",
+    "reportedAs": "an entity of the cube, with its own period and origin, never spread silently"
+  },
+
+  "h2Provisions": {
+    "notes": "Not built in H1. Recorded so the id space and the fact-table shape do not have to move later.",
+    "perimeters": "The spec's notion of perimeter, as two dimension hierarchies: organisation (group -> entity -> site -> department -> service, the last optional) and geography (world region -> country -> site). The entity id of a cell resolves into both.",
+    "otherImpacts": "New impacts attach as siblings of impact 1 with their own taxonomies. The mode field already carries what distinguishes them at cell level.",
+    "uncertainty": "Two five-tuples, per ABC: one scoring the activity datum, one scoring the factor. Field reserved, unpopulated in H1."
+  }
+}

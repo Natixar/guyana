@@ -44,6 +44,54 @@ export function buildCredential({ issuerDid, subjectId, claims, confirmedBy = nu
 }
 
 /**
+ * L'attestation carbone de Natixar.
+ *
+ * Elle ne porte QUE des positions dans la taxonomie pivot, jamais une ligne de
+ * référentiel. BEGES change régulièrement, et comparer des tendances suppose de
+ * recalculer les inventaires passés dans le cadre nouveau — ce qu'une ligne
+ * figée dans un document signé interdit à jamais (#61). Le vérificateur dérive
+ * la ligne lui-même à partir de la taxonomie publiée, ce qui est une propriété
+ * plus forte que de croire la nôtre.
+ *
+ * `derivedFrom` porte l'empreinte de l'attestation d'origine : sans elle,
+ * n'importe qui pourrait émettre un chiffre carbone pour ce sujet.
+ *
+ * Les exclusions voyagent. Le signataire ne juge pas une raison d'écarter une
+ * cellule — il vérifie seulement qu'il y en a une —, donc c'est au vérificateur
+ * qu'elle est destinée, et elle doit lui parvenir.
+ *
+ * @param {object} p
+ * @param {string} p.issuerDid     l'émetteur du chiffre, ici Natixar
+ * @param {string} p.subjectId     le même URN opaque que l'attestation d'origine
+ * @param {{id: string, digestMultibase: string}} p.derivedFrom
+ * @param {{value: number, unit: string}} p.intensity
+ * @param {Array<object>} p.pivot  la matrice, en positions pivot
+ * @param {object} p.method        conditions, version de taxonomie, allocation
+ * @param {Array<{cell: object, reason: string}>} [p.excluded]
+ */
+export function buildCarbonCredential({
+  issuerDid, subjectId, derivedFrom, intensity, pivot, method,
+  excluded = [], unallocated = 0, now = new Date(),
+}) {
+  return {
+    "@context": CONTEXTS,
+    type: ["VerifiableCredential", "CarbonIntensityCredential"],
+    issuer: issuerDid,
+    validFrom: now.toISOString(),
+    credentialSubject: {
+      id: subjectId,
+      carbonIntensity: intensity,
+      breakdown: pivot,
+      // Un total complet et faux serait pire qu'un total incomplet et déclaré.
+      unallocated,
+    },
+    derivedFrom,
+    method,
+    excluded: excluded.map(({ cell, reason }) => ({ id: cell.id, reason })),
+  };
+}
+
+/**
  * Signe selon ecdsa-jcs-2019.
  *
  * Le hachage porte sur la concaténation de deux condensats — celui de la

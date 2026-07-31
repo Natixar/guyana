@@ -14,6 +14,20 @@ jobs:
   lint:
     name: lint
     runs-on: ubuntu-latest
+    # Les tests du magasin s'exécutent contre un VRAI PostgreSQL. L'essentiel de
+    # ce qu'ils vérifient est du comportement de la base — recouvrement
+    # tstzrange, index GiST, contrainte d'intervalle non vide — et un bouchon
+    # confirmerait mes hypothèses au lieu de les éprouver.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: aurora
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
         with: { submodules: recursive }
@@ -67,6 +81,49 @@ jobs:
       # parce qu'il ne demande ni Hugo ni Docker — il doit échouer vite.
       - name: libellés d'interface résolus
         run: python3 site/check-labels.py
+
+      # « Un moteur, deux hôtes » : le navigateur et le signataire exécutent le
+      # même fichier source, les mêmes vecteurs et le même comparateur. Ce job
+      # est l'hôte Node. Sans lui, la propriété est une intention — rien
+      # n'empêcherait les deux côtés de diverger entre deux revues.
+      - name: moteur — vecteurs partagés, hôte Node
+        run: node services/run-vectors.mjs
+
+      # Ce que le signataire REFUSE. Une extraction non signée, altérée, ou
+      # signée par un autre ; une cellule servie dont le client ne rend pas
+      # compte ; une exclusion sans raison ; un chiffre que le recalcul ne
+      # redonne pas. Un contrôle qui ne peut pas faire échouer un test est
+      # décoratif — la règle de deploy/verify/ vaut ici aussi.
+      - name: signataire — ce qu'il refuse
+        working-directory: services/signer
+        run: |
+          npm ci --omit=optional
+          node --test "*.test.mjs"
+
+      # Le magasin signe ce qu'il sert, en Python ; le signataire vérifie cette
+      # signature, en JavaScript. Ce qui est signé, ce sont des octets : si les
+      # deux langages ne sérialisent pas identiquement, rien ne se vérifie et la
+      # panne est muette — une signature qui ne correspond pas ressemble à une
+      # signature invalide, pas à un désaccord d'encodage. Les deux hôtes
+      # exécutent donc les MÊMES vecteurs.
+      - name: sérialisation canonique — hôte JavaScript
+        run: node services/run-jcs-vectors.mjs
+
+      - name: magasin — sérialisation, signature, et la base
+        working-directory: services/store
+        env:
+          STORE_DSN: postgresql://postgres:test@localhost:5432/aurora
+        run: |
+          python3 -m pip install --quiet pytest cryptography 'psycopg[binary]'
+          python3 -m pytest -q
+
+      # Les deux moitiés d'un seul contrôle. Python signe, JavaScript vérifie —
+      # et l'échec serait muet : une signature DER là où WebCrypto attend r||s
+      # ne lève pas, elle renvoie false, ce qui ressemble à une clé fausse.
+      # Deux implémentations qui se croient d'accord ne valent rien tant
+      # qu'aucune n'a vérifié la signature de l'autre.
+      - name: interopérabilité de signature — Python signe, JavaScript vérifie
+        run: node services/verify-store-signature.mjs
 
   codeql:
     name: codeql
