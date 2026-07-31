@@ -25,7 +25,11 @@ pf_check() { # $1 libellé, $2.. commande ou fonction
     fi
 }
 
-pf_docker_group() { id -nG | tr ' ' '\n' | grep -qx docker; }
+# Ce qui compte n'est pas d'appartenir à un groupe nommé « docker » — il peut
+# s'appeler autrement — mais de pouvoir interroger le démon sans élévation.
+# On teste donc la capacité, et l'on ne rapporte le groupe que pour le journal.
+pf_docker_socket() { docker info --format '{{.ServerVersion}}'; }
+pf_report_group() { id -nG | tr ' ' '\n' | grep -E '^docker' || true; }
 
 pf_traefik_running() { docker ps --format '{{.Names}}' | grep -q traefik; }
 
@@ -42,12 +46,12 @@ pf_clock() {
     [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = yes ]
 }
 
-: "${PROXY_NETWORK:?PROXY_NETWORK doit être défini par le descripteur d'environnement}"
+: "${PROXY_NETWORK:?PROXY_NETWORK must be set by the environment descriptor}"
 
 echo "== préflight sur $(hostname) =="
 
 pf_check "docker joignable sans sudo"          docker version --format '{{.Server.Version}}'
-pf_check "appartenance au groupe docker"       pf_docker_group
+pf_check "pilotage du démon sans élévation"    pf_docker_socket
 pf_check "réseau '$PROXY_NETWORK' présent"     docker network inspect "$PROXY_NETWORK"
 pf_check "conteneur Traefik en marche"         pf_traefik_running
 pf_check "espace disque libre > 1 Go"          pf_disk_free
@@ -57,4 +61,5 @@ if [ "$pf_fail" -ne 0 ]; then
     echo "préflight en échec — déploiement interrompu" >&2
     exit 1
 fi
+printf '  info  groupes docker : %s\n' "$(pf_report_group | paste -sd, || echo aucun)"
 echo "préflight ok"

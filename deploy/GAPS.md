@@ -79,3 +79,29 @@ mes scripts ne remplissaient pas : **les scripts accompagnent l'utilisateur.**
 Ils lancent l'agent SSH avec une expiration, ils sont précis quand ils demandent
 un mot de passe, ils expliquent. Un script correct mais taciturne n'est pas
 conforme à cette doctrine.
+
+---
+
+## Écarts relevés à la revue de l'issue #55
+
+| # | Constat | Mesure | Statut |
+|---|---|---|---|
+| 20 | `00-preflight.sh` **n'a jamais été analysable** : une apostrophe dans `${PROXY_NETWORK:?… d'environnement}` — bash interprète les quotes à l'intérieur d'une expansion. Le step n'avait donc jamais pu s'exécuter | message passé en anglais, plus d'apostrophe. **Le job `lint` de la CI aurait attrapé les deux occurrences** : c'est exactement ce pour quoi il existe | **fermé** |
+| 21 | le contrôle d'appartenance au groupe `docker` était codé en dur | on teste la **capacité** — `docker info` sans élévation — et non le moyen. Le groupe n'est plus qu'une information de journal | **fermé** |
+| 22 | `verify-http` et `verify-network` échouaient : le déploiement est passé derrière BasicAuth et le conteneur a changé de nom | les vérifications connaissent l'authentification, `APP_CONTAINER` vient du descripteur | **fermé** |
+| 23 | quatre fichiers `verify/` seulement, et pas ceux du plan | `verify-authz.bats` ajouté — testable depuis que BasicAuth existe — et `verify-rls.bats` écrit comme **non applicable déclaré** plutôt qu'omis : un fichier absent se confond avec un oubli | **fermé** |
+| 24 | `bash-deploy-libs` n'était pas un sous-module | câblé en `deploy/lib`, `detect_unguarded_calls.sh` devient un vrai contrôle de CI | **fermé** |
+| 25 | `deploy.sh` **réimplémente `remote_run`** au lieu de l'employer. `run_step`, débarrassé de son `rsh`, relève de la bibliothèque | à traiter avec `rr_put` (#148) et `ensure_docker` (#132/#149) côté `bash-deploy-libs`, reportés à septembre | **ouvert, hors de ce dépôt** |
+| 26 | le job `ephemeral` exerce encore le squelette v0 | après la fusion de `h1` : construire `site/` avec Hugo et exécuter `deploy/verify/*.bats` contre l'instance éphémère | **ouvert** |
+| 27 | CodeQL n'analyse que `actions` | après la fusion de `h1` : ajouter `javascript-typescript`. Le site apporte des modules qui **signent des documents** et méritent l'analyse bien plus que les workflows | **ouvert** |
+
+## Ce que cette revue confirme sur les gates
+
+L'écart 20 mérite d'être retenu au-delà de sa correction. Le même piège de
+citation s'est produit deux fois, dans deux fichiers, à des jours d'intervalle,
+et il rendait un script entièrement inexécutable — sans qu'aucune exécution ne
+l'ait révélé, puisque le step n'avait jamais tourné. Un simple `bash -n` en
+intégration continue l'aurait signalé les deux fois, en quelques secondes.
+
+C'est l'argument concret pour que le premier `.yml` passe avant le reste, plutôt
+que l'argument théorique que j'avançais jusqu'ici.

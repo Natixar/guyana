@@ -9,8 +9,13 @@ setup() { load_env; DOM="$(primary_domain)"; }
     [ "$(http_code "https://$DOM/")" = "200" ]
 }
 
-@test "le contenu servi est celui du squelette" {
-    body "https://$DOM/" | grep -q 'Hello world!'
+@test "le contenu servi est celui de l'application" {
+    body "https://$DOM/" | grep -q 'Natixar Gold Trace'
+}
+
+@test "les points d'entrée de l'API répondent" {
+    [ "$(http_code "https://$DOM/api/v1/me")" = "200" ]
+    [ "$(http_code "https://$DOM/api/v1/pour")" = "200" ]
 }
 
 @test "une URL inconnue tombe sur le repli d'application" {

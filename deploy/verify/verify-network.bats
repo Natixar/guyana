@@ -6,8 +6,8 @@ load helpers
 setup() { load_env; }
 
 @test "le conteneur applicatif ne publie aucun port sur l'hôte" {
-    run ssh $DEPLOY_SSH_OPTS "${DEPLOY_USER}@${DEPLOY_HOST}" \
-        "docker inspect ${ROUTER_PREFIX}-hello --format '{{json .NetworkSettings.Ports}}'"
+    run ssh ${DEPLOY_SSH_OPTS} "${DEPLOY_USER}@${DEPLOY_HOST}" \
+        "docker inspect ${APP_CONTAINER} --format '{{json .NetworkSettings.Ports}}'"
     [ "$status" -eq 0 ]
     # Une liaison publiée apparaîtrait sous la forme "80/tcp":[{...}]
     [[ "$output" != *'":['* ]]
@@ -16,7 +16,7 @@ setup() { load_env; }
 @test "le conteneur est bien sur le réseau du proxy" {
     # Le fournisseur docker de Traefik est épinglé sur ce réseau : un conteneur
     # ailleurs serait découvert mais resterait injoignable.
-    run ssh $DEPLOY_SSH_OPTS "${DEPLOY_USER}@${DEPLOY_HOST}" \
-        "docker inspect ${ROUTER_PREFIX}-hello --format '{{range \$k,\$v := .NetworkSettings.Networks}}{{\$k}} {{end}}'"
+    run ssh ${DEPLOY_SSH_OPTS} "${DEPLOY_USER}@${DEPLOY_HOST}" \
+        "docker inspect ${APP_CONTAINER} --format '{{range \$k,\$v := .NetworkSettings.Networks}}{{\$k}} {{end}}'"
     [[ "$output" == *"$PROXY_NETWORK"* ]]
 }

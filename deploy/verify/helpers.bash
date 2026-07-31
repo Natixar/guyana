@@ -21,12 +21,31 @@ load_env() {
 # Premier domaine déclaré = domaine de référence.
 primary_domain() { load_env >/dev/null; echo "$APP_DOMAINS" | awk '{print $1}'; }
 
-http_code() { # $1 url  [$2 option curl supplémentaire]
-    curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "${@:2}" "$1" 2>/dev/null
+# Identifiants de vérification. Jamais dans le dépôt : fournis par
+# l'environnement, ou lus dans le fichier local ignoré par git.
+_auth() {
+    if [ -n "${VERIFY_AUTH:-}" ]; then printf -- '-u\n%s\n' "$VERIFY_AUTH"; return; fi
+    local f="${BATS_TEST_DIRNAME}/../secrets/local/credentials.txt"
+    [ -r "$f" ] || return 0
+    awk '$1=="demo"{print "-u"; print $1":"$2; exit}' "$f"
+}
+
+curl_auth() { # $@ : arguments curl
+    local -a a=(); mapfile -t a < <(_auth)
+    curl -sS --max-time 15 "${a[@]}" "$@"
+}
+
+http_code() { # $1 url  [$2.. options curl]
+    curl_auth -o /dev/null -w '%{http_code}' "${@:2}" "$1" 2>/dev/null
+}
+
+# Sans identifiants : sert à vérifier que le proxy refuse bien.
+http_code_anon() {
+    curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$1" 2>/dev/null
 }
 
 tls_verify_result() { # $1 url
     curl -sS -o /dev/null -w '%{ssl_verify_result}' --max-time 15 "$1" 2>/dev/null
 }
 
-body() { curl -sS --max-time 15 "$1" 2>/dev/null; }
+body() { curl_auth "$1" 2>/dev/null; }

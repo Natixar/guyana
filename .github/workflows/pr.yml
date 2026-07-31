@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: { submodules: recursive }
 
       - name: shellcheck
         run: |
@@ -27,9 +28,13 @@ jobs:
 
       - name: commandes externes non gardées
         run: |
-          # Gate hérité de bash-deploy-libs. Tant que le sous-module n'est pas
-          # câblé, on se contente de signaler ; il deviendra bloquant ensuite.
-          echo "TODO: câbler detect_unguarded_calls.sh avec le sous-module bash-deploy-libs"
+          # Gate hérité de bash-deploy-libs, désormais câblé en sous-module.
+          scan=deploy/lib/.claude/commands/software-configuration-management/scripts/detect_unguarded_calls.sh
+          if [ -x "$scan" ]; then
+            bash "$scan" deploy/deploy.sh deploy/steps/*.sh deploy/secrets/*.sh
+          else
+            echo "::warning::detect_unguarded_calls.sh introuvable dans le sous-module ($scan)"
+          fi
 
       - name: syntaxe bats
         run: |
@@ -41,10 +46,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # CodeQL ne sait pas analyser Bash. Tant que le dépôt ne contient que
-        # des scripts shell, 'actions' est le seul langage analysable — il
-        # couvre les workflows eux-mêmes. À étendre (javascript, python…) dès
-        # que le code applicatif arrive. Voir #55.
+        # CodeQL ne sait pas analyser Bash. Sur cette branche le dépôt ne
+        # contient que du shell, donc 'actions' — qui couvre les workflows
+        # eux-mêmes — est le seul langage analysable.
+        # APRÈS LA FUSION DE h1 : ajouter 'javascript-typescript', le site
+        # apporte des modules ES qui signent des documents et méritent
+        # l'analyse bien plus que les workflows.
         language: [actions]
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +67,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: { submodules: recursive }
 
+      # NOTE — ce job exerce encore le squelette v0. Après la fusion de la
+      # branche h1, il doit construire site/ avec Hugo et exécuter
+      # deploy/verify/*.bats contre l'instance éphémère, ce qui est le seul
+      # moyen d'exercer les invariants sans toucher à kubb.
       - name: construire l'image du squelette
         run: docker build -t aurora-skeleton:ci deploy/skeleton
 
