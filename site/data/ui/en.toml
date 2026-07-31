@@ -61,7 +61,7 @@ resetDone        = "Deleted. Reload the page."
 resetMismatch    = "Fingerprint does not match — nothing was deleted."
 resetNoKey       = "No key to delete."
 resetProduction  = "Disabled: someone is signed in. Use key rotation instead."
-keyAlreadyThere  = "A key already exists on this computer"
+keyAvailableHere = "A key is available on this computer"
 
 vStep1        = "The certificate"
 vStep1Body    = "Choose the credential.json file you received."
