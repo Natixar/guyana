@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="{{ site.Language.Locale }}">
+<head>{{ partial "head.html" . }}</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <span class="brand">{{ partial "logo.html" (dict "variant" "white") }}</span>
+      <span class="brand-name">{{ site.Params.platformName }}</span>
+    </div>
+  </header>
+
+  <main><div class="wrap">{{ block "main" . }}{{ end }}</div></main>
+
+
+  <footer class="site-footer">
+    <div class="wrap">{{ site.Params.platformName }} — {{ partial "t" "footer" }}</div>
+  </footer>
+</body>
+</html>

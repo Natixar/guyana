@@ -92,7 +92,7 @@ conforme à cette doctrine.
 | 23 | quatre fichiers `verify/` seulement, et pas ceux du plan | `verify-authz.bats` ajouté — testable depuis que BasicAuth existe — et `verify-rls.bats` écrit comme **non applicable déclaré** plutôt qu'omis : un fichier absent se confond avec un oubli | **fermé** |
 | 24 | `bash-deploy-libs` n'était pas un sous-module | câblé en `deploy/lib`, `detect_unguarded_calls.sh` devient un vrai contrôle de CI | **fermé** |
 | 25 | `deploy.sh` **réimplémente `remote_run`** au lieu de l'employer. `run_step`, débarrassé de son `rsh`, relève de la bibliothèque | à traiter avec `rr_put` (#148) et `ensure_docker` (#132/#149) côté `bash-deploy-libs`, reportés à septembre | **ouvert, hors de ce dépôt** |
-| 26 | le job `ephemeral` exerce encore le squelette v0 | après la fusion de `h1` : construire `site/` avec Hugo et exécuter `deploy/verify/*.bats` contre l'instance éphémère | **ouvert** |
+| 26 | le job `ephemeral` exerce encore le squelette v0 | `deploy.sh` construit désormais `site/` et `deploy/skeleton/` est supprimé. Reste à faire de même dans le job `ephemeral` — suivi en #58 | **partiel** |
 | 27 | CodeQL n'analyse que `actions` | après la fusion de `h1` : ajouter `javascript-typescript`. Le site apporte des modules qui **signent des documents** et méritent l'analyse bien plus que les workflows | **ouvert** |
 
 ## Ce que cette revue confirme sur les gates

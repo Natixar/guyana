@@ -1,0 +1,17 @@
+{{/* Logo responsive.
+     La source est un PNG 4168×614 (rapport 6,79:1). Hugo en dérive des WebP
+     aux largeurs utiles et construit le srcset : le navigateur choisit, on ne
+     sert jamais 4168 px à personne.
+     Paramètre : variant = "blue" (défaut) ou "white". */}}
+{{ $variant := .variant | default "blue" }}
+{{ $src := resources.Get (printf "img/logo-%s.png" $variant) }}
+{{ with $src }}
+  {{ $w1 := .Resize "220x webp q90" }}
+  {{ $w2 := .Resize "440x webp q90" }}
+  {{ $w3 := .Resize "660x webp q90" }}
+  <img src="{{ $w2.RelPermalink }}"
+       srcset="{{ $w1.RelPermalink }} 220w, {{ $w2.RelPermalink }} 440w, {{ $w3.RelPermalink }} 660w"
+       sizes="(max-width: 40rem) 160px, 220px"
+       width="{{ $w2.Width }}" height="{{ $w2.Height }}"
+       alt="{{ site.Params.platformName }}" decoding="async">
+{{ end }}

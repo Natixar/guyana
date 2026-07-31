@@ -79,10 +79,10 @@ ENV_FILE="$HERE/inventory/hosts.d/${ENV_NAME}.env"
 # shellcheck source=/dev/null
 . "$ENV_FILE"
 
-APP_CONTAINER="${ROUTER_PREFIX}-hello"
+APP_CONTAINER="${APP_CONTAINER:-${ROUTER_PREFIX}-site}"
 COMMIT="$(git -C "$REPO" rev-parse HEAD 2>/dev/null || echo inconnu)"
 SHORT="$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo dev)"
-APP_IMAGE="${ROUTER_PREFIX}-hello:${SHORT}"
+APP_IMAGE="${ROUTER_PREFIX}-site:${SHORT}"
 DIRTY=""
 git -C "$REPO" diff --quiet 2>/dev/null || DIRTY=" (arbre de travail modifié)"
 
@@ -164,13 +164,24 @@ confirm() {
 }
 
 # --- exécution -------------------------------------------------------------
+# Le secret est lu à l'exécution et passé en variable d'environnement à la
+# commande distante. Il ne touche jamais le système de fichiers de la cible.
+BASICAUTH_USERS=""
+load_secrets() {
+    [ "$APPLY" -eq 1 ] || return 0
+    BASICAUTH_USERS="$("$HERE/secrets/fetch.sh" basicauth | paste -sd,)" \
+        || die "impossible d'obtenir le secret 'basicauth'" \
+               "$HERE/secrets/fetch.sh --list   # secrets déclarés"
+}
+
 run_step() { # $1 = fichier de step ; le script voyage par stdin, rien n'est écrit sur la cible
     local step="$1" name; name="$(basename "$step")"
     if [ "$APPLY" -eq 0 ]; then say "  · $name (simulation)"; return 0; fi
     say "  · $name"
     rsh "PROXY_NETWORK='$PROXY_NETWORK' APP_CONTAINER='$APP_CONTAINER' \
          APP_IMAGE='$APP_IMAGE' APP_IMAGE_ID='${APP_IMAGE_ID:-}' \
-         APP_DOMAINS='$APP_DOMAINS' ROUTER_PREFIX='$ROUTER_PREFIX' bash -s" < "$step" \
+         APP_DOMAINS='$APP_DOMAINS' ROUTER_PREFIX='$ROUTER_PREFIX' \
+         BASICAUTH_USERS='$BASICAUTH_USERS' bash -s" < "$step" \
       || die "$name a échoué sur ${DEPLOY_HOST}" \
              "le message ci-dessus vient de la cible" \
              "rien n'a été laissé sur son système de fichiers : les scripts passent par stdin"
@@ -203,19 +214,38 @@ fi
 
 [ "$APPLY" -eq 1 ] && confirm
 
+load_secrets
+
 title "Préparation"
 run_step "$HERE/steps/00-preflight.sh"
 run_step "$HERE/steps/30-network.sh"
 
 title "Construction"
+# Le site est construit ICI, par Hugo, puis embarqué dans une image. Le contenu
+# vit dans l'image : une image a un digest, s'atteste et se déploie par digest ;
+# un répertoire déposé sur l'hôte, non.
+SRC="$REPO/site"
+[ -d "$SRC" ] || die "site/ introuvable : $SRC" "ce lanceur déploie le site Hugo, plus le squelette v0"
+
 if [ "$APPLY" -eq 1 ]; then
-    APP_IMAGE_ID="$(tar -C "$HERE/skeleton" -cf - . \
+    command -v hugo >/dev/null || die "hugo est absent du poste de contrôle" \
+        "snap install hugo   # ou l'équivalent de votre distribution"
+    say "  · hugo"
+    ( cd "$SRC" && rm -rf public resources && hugo --logLevel error ) \
+        || die "la construction du site a échoué"
+
+    BUILD="$(mktemp -d)"; trap 'rm -rf "$BUILD"' EXIT
+    cp -r "$SRC/public" "$BUILD/public"
+    printf 'FROM ghcr.io/static-web-server/static-web-server:2\nCOPY public/ /public/\n' > "$BUILD/Dockerfile"
+
+    say "  · image, contexte envoyé par stdin"
+    APP_IMAGE_ID="$(tar -C "$BUILD" -cf - Dockerfile public \
         | rsh "docker build -q -t '$APP_IMAGE' -" | tail -1)" \
         || die "la construction de l'image a échoué"
     export APP_IMAGE_ID
     ok "image $APP_IMAGE_ID"
 else
-    say "  · contexte envoyé par stdin, image construite sur la cible (simulation)"
+    say "  · hugo construirait $SRC, puis l'image (simulation)"
 fi
 
 title "Lancement"

@@ -1,0 +1,13 @@
+{
+  "authenticated": false,
+  "mode": "default",
+  "person": null,
+  "organisation": {
+    "id": "agm",
+    "name": "AGM Inc.",
+    "did": "did:web:guygold.com",
+    "lei": "5493009W3C3T4JAL0K51"
+  },
+  "roles": ["pour.confirm"],
+  "keyPolicy": { "keyName": "key-1", "ceremonyRequired": true }
+}

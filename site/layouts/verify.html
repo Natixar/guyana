@@ -1,0 +1,30 @@
+{{ define "main" }}
+  <h1>{{ .Title }}</h1>
+  {{ .Content }}
+
+  <div class="card">
+    <h2><span class="step">1</span> {{ partial "t" "vStep1" }}</h2>
+    <p class="muted">{{ partial "t" "vStep1Body" }}</p>
+    <p><input type="file" accept=".json,application/json" data-vc-file></p>
+    <details><summary>{{ partial "t" "vOrPaste" }}</summary>
+      <textarea rows="5" data-vc-text spellcheck="false"></textarea></details>
+    <p><span data-vc-status class="badge badge--pending">{{ partial "t" "vAwaiting" }}</span></p>
+    <div data-did-hint class="hint" hidden></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">2</span> {{ partial "t" "vStep2" }}</h2>
+    <p class="muted">{{ partial "t" "vStep2Body" }}</p>
+    <p><input type="file" accept=".json,application/json" data-did-file></p>
+    <details><summary>{{ partial "t" "vOrPaste" }}</summary>
+      <textarea rows="5" data-did-text spellcheck="false"></textarea></details>
+    <p><span data-did-status class="badge badge--pending">{{ partial "t" "vAwaiting" }}</span></p>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">3</span> {{ partial "t" "vStep3" }}</h2>
+    <p data-verdict hidden></p>
+    <div data-contents hidden></div>
+    <p class="muted">{{ partial "t" "vScope" }}</p>
+  </div>
+{{ end }}

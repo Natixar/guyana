@@ -1,0 +1,11 @@
+{{/* Bandeau de mode dégradé. Masqué par défaut, révélé par le script quand
+     /api/me indique que personne n'est authentifié.
+
+     Le remède au « n'importe qui génère un DID AGM » n'est pas d'ajouter un
+     formulaire : c'est que la page dise la vérité sur son propre état. Une page
+     qui annonce ses limites inspire plus confiance qu'une page qui n'a pas l'air
+     d'en avoir. */}}
+<div class="banner banner--demo" data-demo-banner hidden>
+  <strong>{{ partial "t" "demoTitle" }}</strong>
+  <span>{{ partial "t" "demoBody" }}</span>
+</div>

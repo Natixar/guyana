@@ -1,0 +1,169 @@
+{{/* Jetons incorporés à la construction. Un @import survivrait à la
+     minification et le navigateur demanderait /css/tokens.css, qui n'est
+     jamais publié : la page s'afficherait sans aucune couleur ni police. */}}
+{{ (resources.Get "css/tokens.css").Content | safeCSS }}
+
+/* Inter, embarquée. Copiée depuis @fontsource/inter 5.0.17, déjà présent dans
+   les projets Natixar — donc la même fonte que le reste de la marque, et pas
+   une variante récupérée ailleurs. Licence SIL OFL en regard.
+   Auto-hébergée et non appelée chez un tiers : la règle d'intégrité qui vaut
+   pour le JavaScript de cette page vaut pour ses fontes.
+   DM Sans, prévue pour les titres, est ABSENTE des dépôts : Inter assure les
+   deux rôles en attendant qu'on l'obtienne. */
+{{ range slice 300 400 500 600 700 }}
+{{- $f := resources.Get (printf "fonts/inter-%d.woff2" .) | fingerprint "sha256" }}
+@font-face { font-family:"Inter"; font-style:normal; font-weight:{{ . }};
+             src:url("{{ $f.RelPermalink }}") format("woff2"); font-display:swap; }
+{{- end }}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { font-size: var(--font-size); }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-body);
+  font-weight: var(--fw-normal);
+  line-height: 1.6;
+  color: var(--foreground);
+  background: var(--background);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: var(--font-heading); font-weight: var(--fw-semibold);
+             line-height: 1.25; margin: 0 0 .5rem; }
+h1 { font-size: clamp(1.5rem, 4vw, 2rem); }
+h2 { font-size: 1.25rem; }
+p  { margin: 0 0 1rem; }
+
+.wrap { width: min(56rem, 100% - 2.5rem); margin-inline: auto; }
+
+/* En-tête ------------------------------------------------------------- */
+.site-header {
+  background: linear-gradient(135deg, var(--header-gradient-start), var(--header-gradient-end));
+  color: var(--header-foreground);
+  padding: 1rem 0;
+}
+.site-header .wrap { display: flex; align-items: center; gap: 1rem; }
+.brand img { display: block; height: 1.75rem; width: auto; }
+.brand-name {
+  font-family: var(--font-heading); font-weight: var(--fw-semibold);
+  font-size: 1.0625rem; letter-spacing: -.01em;
+  color: var(--header-foreground);
+}
+
+/* Bandeaux --------------------------------------------------------------- */
+.banner {
+  display: flex; flex-wrap: wrap; gap: .5rem;
+  padding: .875rem 1.125rem; margin-bottom: 1.25rem;
+  border-radius: var(--radius); font-size: .9375rem;
+}
+.banner--demo {
+  background: color-mix(in srgb, var(--status-pending) 14%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--status-pending) 45%, transparent);
+  color: var(--foreground);
+}
+.banner[hidden] { display: none; }
+
+/* Contenu ------------------------------------------------------------- */
+main { flex: 1; padding: 2.5rem 0 3rem; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-2xl);
+  padding: 1.75rem;
+  margin-bottom: 1.25rem;
+}
+
+/* Champs de données d'un lingot : la lecture doit être sans ambiguïté,
+   donc chiffres en chasse fixe et libellés en retrait. */
+.facts { display: grid; gap: .75rem; margin: 0; }
+.facts > div { display: grid; grid-template-columns: minmax(9rem, 30%) 1fr;
+               gap: 1rem; align-items: baseline; }
+.facts dt { color: var(--muted-foreground); font-size: .9375rem; }
+.facts dd { margin: 0; font-family: var(--font-mono); font-weight: var(--fw-medium); }
+
+/* Statuts — reprend le vocabulaire de la maquette ---------------------- */
+.badge {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .25rem .625rem; border-radius: 999px;
+  font-size: .8125rem; font-weight: var(--fw-medium);
+}
+.badge::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%;
+                 background: currentColor; }
+.badge--verified { color: var(--status-verified); background: color-mix(in srgb, var(--status-verified) 12%, transparent); }
+.badge--pending  { color: var(--status-pending);  background: color-mix(in srgb, var(--status-pending) 12%, transparent); }
+.badge--warning  { color: var(--status-warning);  background: color-mix(in srgb, var(--status-warning) 12%, transparent); }
+.badge--info     { color: var(--status-info);     background: color-mix(in srgb, var(--status-info) 12%, transparent); }
+
+/* Actions -------------------------------------------------------------- */
+.btn {
+  font: inherit; font-family: var(--font-heading); font-weight: var(--fw-medium);
+  padding: .75rem 1.5rem; border-radius: var(--radius);
+  border: 1px solid transparent; cursor: pointer;
+  transition: background-color .15s ease;
+}
+.btn--primary { background: var(--primary); color: var(--primary-foreground); }
+.btn--primary:hover { background: var(--primary-hover); }
+.btn--primary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+
+.muted { color: var(--muted-foreground); font-size: .9375rem; }
+.subhead { font-family: var(--font-heading); font-size: .9375rem; font-weight: var(--fw-semibold);
+           text-transform: uppercase; letter-spacing: .04em; color: var(--muted-foreground);
+           margin: 1.5rem 0 .25rem; }
+.subhead:first-of-type { margin-top: .5rem; }
+.actions { margin-top: 1.5rem; }
+.actions .muted { margin-left: .75rem; }
+input[type="text"] {
+  font: inherit; font-family: var(--font-mono); margin-top: .35rem;
+  padding: .6rem .75rem; width: min(24rem, 100%);
+  background: var(--input); color: var(--foreground);
+  border: 1px solid var(--input-border); border-radius: var(--radius);
+}
+input[type="text"]:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+textarea {
+  font: inherit; font-family: var(--font-mono); font-size: .8125rem;
+  width: 100%; margin-top: .5rem; padding: .6rem .75rem;
+  background: var(--input); color: var(--foreground);
+  border: 1px solid var(--input-border); border-radius: var(--radius);
+}
+textarea:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+details > summary { cursor: pointer; color: var(--muted-foreground); font-size: .9375rem; }
+
+/* Numéro d'étape : la page se lit de haut en bas, une action par carte. */
+.step {
+  display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem;
+  margin-right: .5rem; border-radius: 50%;
+  background: var(--primary); color: var(--primary-foreground);
+  font-size: .875rem; font-weight: var(--fw-semibold); vertical-align: middle;
+}
+.hint { margin-top: 1rem; padding: .875rem 1.125rem; border-radius: var(--radius);
+        background: var(--background-tertiary); }
+.hint p { margin: 0 0 .5rem; }
+.hint p:last-child { margin-bottom: 0; }
+.hint code { font-family: var(--font-mono); font-size: .875rem; }
+
+.checklist { margin-top: 1rem; }
+.checklist > div { margin-bottom: .5rem; }
+.checklist .detail { margin-left: 1rem; }
+
+/* Marque d'origine d'une valeur : dérivée, estimée, non mesurée. Une valeur
+   mesurée n'est pas marquée — l'absence de marque est le cas normal. */
+.origin-tag {
+  font-family: var(--font-body); font-size: .75rem; font-weight: var(--fw-medium);
+  color: var(--status-info); background: color-mix(in srgb, var(--status-info) 12%, transparent);
+  padding: .1rem .4rem; border-radius: var(--radius-xs); vertical-align: middle;
+}
+
+/* Pied ----------------------------------------------------------------- */
+.site-footer {
+  border-top: 1px solid var(--border);
+  padding: 1.25rem 0; font-size: .875rem; color: var(--muted-foreground);
+}
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
