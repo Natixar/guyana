@@ -1,0 +1,3 @@
+[submodule "deploy/lib"]
+	path = deploy/lib
+	url = https://github.com/CriticalOptimisation/bash-deploy-libs.git
