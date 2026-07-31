@@ -98,8 +98,16 @@ jobs:
       - name: sérialisation canonique — hôte Python
         working-directory: services/store
         run: |
-          python3 -m pip install --quiet pytest
-          python3 -m pytest test_jcs.py -q
+          python3 -m pip install --quiet pytest cryptography
+          python3 -m pytest -q
+
+      # Les deux moitiés d'un seul contrôle. Python signe, JavaScript vérifie —
+      # et l'échec serait muet : une signature DER là où WebCrypto attend r||s
+      # ne lève pas, elle renvoie false, ce qui ressemble à une clé fausse.
+      # Deux implémentations qui se croient d'accord ne valent rien tant
+      # qu'aucune n'a vérifié la signature de l'autre.
+      - name: interopérabilité de signature — Python signe, JavaScript vérifie
+        run: node services/verify-store-signature.mjs
 
   codeql:
     name: codeql
