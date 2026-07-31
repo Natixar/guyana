@@ -14,6 +14,7 @@ import { fetchMe, issuerDid } from "./me.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
 import { buildDidDocument } from "./did.js";
 import { signBlocker, signView } from "./sign-state.js";
+import { aggregate } from "./engine.js";
 
 
 const cases = [];
@@ -144,6 +145,74 @@ test("self-check leaves no key behind", async () => {
   const a = await ephemeralKeyPair(), b = await ephemeralKeyPair();
   const ta = await thumbprint(a), tb = await thumbprint(b);
   return ta === tb ? "ephemeral pairs are not distinct — they are being persisted" : null;
+});
+
+// --- Le moteur, côté navigateur (#66) -------------------------------------
+// Ces cas ne sont pas écrits ici : ils viennent de `/engine/vectors.json`, le
+// même fichier que la suite du signataire exécute dans Node. C'est ce qui rend
+// vérifiable la propriété « un moteur, deux hôtes » — deux copies de cas de
+// test qu'on garde synchrones à la main ne prouveraient rien.
+//
+// TÂCHE 4 : le moteur est un squelette qui lève. Ces cas DOIVENT échouer.
+
+let vectors = null;
+
+async function loadVectors() {
+  if (vectors) return vectors;
+  const r = await fetch("/engine/vectors.json", { headers: { accept: "application/json" } });
+  if (!r.ok) throw new Error(`vecteurs introuvables : HTTP ${r.status}`);
+  vectors = await r.json();
+  return vectors;
+}
+
+async function loadTaxonomy() {
+  const r = await fetch("/engine/taxonomy.json", { headers: { accept: "application/json" } });
+  if (!r.ok) throw new Error(`taxonomie introuvable : HTTP ${r.status}`);
+  return r.json();
+}
+
+test("moteur — les vecteurs partagés sont servis et lisibles", async () => {
+  const v = await loadVectors();
+  if (!Array.isArray(v.cases) || v.cases.length === 0) return "aucun cas dans les vecteurs";
+  return null;
+});
+
+// Les vecteurs déclarent la version de taxonomie qu'ils supposent. Servir une
+// autre version rendrait les attentes fausses sans rien casser de visible : la
+// dérive se déclare ici plutôt que de se découvrir sur un chiffre signé.
+test("moteur — vecteurs et taxonomie servie parlent de la même version", async () => {
+  const [v, taxonomy] = await Promise.all([loadVectors(), loadTaxonomy()]);
+  return v.taxonomy === taxonomy.version
+    ? null
+    : `vecteurs pour ${v.taxonomy}, taxonomie servie en ${taxonomy.version}`;
+});
+
+test("moteur — chaque vecteur redonne le profil attendu", async () => {
+  const v = await loadVectors();
+  const taxonomy = await loadTaxonomy();
+
+  const failures = [];
+  for (const c of v.cases) {
+    try {
+      const got = aggregate(c.cells, taxonomy);
+      if (c.expect.error) { failures.push(`${c.name} : aurait dû lever ${c.expect.error}`); continue; }
+      for (const [line, want] of Object.entries(c.expect.lines)) {
+        // Les facteurs sont décimaux : on compare à la tolérance du flottant,
+        // pas à l'égalité stricte, qui échouerait sur 0.61 + 2.68.
+        if (Math.abs((got.lines?.[line] ?? 0) - want) > 1e-9) {
+          failures.push(`${c.name} : ligne ${line} attendue ${want}, obtenue ${got.lines?.[line]}`);
+        }
+      }
+      if (got.origin !== c.expect.origin) failures.push(`${c.name} : origine ${got.origin}, attendue ${c.expect.origin}`);
+      if (Math.abs((got.unallocated ?? 0) - c.expect.unallocated) > 1e-9) {
+        failures.push(`${c.name} : non-alloué ${got.unallocated}, attendu ${c.expect.unallocated}`);
+      }
+    } catch (err) {
+      if (c.expect.error && String(err.message).includes(c.expect.error)) continue;
+      failures.push(`${c.name} : ${err.message ?? err}`);
+    }
+  }
+  return failures.length ? failures.join(" | ") : null;
 });
 
 // Chaîne complète : identité, coulée, attestation signée. C'est le seul
