@@ -80,6 +80,47 @@ Le fichier de vecteurs est servi à `/engine/vectors.json` pour le navigateur et
 lu directement dans le dépôt par le signataire : une source, deux lecteurs,
 aucune étape de construction pour les désynchroniser.
 
+## La sérialisation se duplique, la sémantique jamais
+
+Le magasin est en Python et signe ce qu'il sert ; le signataire est en Node et
+vérifie cette signature. Ce qui est signé, ce sont des octets — donc RFC 8785
+existe deux fois dans ce dépôt.
+
+C'est un arbitrage assumé, et la règle qui le gouverne mérite d'être écrite :
+
+> **On duplique la sérialisation, jamais la sémantique.** Cent vingt lignes de
+> JCS écrites deux fois se tiennent par des vecteurs partagés. Le moteur écrit
+> deux fois ne se tiendrait par rien.
+
+### L'alternative écartée : un proxy Node devant le magasin
+
+Elle vaut mieux que son sort ici, et elle reviendra. Un conteneur Node placé
+devant le service Python sérialiserait et signerait en JavaScript ; JCS
+n'existerait qu'une fois. Ce n'est pas cher — nous ne sommes pas à un conteneur
+près — et c'était probablement le chemin le plus court.
+
+Ce qu'elle échange :
+
+- **Elle ne supprime pas le risque, elle le déplace.** Python produirait la
+  structure, Node la sérialiserait, et entre les deux passe un aller-retour
+  JSON. Les flottants IEEE 754 y survivent exactement, mais un entier au-delà
+  de 2^53 perdrait sa précision en silence côté JavaScript, et un `NUMERIC`
+  PostgreSQL arrive en `Decimal` — chaîne ou flottant, et le choix compte.
+  « Deux sérialiseurs doivent s'accorder » devient « un sérialiseur doit
+  recevoir exactement ce que l'autre voulait dire » : plus étroit et mieux
+  balisé, pas nul.
+- **Elle ajoute un saut sur le chemin de lecture**, celui-là même qui doit
+  rester rapide et streamable. Un proxy qui doit analyser toute la charge pour
+  la re-sérialiser double la mémoire et interdit le streaming. Négligeable en
+  H1, réel à l'échelle H3.
+- **Elle rend le magasin incapable de signer seul.** Les vecteurs partagés, eux,
+  sont devenus un actif de spécification : le jour où un SDK client apparaît
+  dans un troisième langage, il a de quoi se conformer.
+
+**À revisiter** si le magasin doit signer autre chose que des extractions, ou si
+un troisième langage apparaît côté serveur. À ce moment-là le proxy redevient le
+bon choix, et il vaut mieux que la raison soit écrite que redécouverte.
+
 ## Admissible, et non « bien formée »
 
 Tout ce qu'un client sait exprimer, Natixar l'attestera. La grammaire de requête
