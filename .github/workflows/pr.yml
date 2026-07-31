@@ -45,7 +45,11 @@ jobs:
           # Ce qui EST vérifiable aujourd'hui : qu'aucun script n'appelle une
           # commande par un chemin absolu codé en dur, ce qui contournerait le
           # garde le jour où il sera en place.
-          if grep -nE '(^|[^[:alnum:]_/])/(usr/)?s?bin/[a-z]' deploy/deploy.sh deploy/steps/*.sh deploy/secrets/*.sh; then
+          # Le shebang est exclu : c'est le seul chemin absolu légitime, et il
+          # ne passe par aucun garde puisqu'il précède l'interpréteur.
+          if grep -nE '(^|[^[:alnum:]_/])/(usr/)?s?bin/[a-z]' \
+               deploy/deploy.sh deploy/steps/*.sh deploy/secrets/*.sh \
+             | grep -v ':1:#!'; then
             echo "::error::chemin absolu codé en dur vers une commande"
             exit 1
           fi
