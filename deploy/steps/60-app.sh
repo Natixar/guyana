@@ -10,6 +10,7 @@
 
 set -euo pipefail
 : "${APP_CONTAINER:?}" "${APP_IMAGE:?}" "${PROXY_NETWORK:?}" "${APP_DOMAINS:?}" "${ROUTER_PREFIX:?}"
+: "${BASICAUTH_USERS:?BASICAUTH_USERS must be supplied by the launcher, from secrets/fetch.sh}"
 
 # --- Vérification de l'image ---------------------------------------------
 # Le plan exige un déploiement par digest attesté. Tant que la chaîne
@@ -28,6 +29,17 @@ fi
 # --- Construction des labels de routage ----------------------------------
 labels=( --label traefik.enable=true )
 
+# Authentification et en-têtes de sécurité, déclarés sur NOTRE conteneur : la
+# configuration de Traefik appartient à un autre projet et serait écrasée.
+# frame-ancestors ne pouvant pas être délivré par un <meta>, c'est ici que
+# l'équivalent effectif est posé.
+labels+=( --label "traefik.http.middlewares.${ROUTER_PREFIX}-auth.basicauth.users=${BASICAUTH_USERS}" )
+labels+=( --label "traefik.http.middlewares.${ROUTER_PREFIX}-auth.basicauth.headerfield=X-Webauth-User" )
+labels+=( --label "traefik.http.middlewares.${ROUTER_PREFIX}-sec.headers.frameDeny=true" )
+labels+=( --label "traefik.http.middlewares.${ROUTER_PREFIX}-sec.headers.contentTypeNosniff=true" )
+labels+=( --label "traefik.http.middlewares.${ROUTER_PREFIX}-sec.headers.referrerPolicy=strict-origin-when-cross-origin" )
+mw="${ROUTER_PREFIX}-auth@docker,${ROUTER_PREFIX}-sec@docker"
+
 i=0
 for domain in $APP_DOMAINS; do
   i=$((i+1))
@@ -35,6 +47,7 @@ for domain in $APP_DOMAINS; do
   labels+=( --label "traefik.http.routers.${r}.rule=Host(\`${domain}\`)" )
   labels+=( --label "traefik.http.routers.${r}.entrypoints=websecure" )
   labels+=( --label "traefik.http.routers.${r}.tls=true" )
+  labels+=( --label "traefik.http.routers.${r}.middlewares=${mw}" )
 done
 
 # Routeur générique : rend le service indifférent au domaine, ce qui permet de
@@ -45,6 +58,7 @@ labels+=( --label "traefik.http.routers.${ROUTER_PREFIX}-any.rule=HostRegexp(\`^
 labels+=( --label "traefik.http.routers.${ROUTER_PREFIX}-any.entrypoints=websecure" )
 labels+=( --label "traefik.http.routers.${ROUTER_PREFIX}-any.tls=true" )
 labels+=( --label "traefik.http.routers.${ROUTER_PREFIX}-any.priority=1" )
+labels+=( --label "traefik.http.routers.${ROUTER_PREFIX}-any.middlewares=${mw}" )
 
 labels+=( --label "traefik.http.services.${ROUTER_PREFIX}-app.loadbalancer.server.port=80" )
 

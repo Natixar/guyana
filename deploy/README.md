@@ -56,7 +56,7 @@ déployé doit être ce qui est commité.
 | `secrets/fetch.sh` | adaptateur unique vers la source de secrets (bouchon aujourd'hui, interface définitive) |
 | `steps/` | ce qui agit sur la cible, exécuté par stdin |
 | `verify/` | ce qui affirme les invariants — **spécification**, pas tests d'implémentation |
-| `skeleton/` | contenu de l'image du squelette. Temporaire : appartient au CI applicatif dès qu'il existe |
+| — | le contenu déployé vient de `site/`, construit par Hugo. `skeleton/` a été retiré : il était marqué temporaire et l'application existe désormais |
 | `GAPS.md` | écarts entre le plan et la réalité, avec leur statut |
 
 ## Pourquoi `verify/` est séparé de `steps/`
