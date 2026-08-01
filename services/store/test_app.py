@@ -203,3 +203,59 @@ def test_fetching_one_bar_returns_both_of_its_credentials(conn):
     found = db.credential_by_subject(conn, SUBJECT)
     assert {c["type"] for c in found} == {"DoreBarOriginCredential", "CarbonIntensityCredential"}
     assert db.credential_by_subject(conn, "urn:aurora:dore:inconnu") == []
+
+
+# --- Les rôles ------------------------------------------------------------
+# Un menu qui cache un lien ne protège de rien. Ces cas affirment que le refus
+# est dans le service, là où `curl` le rencontre aussi.
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+import app as store_app  # noqa: E402
+
+
+@pytest.fixture()
+def client(conn):
+    return TestClient(store_app.app)
+
+
+def _as(client, user, path, method="get", **kw):
+    return getattr(client, method)(path, headers={"X-Webauth-User": user}, **kw)
+
+
+def test_the_verifier_cannot_browse_the_cube(client):
+    """`demo` vérifie une barre qu'on lui a remise, hors ligne. Lui ouvrir le
+    cube lui donnerait le rythme de production d'AGM en prime."""
+    r = _as(client, "demo", "/api/v1/ranges", "post",
+            json={"periods": [{"start": "2025-01-01T04:00:00Z", "end": "2025-02-01T04:00:00Z"}]})
+    assert r.status_code == 403
+
+
+def test_the_verifier_cannot_list_the_other_bars(client):
+    assert _as(client, "demo", "/api/v1/credentials/index").status_code == 403
+    assert _as(client, "demo", "/api/v1/credentials").status_code == 403
+
+
+def test_natixar_sees_counts_but_never_a_bar(client):
+    """L'exploitant surveille une plateforme ; il ne parcourt pas les lingots."""
+    assert _as(client, "natixar", "/api/v1/counts").status_code == 200
+    assert _as(client, "natixar", "/api/v1/credentials/index").status_code == 403
+
+
+def test_the_mine_reaches_its_own_data(client):
+    assert _as(client, "agm-randy", "/api/v1/credentials/index").status_code == 200
+    assert _as(client, "agm-randy", "/api/v1/counts").status_code == 403
+
+
+def test_an_unknown_user_gets_nothing(client):
+    """Un nom inconnu n'hérite d'aucun droit — le défaut est le refus."""
+    assert _as(client, "inconnu", "/api/v1/credentials/index").status_code == 403
+    assert client.get("/api/v1/credentials/index").status_code == 403
+
+
+def test_me_stays_open_and_declares_the_grants(client):
+    """Le menu se déduit de /me, donc /me reste lisible par tous — mais il
+    DÉCRIT les droits, il ne les accorde pas."""
+    body = _as(client, "demo", "/api/v1/me").json()
+    assert body["authenticated"] is True
+    assert body["grants"] == []
