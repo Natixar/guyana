@@ -191,6 +191,43 @@ Un dossier qui surpromet se démonte en une question. Voici les cinq limites, av
 
 ---
 
+## 5 bis. Les hypothèses de production — à dire avant qu'on les demande
+
+La démonstration porte sur **378 lingots de doré, année 2025**. Quatre hypothèses
+les font exister, et elles sont toutes assumées. Si le jury les découvre en
+posant une question, elles ressemblent à un raccourci ; énoncées d'avance, elles
+ressemblent à ce qu'elles sont — un modèle explicite, versionné, et remplaçable
+par les vraies données le jour où elles arrivent.
+
+| Hypothèse | Pourquoi |
+|---|---|
+| Le cycle de production dure **un mois** | Le minerai extrait un mois est traité et coulé le suivant. C'est court pour une mine, et c'est le seul point où nous simplifions la réalité physique. |
+| Les lingots sont coulés **en début de mois** | Le volume est faible — une trentaine de lingots par mois — donc la coulée est intermittente et non continue. |
+| Les opérations d'un lot sont les consommations des départements de production du **mois précédent** | C'est le cycle d'un mois, appliqué. Un lingot coulé le 1er mars porte le gazole de février. |
+| La fenêtre est **février à décembre**, pas l'année pleine | Des lingots coulés début janvier puiseraient dans décembre 2024, que nous n'avons pas. La fenêtre couvre **93,2 % des onces de l'année**. |
+
+**Ce qui est fabriqué, et ce qui ne l'est pas.** Le registre de coulée d'AGM — le
+jeu de données G-01 — est encore partiel : les onces mensuelles existent, mais la
+date de coulée, l'identifiant de lingot, le poids et le titre n'ont pas été
+fournis. Ces quatre champs sont donc simulés, et l'attestation le déclare dans un
+champ prévu pour cela (`eventModel: "simulated-v1"`). Tout le reste — les litres
+de gazole, les départements, les explosifs, les onces par mois — vient du paquet
+réel d'AGM.
+
+**La phrase à dire si on vous interroge :** *« La chaîne de preuve est réelle et
+tourne ; le registre de coulée est simulé parce que la mine ne nous l'a pas encore
+transmis, et l'attestation le déclare elle-même. »* C'est plus fort qu'un silence,
+et c'est vérifiable — le champ est dans le fichier signé.
+
+**Le périmètre organisationnel.** Pour le pilote, la mine est traitée comme un
+ensemble, et les entreprises sous-traitantes comme des directions regroupant des
+départements. Distinguer ce qu'AGM exploite de ce qu'elle ne fait que financer —
+les engins lourds de Sinohydro, par exemple — demanderait un audit du pouvoir de
+décision. **Cela ne change pas le chiffre par lingot** : cela change la ligne du
+référentiel où l'émission se range, pas le total qu'un lingot porte.
+
+---
+
 ## 6. Les cinq questions que le jury posera, et les réponses vraies
 
 **« Combien d'utilisateurs, quelle adoption ? »**
