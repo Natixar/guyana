@@ -61,8 +61,8 @@ function lotSection(lot, bars, heldRefs, storeSubjects) {
     const href = `/bar/?id=${encodeURIComponent(bar.internalId)}`;
     return `<tr>
       <td><a href="${href}">${bar.internalId}</a></td>
-      <td class="num">${bar.ounces.toFixed(2)}</td>
-      <td class="num">${bar.weightKg.toFixed(3)}</td>
+      <td class="num">${bar.fineGoldKg.toFixed(3)}</td>
+      <td class="num">${bar.grossMassKg.toFixed(3)}</td>
       <td><span class="badge badge--${st.kind}">${st.label}</span></td>
       <td><a class="btn btn--small" href="${href}">${T.registerOpen}</a></td>
     </tr>`;
@@ -77,8 +77,8 @@ function lotSection(lot, bars, heldRefs, storeSubjects) {
     </summary>
     <table class="register">
       <thead><tr>
-        <th>${T.barInternalId}</th><th class="num">${T.barOunces}</th>
-        <th class="num">${T.barWeight}</th><th>Status</th><th></th>
+        <th>${T.barInternalId}</th><th class="num">${T.barFineGold}</th>
+        <th class="num">${T.barGrossMass}</th><th>Status</th><th></th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>

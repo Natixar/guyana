@@ -45,25 +45,27 @@ function fault(code, detail) {
 }
 
 /**
- * Le profil est publié en tCO2e — exigence du §4.5 — alors que les bases de
- * facteurs sont presque toutes en kgCO2e par unité d'activité. La conversion
- * existe donc, et le seul choix ouvert est de la rendre visible ou de la
- * laisser implicite.
+ * TOUT EST EN SI. Le moteur produit des kgCO2e, un point c'est tout.
  *
- * Elle est ici, et une unité de facteur inconnue est **refusée**. Supposer le
- * kilogramme donnerait un facteur mille silencieux sur un chiffre signé — la
- * classe d'erreur exacte qu'une attestation ne peut pas se permettre.
+ * Les bases de facteurs sont déjà en kgCO2e par unité d'activité : ne rien
+ * convertir supprime la conversion, et avec elle la classe d'erreur qu'elle
+ * portait. Un facteur mille silencieux sur un chiffre signé n'est plus
+ * possible parce qu'il n'y a plus de facteur mille à appliquer.
+ *
+ * Publier en tCO2e, quand un référentiel l'exige, est une affaire de rendu :
+ * cela se divise par mille au moment d'écrire un rapport, pas au moment de
+ * calculer, et surtout pas au moment de signer.
+ *
+ * Une unité de facteur qui n'est pas en kgCO2e est REFUSÉE plutôt que
+ * convertie. Convertir supposerait qu'on a compris ce que l'autre voulait
+ * dire ; refuser le lui fait dire.
  */
-const RESULT_UNIT = "tCO2e";
+const RESULT_UNIT = "kgCO2e";
 
-const TO_TONNES = { kgCO2e: 1e-3, tCO2e: 1 };
-
-/** « kgCO2e/L » → 0.001. L'unité d'activité ne regarde pas la conversion. */
-function toTonnes(factorUnit) {
+/** « kgCO2e/L » -> « kgCO2e ». L'unité d'activité ne regarde pas ce contrôle. */
+function assertMassUnit(factorUnit) {
   const mass = String(factorUnit ?? "").split("/")[0];
-  const k = TO_TONNES[mass];
-  if (k === undefined) throw fault("FACTOR_UNIT_UNKNOWN", String(factorUnit));
-  return k;
+  if (mass !== RESULT_UNIT) throw fault("FACTOR_UNIT_NOT_SI", String(factorUnit));
 }
 
 const worstOrigin = (a, b) =>
@@ -135,8 +137,8 @@ export function translate({ subPost, partType, caracterisation }, taxonomy) {
  * @param {Array<object>} cells
  * @param {object} taxonomy
  * @returns {{pivot: Array<object>, lines: Record<string, number>, origin: string,
- *            unallocated: number, unit: string, groups: number}} montants en tCO2e.
- *          `pivot` est ce qui se signe ; `lines` est la vue dérivée.
+ *            unallocated: number, unit: string, groups: number}}
+ *          `pivot` est ce qui se signe ; `lines` est la vue dérivée. Montants en kgCO2e.
  */
 export function aggregate(cells, taxonomy) {
   if (!Array.isArray(cells)) throw fault("CELLS_REQUIRED");
@@ -148,7 +150,8 @@ export function aggregate(cells, taxonomy) {
   let origin = ORIGIN_RANK[0];
 
   for (const cell of cells) {
-    const emission = cell.value * cell.factor * toTonnes(cell.factorUnit);
+    assertMassUnit(cell.factorUnit);
+    const emission = cell.value * cell.factor;
     origin = worstOrigin(origin, cell.origin ?? "NOT_MEASURED");
 
     // Ce que la cartographie n'atteint pas reste visible en tant que tel. Le

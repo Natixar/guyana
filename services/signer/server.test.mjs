@@ -68,8 +68,8 @@ async function request(over = {}) {
     extraction: await signedExtraction([CELL]),
     dispositions: [{ id: "c1", use: "USED" }],
     denominator: 2,
-    denominatorUnit: "tCO2e/oz",
-    value: 1.34,
+    denominatorUnit: "kg",
+    value: 1340,
     ...over,
   };
 }
@@ -85,7 +85,8 @@ test("un cas nominal rend une attestation signée", async () => {
   assert.equal(r.status, 201);
   assert.equal(r.body.proof?.cryptosuite, "ecdsa-jcs-2019");
   assert.ok(r.body.proof.proofValue.startsWith("z"));
-  assert.equal(r.body.credentialSubject.carbonIntensity.value, 1.34);
+  assert.equal(r.body.credentialSubject.carbonIntensity.value, 1340);
+  assert.equal(r.body.credentialSubject.carbonIntensity.unit, "kgCO2e/kg");
   assert.equal(r.body.type[1], "CarbonIntensityCredential");
 });
 
@@ -128,19 +129,17 @@ test("les exclusions voyagent jusqu'au vérificateur", async () => {
 });
 
 test("un refus est une réponse, pas un incident : 422 et un code stable", async () => {
-  // 5 est vraisemblable et faux — le recalcul donne 1,34. Une valeur absurde
-  // serait rejetée par le contrôle 1 et ne dirait rien du contrôle 4 : l'ordre
-  // des contrôles est lui-même une propriété, et un test qui l'ignore mesure
-  // autre chose que ce qu'il annonce.
-  const r = await call("/api/v1/sign", await request({ value: 5 }));
+  const r = await call("/api/v1/sign", await request({ value: 5000 }));
   assert.equal(r.status, 422);
   assert.equal(r.body.error, "VALUE_MISMATCH");
 });
 
-test("l'ordre des contrôles tient : l'invraisemblable est rejeté avant le recalcul", async () => {
-  const r = await call("/api/v1/sign", await request({ value: 1e9 }));
+test("l'ordre des contrôles tient : l'admissibilité passe avant le recalcul", async () => {
+  // Unité hors SI ET chiffre faux : c'est l'admissibilité qui répond, parce
+  // qu'elle est le premier contrôle et le moins cher.
+  const r = await call("/api/v1/sign", await request({ denominatorUnit: "oz", value: 9e9 }));
   assert.equal(r.status, 422);
-  assert.equal(r.body.error, "VALUE_IMPLAUSIBLE");
+  assert.equal(r.body.error, "DENOMINATOR_UNIT_NOT_SI");
 });
 
 test("une extraction non signée est refusée avec son code", async () => {

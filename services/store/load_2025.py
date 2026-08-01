@@ -42,16 +42,19 @@ FIXTURE = ROOT / "site" / "static" / "engine" / "erp-fixture.json"
 #: Feuille 9 du paquet. Cinq des six sont marqués « provisional » par AGM ;
 #: seul le facteur de combustion du gazole est accepté, et seulement parce que
 #: janvier réconcilie à −0,16 % contre leur propre classeur.
-DIESEL_COMBUSTION = 2.68     # kgCO2e / L
-DIESEL_UPSTREAM = 0.61       # kgCO2e / L, well-to-tank
-EXPLOSIVE = 0.17             # kgCO2e / kg
+# TOUT EST EN SI. La feuille 9 donne les facteurs par litre, parce que les bons
+# de sortie comptent en litres ; le cube ne connaît que le mètre cube. Convertir
+# ici, une fois, vaut mieux que de porter deux unités jusqu'au bout.
+DIESEL_COMBUSTION = 2.68 * 1000     # kgCO2e / m3
+DIESEL_UPSTREAM = 0.61 * 1000       # kgCO2e / m3, well-to-tank
+EXPLOSIVE = 0.17                    # kgCO2e / kg, déjà SI
 
 #: Identifiants de la taxonomie servie, agm-h1-v2.
 PART_COMBUSTION, PART_AMONT = 1, 2
 CARAC_OPERATED, CARAC_PROCEDEED = 1, 2
 SUBPOST_EXPLOSIVES = 1005
 
-UNITS = {"L": 1, "kg": 2}
+UNITS = {"m3": 1, "kg": 2}
 
 
 #: Le Guyana est à UTC−4 toute l'année, sans heure d'été.
@@ -83,7 +86,7 @@ def read_pack():
     fuel, explosives = [], []
     for r in wb["3. Fuel by consumer"].iter_rows(min_row=6, values_only=True):
         if r[1] and isinstance(r[3], (int, float)):
-            fuel.append({"month": r[0], "department": r[1], "litres": float(r[3])})
+            fuel.append({"month": r[0], "department": r[1], "m3": float(r[3]) / 1000.0})
     for r in wb["7. Explosives"].iter_rows(min_row=6, values_only=True):
         if r[1] and isinstance(r[2], (int, float)):
             explosives.append({"month": r[0], "product": r[1], "kg": float(r[2])})
@@ -129,8 +132,8 @@ def build_cells(fuel, explosives, assignment, org):
                 "entity_id": dept["id"],
                 "sub_post": sub_post, "part_type": part,
                 "caracterisation": CARAC_OPERATED,
-                "value": row["litres"], "unit": "L",
-                "factor": factor, "factor_unit": "kgCO2e/L",
+                "value": row["m3"], "unit": "m3",
+                "factor": factor, "factor_unit": "kgCO2e/m3",
                 "origin": "MEASURED",
             })
 
@@ -246,14 +249,14 @@ def main() -> int:
     org = organisation()
     cells = build_cells(fuel, explosives, assignment, org)
 
-    litres = sum(c["value"] for c in cells if c["unit"] == "L" and c["part_type"] == PART_COMBUSTION)
+    m3 = sum(c["value"] for c in cells if c["unit"] == "m3" and c["part_type"] == PART_COMBUSTION)
     tonnes = sum(c["value"] * c["factor"] for c in cells) / 1000
 
     # Le résumé est un diagnostic, pas une donnée : il va sur stderr, sinon il
     # se mêle au SQL quand celui-ci part dans un tuyau.
     industrial = sum(1 for d in org.values() if d["industrial"])
     say = lambda m: print(m, file=sys.stderr)
-    say(f"{len(cells)} cellules — {litres:,.0f} L de gazole, {tonnes:,.0f} tCO2e au total")
+    say(f"{len(cells)} cellules — {m3:,.0f} m3 de gazole, {tonnes:,.0f} tCO2e au total")
     say(f"  organisation : {len(org)} départements, dont {industrial} industriels")
     say(f"  affectation : {assignment['version']} ({assignment['status'].split(' - ')[0]})")
 

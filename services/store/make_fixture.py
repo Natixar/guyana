@@ -47,6 +47,12 @@ OUT = ROOT / "site" / "static" / "engine" / "erp-fixture.json"
 
 TOTAL_BARS = 378
 
+#: TOUT EST EN SI. Le paquet AGM rapporte en onces troy, parce que c'est ainsi
+#: que l'or se vend ; le modèle, lui, ne connaît que le kilogramme. Convertir
+#: une fois, ici, à l'entrée, vaut mieux que de porter deux unités jusqu'au
+#: bout et de laisser quelqu'un se tromper de facteur trente et un.
+TROY_OUNCE_KG = 0.0311034768
+
 #: Le Guyana ne pratique pas l'heure d'été : un décalage fixe suffit, et évite
 #: d'embarquer une base de fuseaux dans le navigateur.
 GUYANA = timezone(timedelta(hours=-4))
@@ -95,14 +101,14 @@ def previous_month(label: str) -> str:
     return f"{year - (month == 1)}-{12 if month == 1 else month - 1:02d}"
 
 
-def bars_per_month(ounces: dict[str, float], window: list[str]) -> dict[str, int]:
-    """Au prorata des onces, par plus grand reste.
+def bars_per_month(gold_kg: dict[str, float], window: list[str]) -> dict[str, int]:
+    """Au prorata de l'or fin produit, par plus grand reste.
 
     Arrondir chaque mois indépendamment donnerait 374 ou 381 barres, et un total
     qui ne tombe pas juste se remarque tout de suite dans une démonstration.
     """
-    total = sum(ounces[m] for m in window)
-    raw = {m: TOTAL_BARS * ounces[m] / total for m in window}
+    total = sum(gold_kg[m] for m in window)
+    raw = {m: TOTAL_BARS * gold_kg[m] / total for m in window}
     counts = {m: int(v) for m, v in raw.items()}
     for m, _ in sorted(raw.items(), key=lambda kv: kv[1] - int(kv[1]), reverse=True)[
         : TOTAL_BARS - sum(counts.values())
@@ -116,20 +122,23 @@ def main() -> int:
 
     wb = openpyxl.load_workbook(PACK, data_only=True)
 
-    ounces = {}
+    # Converti dès la lecture : au-delà de cette ligne, plus une once.
+    gold_kg = {}
     for r in wb["6. Production"].iter_rows(min_row=6, values_only=True):
         if r[0] and isinstance(r[7], (int, float)):
-            ounces[r[0]] = float(r[7])
+            gold_kg[r[0]] = float(r[7]) * TROY_OUNCE_KG
 
     fuel: dict[str, dict[str, float]] = {}
     for r in wb["3. Fuel by consumer"].iter_rows(min_row=6, values_only=True):
         if r[1] and isinstance(r[3], (int, float)):
-            fuel.setdefault(r[0], {})[r[1]] = float(r[3])
+            # Litres -> mètres cubes. Le paquet compte en litres parce que
+            # les bons de sortie le font ; le modèle n'a qu'une unité de volume.
+            fuel.setdefault(r[0], {})[r[1]] = float(r[3]) / 1000.0
 
     explosives: dict[str, dict[str, float]] = {}
     for r in wb["7. Explosives"].iter_rows(min_row=6, values_only=True):
         if r[1] and isinstance(r[2], (int, float)):
-            explosives.setdefault(r[0], {})[r[1]] = float(r[2])
+            explosives.setdefault(r[0], {})[r[1]] = float(r[2])   # déjà en kg
 
     assignment = json.loads(ASSIGNMENT.read_text("utf-8"))
     names = [e["department"] for e in assignment["emissionBearing"]["fuel"]]
@@ -154,15 +163,15 @@ def main() -> int:
     }
     blast_step = next(s["id"] for s in process["steps"] if s["consumesExplosives"])
 
-    source_of = {m: previous_month(m) for m in sorted(ounces)}
+    source_of = {m: previous_month(m) for m in sorted(gold_kg)}
     synthetic = sorted({m for m in source_of.values() if m not in fuel})
     for missing in synthetic:
         donor = f"{int(missing.split('-')[0]) + 1}-12"
         fuel[missing] = dict(fuel[donor])
         explosives[missing] = dict(explosives.get(donor, {}))
 
-    window = sorted(ounces)
-    counts = bars_per_month(ounces, window)
+    window = sorted(gold_kg)
+    counts = bars_per_month(gold_kg, window)
 
     lots, bars = [], []
     for pour_month in window:
@@ -180,14 +189,14 @@ def main() -> int:
             # Le paquet de données du lot. Un seul procédé en H1, donc un seul
             # paquet possible : gazole par département, explosifs par produit.
             "dataPackage": {
-                "diesel": [{"department": dept_id[d], "litres": round(v, 3)}
+                "diesel": [{"department": dept_id[d], "m3": round(v, 6)}
                            for d, v in sorted(fuel.get(source, {}).items()) if d in dept_id],
                 "explosives": [{"step": blast_step, "product": p, "kg": round(v, 3)}
                                for p, v in sorted(explosives.get(source, {}).items())],
             },
         })
 
-        oz_each = ounces[pour_month] / counts[pour_month]
+        fine_kg = gold_kg[pour_month] / counts[pour_month]
         pour_start, _ = month_bounds(pour_month)
         for n in range(1, counts[pour_month] + 1):
             bars.append({
@@ -197,8 +206,10 @@ def main() -> int:
                 "internalId": f"AUR-{pour_month.replace('-', '')}-{n:03d}",
                 "lot": lot_id,
                 "pouredAt": pour_start,
-                "ounces": round(oz_each, 2),
-                "weightKg": round(oz_each * 0.0311034768 / 0.92, 3),
+                # L'or fin que porte la barre, et sa masse brute. Deux masses,
+                # une seule unité.
+                "fineGoldKg": round(fine_kg, 4),
+                "grossMassKg": round(fine_kg / 0.92, 3),
                 "assay": 0.92,
             })
 
@@ -218,7 +229,8 @@ def main() -> int:
             "dieselSource": "issues-to-equipment",
             "syntheticMonths": synthetic,
         },
-        "simulatedFields": ["pouredAt", "internalId", "weightKg", "assay"],
+        "units": {"mass": "kg", "energy": "kWh", "volume": "m3", "emission": "kgCO2e"},
+        "simulatedFields": ["pouredAt", "internalId", "grossMassKg", "assay"],
         "organisation": organisation,
         "process": process,
         "lots": lots,

@@ -67,8 +67,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       ${fact(T.barSubject, `<code>${bar.subjectId}</code>`)}
       ${fact(T.barLot, `${bar.lot} — ${T.registerDrawnFrom} ${lot?.productionMonth ?? "?"}`)}
       ${fact(T.barPourDate, localDay(bar.pouredAt))}
-      ${fact(T.barOunces, `${bar.ounces.toFixed(2)} oz`)}
-      ${fact(T.barWeight, `${bar.weightKg.toFixed(3)} kg`)}
+      ${fact(T.barFineGold, `${bar.fineGoldKg.toFixed(3)} kg`)}
+      ${fact(T.barGrossMass, `${bar.grossMassKg.toFixed(3)} kg`)}
       ${fact(T.barAssay, `${(bar.assay * 100).toFixed(2)} %`)}
     </dl>
 
