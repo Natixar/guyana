@@ -63,11 +63,11 @@ Les points 1 et 2 sont **le delta FIDES en entier**. Trois à quatre jours d'ing
 
 Par ordre d'urgence. Les deux premiers sont bloquants — sans eux, il n'y a pas de dossier FIDES du tout, et il n'y a pas non plus de KPI n° 3.
 
-### ⛔ 1. L'accord écrit d'AGM sur la publication — avant le 15 août
+### ⛔ 1. L'accord écrit d'AGM sur la publication — avant le 8 août
 
 Le paquet de données porte la mention *« Confidential Information under Clause 9 of the Collaboration Agreement »*. **Nommer AGM, la mine Aurora ou Zijin dans une publication publique est une divulgation.** Il faut un accord écrit.
 
-L'artéfact 1 contient deux versions de la fiche : nommée et anonymisée. Si l'accord n'est pas obtenu le 15 août, on publie l'anonymisée. **Ne pas attendre le 19 pour trancher.**
+L'artéfact 1 contient deux versions de la fiche : nommée et anonymisée. Si l'accord n'est pas obtenu le 8 août, on publie l'anonymisée. **Ne pas attendre le 19 pour trancher : les autres candidats rassemblent déjà des voix.**
 
 ### ⛔ 2. Le registre de coulée — G-01, relance immédiate
 
@@ -112,7 +112,7 @@ Un mot sur le dernier point, parce qu'il est le seul que nous contrôlons entiè
 
 ## 7. Ce sur quoi nous vous demandons de vous engager
 
-- Obtenir l'accord d'AGM, ou trancher pour la version anonymisée, **avant le 15 août**.
+- Obtenir l'accord d'AGM, ou trancher pour la version anonymisée, **avant le 8 août**.
 - Relancer G-01 **cette semaine**, indépendamment du reste.
 - Publier la fiche **avant le 20 août** — rien ne se rattrape après.
 - Porter le vote communautaire à partir du 22 août.
