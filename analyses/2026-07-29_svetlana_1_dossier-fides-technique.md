@@ -17,7 +17,7 @@ Deux versions du dossier sont donc préparées ci-dessous :
 - **Version A — nommée.** Meilleur dossier, nécessite l'accord écrit d'AGM.
 - **Version B — anonymisée.** « A gold mining operation in South America ». Publiable sans accord, moins convaincante mais parfaitement recevable : plusieurs fiches du catalogue FIDES ne nomment pas leur client final.
 
-Si l'accord n'est pas obtenu **avant le 15 août**, on publie la version B. Ne pas attendre le 19.
+Si l'accord n'est pas obtenu **avant le 8 août**, on publie la version B. Ne pas attendre le 19 : les autres candidats rassemblent déjà des voix.
 
 ---
 
@@ -198,7 +198,7 @@ Ce qu'on lui accorde : l'origine, la date, l'intensité carbone, la méthode. Pa
 | **1er–5 août** | Accord écrit d'AGM sur la version A, ou décision de partir en version B | Svetlana |
 | **avant le 5 août** | Texte de la fiche validé par Jean-Marc | Svetlana + Jean-Marc |
 | **~12 août** | Nous vous livrons la page de vérification et le lien à insérer | Claude |
-| **15 août** | Point de bascule : sans accord AGM, on publie la version B | Svetlana |
+| **8 août** | Point de bascule : sans accord AGM, on publie la version B | Svetlana |
 | **20 août** | **Publication dans l'Ecosystem Explorer — date limite** | Svetlana |
 | 21 août | Finalistes annoncés | — |
 | 22 août → | Vote communautaire — mobilisation des réseaux | Svetlana |
