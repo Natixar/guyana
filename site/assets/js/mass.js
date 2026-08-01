@@ -85,13 +85,36 @@ export function formatMass(kg, { suffix = "", locale = "fr-FR" } = {}) {
 }
 
 /**
+ * Décimales nécessaires pour que CETTE valeur porte trois chiffres significatifs.
+ *
+ * Dans une colonne, l'unité est au titre et non sur chaque ligne : la place
+ * ainsi gagnée se dépense en zéros. `0,0273` vaut mieux que `0,03`, qui n'a
+ * qu'un chiffre significatif et fait croire à une mesure grossière là où la
+ * donnée en porte trois.
+ */
+function decimalsForPrecision(value) {
+  const magnitude = Math.abs(value);
+  if (!Number.isFinite(magnitude) || magnitude === 0) return 0;
+  const exponent = Math.floor(Math.log10(magnitude));
+  return Math.max(0, SIGNIFICANT - 1 - exponent);
+}
+
+/** Au-delà, la colonne devient illisible et la notation scientifique sert. */
+const MAX_DECIMALS = 6;
+
+/**
  * Le préfixe commun d'une colonne, choisi sur la médiane.
  *
- * Renvoie aussi `scientific` quand un préfixe unique ne peut pas servir : si la
- * plus petite valeur non nulle, exprimée dans l'unité retenue, s'arrondit à
- * zéro à trois chiffres significatifs, la colonne mentirait par omission sur
- * ses petites lignes. C'est le critère, et non un écart d'ordres de grandeur
- * fixé arbitrairement.
+ * L'UNITÉ EST AU TITRE, JAMAIS SUR LA LIGNE. C'est ce qui rend la colonne
+ * comparable d'un coup d'œil, et c'est aussi ce qui libère la place : chaque
+ * valeur peut alors porter ses trois chiffres significatifs, quitte à aligner
+ * des zéros. Une colonne en ktCO2e affiche `5,93` et `0,0273`, pas `5,93` et
+ * `0,03`.
+ *
+ * La notation scientifique n'intervient que si la plus petite valeur non nulle
+ * demanderait plus de six décimales pour garder ses trois chiffres : au-delà,
+ * la colonne cesse d'être lisible et le seul choix honnête est de changer de
+ * registre.
  */
 export function massColumn(values, { suffix = "", locale = "fr-FR" } = {}) {
   const finite = values.filter((v) => Number.isFinite(v));
@@ -103,12 +126,9 @@ export function massColumn(values, { suffix = "", locale = "fr-FR" } = {}) {
 
   const median = nonZero[Math.floor(nonZero.length / 2)];
   const step = pick(median);
-  const smallestScaled = nonZero[0] / 10 ** step.exponent;
+  const scale = 10 ** step.exponent;
 
-  // Une valeur qui s'affiche « 0,00 » n'est pas affichée : elle est effacée.
-  const scientific = Number(smallestScaled.toFixed(2)) === 0;
-
-  if (scientific) {
+  if (decimalsForPrecision(nonZero[0] / scale) > MAX_DECIMALS) {
     return {
       unit: `kg${suffix}`,
       scientific: true,
@@ -116,16 +136,20 @@ export function massColumn(values, { suffix = "", locale = "fr-FR" } = {}) {
     };
   }
 
-  const decimals = decimalsFor(median / 10 ** step.exponent);
   return {
     unit: `${step.symbol}${suffix}`,
     scientific: false,
-    format: (v) =>
-      Number.isFinite(v)
-        ? (v / 10 ** step.exponent).toLocaleString(locale, {
-            minimumFractionDigits: decimals,
-            maximumFractionDigits: decimals,
-          })
-        : "—",
+    format: (v) => {
+      if (!Number.isFinite(v)) return "—";
+      const scaled = v / scale;
+      // Un zéro exact est un zéro, pas « 0,000 » : il n'a pas de chiffre
+      // significatif à montrer.
+      if (scaled === 0) return "0";
+      const decimals = decimalsForPrecision(scaled);
+      return scaled.toLocaleString(locale, {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      });
+    },
   };
 }

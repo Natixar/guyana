@@ -120,6 +120,12 @@ main { flex: 1; padding: 2.5rem 0 3rem; }
 
 /* Navigation ------------------------------------------------------------ */
 .site-nav { display: flex; gap: 1rem; margin-left: 1.5rem; flex-wrap: wrap; }
+/* Sur un téléphone le menu passe à la ligne : la marge de gauche, utile
+   quand il suit le nom de marque, ne l'est plus quand il est seul. */
+@media (max-width: 34rem) {
+  .site-nav { margin-left: 0; width: 100%; gap: .875rem; }
+  .site-user { margin-left: 0; width: 100%; }
+}
 .site-nav a { color: inherit; opacity: .75; text-decoration: none; font-size: .9375rem; }
 .site-nav a:hover { opacity: 1; text-decoration: underline; }
 /* La page courante se signale au lecteur ET au lecteur d'écran. */
@@ -167,8 +173,16 @@ table.register .num { text-align: right; font-variant-numeric: tabular-nums; }
            text-transform: uppercase; letter-spacing: .04em; color: var(--muted-foreground);
            margin: 1.5rem 0 .25rem; }
 .subhead:first-of-type { margin-top: .5rem; }
-.actions { margin-top: 1.5rem; }
-.actions .muted { margin-left: .75rem; }
+/* Une ligne d'action tient sur une ligne quand elle peut, et se replie quand
+   elle ne peut pas. `margin-left` sur un texte en flux le laissait couler SOUS
+   le bouton dès que la largeur manquait — sur un téléphone, le texte passait
+   derrière. Flex + wrap replie proprement ; `align-items: center` garde le
+   texte à hauteur du bouton tant qu'ils cohabitent. */
+.actions {
+  margin-top: 1.5rem;
+  display: flex; flex-wrap: wrap; align-items: center; gap: .75rem;
+}
+.actions .muted { margin-left: 0; flex: 1 1 16rem; }
 input[type="text"] {
   font: inherit; font-family: var(--font-mono); margin-top: .35rem;
   padding: .6rem .75rem; width: min(24rem, 100%);
