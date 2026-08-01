@@ -39,7 +39,7 @@ Le jury Innovation évalue : originalité de l'approche, application inédite de
 
 **3. Deux émetteurs, deux bases de confiance, dans une même chaîne.** La mine atteste ce qu'elle observe — le lingot existe, il pèse tant, il titre tant, il a été coulé tel jour. Nous attestons ce que nous calculons — l'intensité carbone, avec sa méthode. **Nous ne signons pas le poids d'un lingot que nous n'avons jamais vu, et la mine ne signe pas un calcul qu'elle n'a pas fait.** Le vérificateur contrôle les deux signatures séparément. C'est honnête, et c'est rare.
 
-**4. La minimisation des données est ici une exigence commerciale, pas réglementaire.** Dans la plupart des cas d'usage du catalogue, on protège des données personnelles parce que la loi l'impose. Ici, les prix, les contreparties et les volumes doivent rester invisibles parce que **les révéler détruirait la position commerciale du vendeur**. La divulgation sélective n'est pas une case de conformité, c'est la condition sans laquelle la mine ne participe pas du tout.
+**4. La minimisation des données est ici une exigence commerciale, pas réglementaire.** Dans la plupart des cas d'usage du catalogue, on protège des données personnelles parce que la loi l'impose. Ici, les prix, les contreparties et les volumes doivent rester invisibles parce que **les révéler détruirait la position commerciale du vendeur**. La divulgation maîtrisée n'est pas une case de conformité, c'est la condition sans laquelle la mine ne participe pas du tout.
 
 **5. Vérifiable sans l'opérateur de la plateforme.** Une chaîne d'approvisionnement de métaux met en présence des acteurs qui sont concurrents entre eux. Un système où il faut appeler l'intermédiaire pour vérifier une affirmation est un système où l'intermédiaire sait tout. Notre attestation se vérifie contre la clé publique de son émetteur : nous pouvons refuser l'accès, nous ne pouvons pas mentir.
 
@@ -146,7 +146,24 @@ Rangés dans l'ordre où ils apparaissent dans le dossier. Chacun tient en trois
 
 **Identifiant décentralisé** *(DID)* — un identifiant qui permet de retrouver la clé publique d'un émetteur. Nous employons la variante `did:web`, la plus simple : l'identifiant `did:web:guygold.com` signifie « la clé publique est publiée à une adresse convenue sur le site guygold.com ». Aucune blockchain n'est nécessaire. AGM nous a déjà fourni le sien, ainsi que son identifiant légal international (LEI).
 
-**Divulgation sélective** *(selective disclosure)* — la capacité de prouver une partie d'une attestation sans révéler le reste. Un acheteur obtient l'intensité carbone et la date de coulée sans voir les volumes ni les contreparties. Techniquement, chaque information est engagée séparément dans l'attestation, et on ne révèle que celles que l'on choisit.
+**Divulgation maîtrisée** — notre terme, et il est délibéré. La capacité de prouver une partie d'une attestation sans révéler le reste, **plus** le fait que la plateforme elle-même ne lise pas les chiffres en clair. Un acheteur obtient l'intensité carbone et la date de coulée sans voir les volumes ni les contreparties. Techniquement, chaque information est engagée séparément dans l'attestation, et on ne révèle que celles que l'on choisit.
+
+*Pourquoi pas « divulgation sélective ».* L'expression désigne, dans les normes du domaine, des constructions précises — SD-JWT, signatures BBS+ — que nous n'implémentons pas. Employer le terme exposerait à une question à laquelle nous ne pourrions pas répondre par oui. **Le tableau ci-dessous est la réponse à préparer** : il dit ce que nous offrons et ce que la voie normalisée offre en plus. Il n'est pas destiné au formulaire ; il est là pour que vous ne soyez jamais prise de court.
+
+| | Notre divulgation maîtrisée | Divulgation sélective normalisée |
+|---|---|---|
+| Révéler une partie, garder le reste | **oui**, ligne par ligne | oui |
+| Une seule signature couvre tout | **oui** | oui |
+| Le vérificateur contrôle sans nous appeler | **oui** | oui |
+| Le vérificateur **refait le calcul** | **oui** — c'est notre apport | non prévu |
+| Les exclusions voyagent avec leur motif | **oui** — notre apport | non prévu |
+| La plateforme ne lit pas les chiffres | **oui, à partir de H2** | hors sujet — la norme ne traite que la présentation |
+| Conforme SD-JWT / BBS+ | non | oui |
+| Fonctionne dans un portefeuille EUDI / EBSI | non | oui |
+| Deux présentations non corrélables entre elles | **non** — un vérificateur qui en reçoit deux sait que c'est le même lot | oui, avec BBS+ |
+| Prouver « moins de X » sans donner X | non | oui, en preuve à divulgation nulle |
+
+**Les trois « non » se disent sans gêne, dans cet ordre :** ils décrivent une compatibilité avec un écosystème de portefeuilles qui n'existe pas encore en production, et notre identifiant de sujet est déjà conçu pour l'y accueillir sans réémettre quoi que ce soit. La non-corrélation, elle, est le seul écart de propriété réelle — et elle ne mord que si un même acheteur reçoit plusieurs présentations du même lot, ce qui n'est pas le cas d'usage.
 
 **Intensité carbone, du berceau à la sortie d'usine** *(cradle-to-gate)* — la quantité de CO₂ équivalent émise pour produire une unité, depuis l'extraction jusqu'à la sortie du site, transport aval exclu. Notre unité est le **tCO2e par once d'or**. « Du berceau à la sortie d'usine » est une convention normalisée : elle dit exactement où le périmètre commence et où il s'arrête.
 
@@ -169,6 +186,8 @@ Un dossier qui surpromet se démonte en une question. Voici les cinq limites, av
 | « C'est compatible EUDI / EBSI » | Nous employons les mêmes normes W3C sur lesquelles ces écosystèmes reposent, ce qui rend l'interopérabilité future possible. Nous n'avons pas fait l'intégration, et nous ne le prétendons pas. |
 | « Le système garantit que la donnée est vraie » | Il garantit **l'intégrité et l'attribution** : la donnée vient bien de l'émetteur déclaré et n'a pas été modifiée. Que la mesure d'origine soit juste relève de l'audit, pas de la cryptographie. C'est une distinction que le jury connaît — l'énoncer vous crédibilise. |
 | « Nous couvrons toute l'empreinte » | Périmètres 1 et 2, sur un périmètre pilote choisi, année 2025. |
+| « C'est de la divulgation sélective » | **Divulgation maîtrisée.** Les propriétés utiles sont les mêmes ; la construction n'est pas celle des normes SD-JWT ou BBS+. Le tableau du §4 dit exactement en quoi, et il vaut mieux le sortir que le laisser deviner. |
+| « Vos données sont chiffrées chez nous » | **Ce sera vrai à partir de H2.** Aujourd'hui le magasin conserve les données du pilote en clair, derrière une authentification. Le schéma le prévoit, la décision de conception est prise ; ce n'est pas encore construit. La page publique porte la mention de date — ne la retirez pas d'une capture d'écran. |
 
 ---
 
