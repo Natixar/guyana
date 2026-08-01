@@ -7,6 +7,7 @@ import { fetchMe, issuerDid, isDemo } from "./me.js";
 import { fetchPour, renderPour, operatorClaims } from "./pour.js";
 import { buildCredential, signCredential, newSubjectId } from "./credential.js";
 import { signView } from "./sign-state.js";
+import { putCredential, credentialsByRef } from "./wallet.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -111,6 +112,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                 signStatus: $("[data-sign-status]"), did,
                 pour: pour && renderPour(pour) ? pour : null, signed: null };
 
+  // Le portefeuille est consulté AVANT le premier rendu : une coulée déjà
+  // confirmée dans une session précédente doit s'afficher comme telle, et non
+  // se proposer une seconde fois.
+  if (ctx.pour?.pourId) {
+    const held = await credentialsByRef(ctx.pour.pourId);
+    ctx.signed = held.DoreBarOriginCredential?.document ?? null;
+  }
+
   if (ctx.pour?.dataOrigin && ctx.pour.dataOrigin !== "MEASURED") {
     const tag = $("[data-pour-origin]");
     if (tag) { tag.textContent = ctx.pour.dataOrigin.toLowerCase(); tag.hidden = false; }
@@ -150,6 +159,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         confirmedBy: me.person ? { id: me.person.id, name: me.person.name } : null,
       });
       ctx.signed = await signCredential(cred, pair, `${did}#${me.keyPolicy?.keyName ?? "key-1"}`);
+      // Rangée avant tout affichage : une attestation signée qui ne survit pas
+      // au rechargement est une attestation que l'opérateur croit détenir.
+      await putCredential(ctx.signed, ctx.pour?.pourId ?? null);
       $("[data-signed-subject]").textContent = subjectId;
       $("[data-signed-by]").textContent = me.person?.name ?? T.operatorUnknown;
       $("[data-signed]").hidden = false;

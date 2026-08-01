@@ -17,72 +17,23 @@
 // déjà émises restent vérifiables.
 
 import { canonicalBytes } from "./canonical.js";
+import { STORES, databaseExists, openDb, tx } from "./idb.js";
 
-const DB_NAME = "natixar-gold-trace";
-const DB_VERSION = 1;
-const STORE = "keys";
 const KEY_ID = "signing";
 
 const ALG = { name: "ECDSA", namedCurve: "P-256" };
 const SIGN_ALG = { name: "ECDSA", hash: "SHA-256" };
 
-function rawOpen(version) {
-  return new Promise((resolve, reject) => {
-    const req = version ? indexedDB.open(DB_NAME, version) : indexedDB.open(DB_NAME);
-    req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-    req.onblocked = () => reject(new Error("IndexedDB upgrade blocked by another tab"));
-  });
-}
-
-/**
- * Ouvre la base en garantissant que le magasin existe.
- *
- * Ne pas supposer qu'une base à la bonne version contient ses magasins : une
- * base peut avoir été créée en version 1 sans aucun magasin par n'importe quel
- * autre code — une commande tapée dans la console, un autre outil. Dans ce cas
- * `onupgradeneeded` ne se déclenche pas et la transaction échoue par
- * NotFoundError. On force alors une montée de version, seul moyen de créer un
- * magasin manquant.
- */
-async function openDb() {
-  let db = await rawOpen();                       // version courante, quelle qu'elle soit
-  if (db.objectStoreNames.contains(STORE)) return db;
-  const next = db.version + 1;
-  db.close();
-  return rawOpen(next);
-}
-
-function tx(db, mode, fn) {
-  return new Promise((resolve, reject) => {
-    const t = db.transaction(STORE, mode);
-    const req = fn(t.objectStore(STORE));
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
 /**
  * La paire existante, ou null.
  *
- * N'ouvre la base que si elle existe déjà : `indexedDB.open` la CRÉE sinon,
- * et une page d'auto-vérification qui laisse une base vide derrière elle ne
- * tient pas tout à fait sa promesse de ne rien laisser.
- *
- * `indexedDB.databases()` n'existe pas dans Firefox ; on y retombe sur
- * l'ouverture directe, qui crée une base vide. C'est sans conséquence — un
- * conteneur vide n'est pas une clé — mais autant que ce soit écrit.
+ * N'ouvre la base que si elle existe déjà — voir `databaseExists` dans idb.js
+ * pour la raison et pour la réserve Firefox.
  */
 export async function loadKeyPair() {
-  if (typeof indexedDB.databases === "function") {
-    const known = await indexedDB.databases();
-    if (!known.some((d) => d.name === DB_NAME)) return null;
-  }
+  if (!(await databaseExists())) return null;
   const db = await openDb();
-  const stored = await tx(db, "readonly", (s) => s.get(KEY_ID));
+  const stored = await tx(db, STORES.KEYS, "readonly", (s) => s.get(KEY_ID));
   db.close();
   return stored ?? null;
 }
@@ -103,7 +54,7 @@ export async function createKeyPair() {
   // extractable = false porte sur la clé PRIVÉE ; la publique reste exportable.
   const pair = await crypto.subtle.generateKey(ALG, false, ["sign", "verify"]);
   const db = await openDb();
-  await tx(db, "readwrite", (s) => s.put(pair, KEY_ID));
+  await tx(db, STORES.KEYS, "readwrite", (s) => s.put(pair, KEY_ID));
   db.close();
   return pair;
 }

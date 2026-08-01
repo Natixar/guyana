@@ -14,6 +14,8 @@ import { fetchMe, issuerDid } from "./me.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
 import { buildDidDocument } from "./did.js";
 import { signBlocker, signView } from "./sign-state.js";
+import { deleteDatabase } from "./idb.js";
+import { allCredentials, putCredential, credentialsFor, credentialsByRef, credentialType } from "./wallet.js";
 import { aggregate, allocateUnallocated } from "./engine.js";
 import { runVectors } from "./vectors.js";
 
@@ -146,6 +148,80 @@ test("self-check leaves no key behind", async () => {
   const a = await ephemeralKeyPair(), b = await ephemeralKeyPair();
   const ta = await thumbprint(a), tb = await thumbprint(b);
   return ta === tb ? "ephemeral pairs are not distinct — they are being persisted" : null;
+});
+
+// --- Le portefeuille (#68) ------------------------------------------------
+// Ce qui est stocké, ce qu'une réinitialisation laisse derrière, et le défaut
+// que le magasin avait : une barre porte DEUX attestations sous le même sujet.
+
+const ORIGIN = {
+  type: ["VerifiableCredential", "DoreBarOriginCredential"],
+  credentialSubject: { id: "urn:aurora:dore:selftest" },
+  proof: { proofValue: "zORIGIN" },
+};
+const CARBON = {
+  type: ["VerifiableCredential", "CarbonIntensityCredential"],
+  credentialSubject: { id: "urn:aurora:dore:selftest" },
+  proof: { proofValue: "zCARBON" },
+};
+
+test("portefeuille — le type significatif est extrait, pas le générique", () => {
+  if (credentialType(ORIGIN) !== "DoreBarOriginCredential") return "type d'origine mal lu";
+  if (credentialType(CARBON) !== "CarbonIntensityCredential") return "type carbone mal lu";
+  return null;
+});
+
+test("portefeuille — les deux attestations d'une barre coexistent", async () => {
+  // Le défaut exact que le magasin avait : ranger par sujet seul écrase la
+  // première avec la seconde, et un vérificateur n'en reçoit qu'une.
+  await putCredential(ORIGIN);
+  await putCredential(CARBON);
+  const held = await credentialsFor("urn:aurora:dore:selftest");
+  const kinds = Object.keys(held).sort();
+  if (kinds.length !== 2) return `${kinds.length} attestation(s) au lieu de 2 : ${kinds}`;
+  return null;
+});
+
+test("portefeuille — une réémission remplace au lieu d'accumuler", async () => {
+  await putCredential({ ...CARBON, validFrom: "2026-09-01T00:00:00Z" });
+  const held = await credentialsFor("urn:aurora:dore:selftest");
+  const doc = held.CarbonIntensityCredential?.document;
+  return doc?.validFrom === "2026-09-01T00:00:00Z"
+    ? null : "le portefeuille détient une version périmée";
+});
+
+test("portefeuille — la référence locale retrouve une coulée, là où le sujet ne le peut pas", async () => {
+  // L'identifiant de sujet est un aléa tiré au moment de signer : après un
+  // rechargement, rien ne relierait une coulée à son attestation sans cet index.
+  await putCredential(ORIGIN, "pour-selftest-01");
+  const held = await credentialsByRef("pour-selftest-01");
+  return held.DoreBarOriginCredential ? null : "la référence locale ne retrouve rien";
+});
+
+test("portefeuille — une attestation sans sujet est refusée", async () => {
+  try {
+    await putCredential({ type: ["VerifiableCredential"] });
+    return "aurait dû lever";
+  } catch (e) {
+    return e.code === "SUBJECT_MISSING" ? null : `code inattendu : ${e.code}`;
+  }
+});
+
+test("portefeuille — l'auto-test ne laisse pas ses attestations derrière lui", async () => {
+  // Les cas ci-dessus écrivent réellement. Les retirer ici garde la promesse de
+  // la page : on ne laisse rien qu'on n'ait trouvé.
+  const before = await allCredentials();
+  const mine = before.filter((r) => r.subject === "urn:aurora:dore:selftest");
+  if (mine.length === 0) return null;
+  const { STORES, openDb, tx } = await import("./idb.js");
+  const db = await openDb();
+  for (const r of mine) {
+    await tx(db, STORES.CREDENTIALS, "readwrite", (s) => s.delete(`${r.subject}${r.type}`));
+  }
+  db.close();
+  const after = await allCredentials();
+  return after.some((r) => r.subject === "urn:aurora:dore:selftest")
+    ? "des attestations d'auto-test subsistent" : null;
 });
 
 // --- Le moteur, côté navigateur (#66) -------------------------------------
@@ -360,10 +436,10 @@ async function wireReset() {
       if (status) status.textContent = T.resetMismatch;
       return;
     }
-    await new Promise((res) => {
-      const q = indexedDB.deleteDatabase("natixar-gold-trace");
-      q.onsuccess = q.onerror = q.onblocked = () => res();
-    });
+    // Supprime la base entière : la clé ET les attestations qu'elle a signées.
+    // C'est la règle produit, et elle tient par colocalisation plutôt que par
+    // deux effacements dont on pourrait en oublier un.
+    await deleteDatabase().catch(() => {});
     if (status) status.textContent = T.resetDone;
     btn.disabled = true;
     // replace() plutôt que href : le retour arrière ne doit pas ramener sur
