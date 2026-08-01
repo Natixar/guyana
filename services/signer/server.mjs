@@ -16,7 +16,8 @@ import { readFile } from "node:fs/promises";
 import express from "express";
 
 import { buildCarbonCredential, signCredential } from "../../site/assets/js/credential.js";
-import { decide } from "./attest.mjs";
+import { commitMatrix, commitTotal } from "../../site/assets/js/commitments.js";
+import { decide, matrixOf } from "./attest.mjs";
 
 const PORT = Number(process.env.SIGNER_PORT ?? 8081);
 const ISSUER_DID = process.env.SIGNER_ISSUER_DID ?? "did:web:natixar.pro";
@@ -47,16 +48,26 @@ export async function createApp({ signingKey, storeKey, taxonomy }) {
       const request = req.body ?? {};
       const verdict = await decide(request, { storeKey, taxonomy });
 
+      // La matrice — ce qui a compté et ce qui n'a pas compté — puis ses
+      // engagements. Les sels naissent ici, à l'émission, et une seule fois.
+      const { cells, disposition } = matrixOf(verdict);
+      const { commitments, disclosures } = await commitMatrix(cells, disposition);
+      const totalCommitment = await commitTotal(
+        commitments, verdict.total, "kgCO2e");
+
       const credential = buildCarbonCredential({
         issuerDid: ISSUER_DID,
         subjectId: request.subjectId,
         derivedFrom: request.derivedFrom,
         // L'unité est dérivée, jamais déclarée : kgCO2e par unité de dénominateur.
         intensity: { value: verdict.value, unit: `kgCO2e/${request.denominatorUnit}` },
-        pivot: verdict.pivot,
+        commitments,
+        totalCommitment,
         unallocated: verdict.unallocated,
-        excluded: verdict.excluded,
         method: {
+          // Par attestation en H1, et sous ce nom précisément pour qu'elle
+          // puisse descendre dans la cellule sans que la cellule change de
+          // forme — décision 4 de l'issue #61.
           taxonomy: taxonomy.version,
           conditions: request.conditions,
           // La méthode dit la vérité sur ce qu'elle a fait. `period` tant que
@@ -69,7 +80,15 @@ export async function createApp({ signingKey, storeKey, taxonomy }) {
 
       const signed = await signCredential(credential, { privateKey: signingKey },
                                           `${ISSUER_DID}#${KEY_NAME}`);
-      res.status(201).json(signed);
+      // LES DIVULGATIONS VOYAGENT À CÔTÉ, JAMAIS DEDANS. C'est ce qui permet au
+      // porteur d'en retirer avant de présenter l'attestation sans toucher à un
+      // octet de ce qui a été signé. Les remettre à l'intérieur rendrait la
+      // divulgation maîtrisée impossible, et le ferait silencieusement.
+      res.status(201).json({
+        credential: signed,
+        disclosures,
+        totalSalt: totalCommitment.salt,
+      });
     } catch (err) {
       // Le code part au client, pas la pile : il doit pouvoir corriger sa
       // requête sans lire un message rédigé pour un humain. Un refus est une

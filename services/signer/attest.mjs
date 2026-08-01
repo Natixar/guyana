@@ -79,5 +79,47 @@ export async function decide(request, { storeKey, taxonomy, tolerance = 1e-9 }) 
     throw fault("VALUE_MISMATCH", `présenté ${request.value}, recalculé ${recomputed}`);
   }
 
-  return { ...profile, excluded, value: recomputed };
+  return { ...profile, excluded, value: recomputed, total };
+}
+
+/**
+ * La matrice complète : ce qui a compté, puis ce qui n'a pas compté.
+ *
+ * LES DEUX SONT DANS LE MÊME TABLEAU, et c'est la décision 1 de l'issue #61.
+ * Une cellule écartée ne disparaît pas de l'attestation : elle y reste,
+ * dénombrable, avec le motif de sa mise à l'écart. Le vérificateur peut donc
+ * dire « vingt-quatre cellules, vingt ont compté, quatre non, et voici
+ * pourquoi » — ce qu'un document d'où les exclusions auraient été retirées ne
+ * permet pas, puisqu'il ressemble trait pour trait à un document complet.
+ *
+ * L'ordre est figé : les groupes agrégés d'abord, dans l'ordre de l'agrégation,
+ * puis les exclues dans l'ordre des dispositions. Une divulgation se rattache à
+ * son engagement par son rang, donc retrier après signature les désapparie.
+ *
+ * Les exclues entrent CELLULE PAR CELLULE et non agrégées : les agréger
+ * fusionnerait des motifs différents sous un seul montant, et le motif est
+ * précisément ce que la décision demande de rendre appréciable.
+ *
+ * @returns {{cells: Array<object>, disposition: (cell: object) => object}}
+ */
+export function matrixOf(verdict) {
+  const cells = [
+    ...verdict.pivot.map((cell) => ({ ...cell, used: true })),
+    ...verdict.excluded.map(({ cell, reason }) => ({
+      subPost: cell.subPost ?? null,
+      partType: cell.partType ?? null,
+      caracterisation: cell.caracterisation,
+      amount: cell.value * cell.factor,
+      origin: cell.origin ?? "NOT_MEASURED",
+      used: false,
+      reason,
+    })),
+  ];
+
+  // `used` et `reason` gouvernent l'entrée signée ; ils ne font pas partie du
+  // contenu engagé, sinon ils y seraient cachés alors qu'ils doivent être lus.
+  return {
+    cells: cells.map(({ used: _u, reason: _r, ...content }) => content),
+    disposition: (_cell, index) => ({ used: cells[index].used, reason: cells[index].reason }),
+  };
 }

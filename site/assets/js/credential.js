@@ -53,25 +53,30 @@ export function buildCredential({ issuerDid, subjectId, claims, confirmedBy = nu
  * la ligne lui-même à partir de la taxonomie publiée, ce qui est une propriété
  * plus forte que de croire la nôtre.
  *
+ * LA MATRICE EST SIGNÉE PAR SES ENGAGEMENTS, PAS PAR SES MONTANTS. Décision 1
+ * de l'issue #61, tranchée le 1er août : granularité par cellule, et les
+ * cellules non divulguées restent là — inutilisables, toujours dénombrables,
+ * avec le motif de leur mise à l'écart. C'est ce qui permet à un porteur de
+ * remettre sa ligne de transport sans sa ligne de minage **sans invalider la
+ * signature** : les montants et leurs sels voyagent à côté du document, en
+ * divulgations, et en retirer une ne touche à aucun octet de ce qui est signé.
+ * Voir `commitments.js` pour la raison détaillée du placement.
+ *
  * `derivedFrom` porte l'empreinte de l'attestation d'origine : sans elle,
  * n'importe qui pourrait émettre un chiffre carbone pour ce sujet.
- *
- * Les exclusions voyagent. Le signataire ne juge pas une raison d'écarter une
- * cellule — il vérifie seulement qu'il y en a une —, donc c'est au vérificateur
- * qu'elle est destinée, et elle doit lui parvenir.
  *
  * @param {object} p
  * @param {string} p.issuerDid     l'émetteur du chiffre, ici Natixar
  * @param {string} p.subjectId     le même URN opaque que l'attestation d'origine
  * @param {{id: string, digestMultibase: string}} p.derivedFrom
  * @param {{value: number, unit: string}} p.intensity
- * @param {Array<object>} p.pivot  la matrice, en positions pivot
+ * @param {Array<{commitment: string, used: boolean, reason?: string}>} p.commitments
+ * @param {{salt: string, commitment: string}} p.totalCommitment
  * @param {object} p.method        conditions, version de taxonomie, allocation
- * @param {Array<{cell: object, reason: string}>} [p.excluded]
  */
 export function buildCarbonCredential({
-  issuerDid, subjectId, derivedFrom, intensity, pivot, method,
-  excluded = [], unallocated = 0, now = new Date(),
+  issuerDid, subjectId, derivedFrom, intensity, commitments, totalCommitment,
+  method, unallocated = 0, now = new Date(),
 }) {
   return {
     "@context": CONTEXTS,
@@ -81,13 +86,19 @@ export function buildCarbonCredential({
     credentialSubject: {
       id: subjectId,
       carbonIntensity: intensity,
-      breakdown: pivot,
+      // La matrice telle qu'elle se signe : un engagement par cellule, le fait
+      // qu'elle ait compté ou non, et le motif quand elle n'a pas compté. Rien
+      // d'autre — publier la catégorie en clair d'une cellule retirée dirait ce
+      // qui existe sans dire combien, et la structure fuirait toute seule.
+      breakdown: commitments,
+      // Il lie le chiffre à la matrice : sans lui, divulguer un sous-ensemble
+      // et annoncer le total de son choix passerait tous les contrôles.
+      totalCommitment: totalCommitment.commitment,
       // Un total complet et faux serait pire qu'un total incomplet et déclaré.
       unallocated,
     },
     derivedFrom,
     method,
-    excluded: excluded.map(({ cell, reason }) => ({ id: cell.id, reason })),
   };
 }
 
