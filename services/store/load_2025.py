@@ -159,7 +159,8 @@ def build_cells(fuel, explosives, assignment, org):
 def load(conn, cells, org) -> None:
     db.apply_schema(conn)
     for symbol, uid in UNITS.items():
-        conn.execute("INSERT INTO unit (id, symbol) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+        conn.execute("INSERT INTO unit (id, symbol) VALUES (%s, %s) "
+                     "ON CONFLICT (id) DO UPDATE SET symbol = EXCLUDED.symbol",
                      (uid, symbol))
     # La taxonomie d'organisation. Les noms sont en clair PROVISOIREMENT : ce
     # sont eux que le chiffrement des dimensions couvrira. Le client n'en connaît
@@ -180,8 +181,12 @@ def load(conn, cells, org) -> None:
                             %(caracterisation)s, %(value)s, %(unit_id)s, %(factor)s,
                             %(factor_unit)s, %(origin)s)
                ON CONFLICT (id) DO UPDATE SET
-                    period = EXCLUDED.period, value = EXCLUDED.value,
-                    factor = EXCLUDED.factor, origin = EXCLUDED.origin""",
+                    period = EXCLUDED.period, entity_id = EXCLUDED.entity_id,
+                    sub_post = EXCLUDED.sub_post, part_type = EXCLUDED.part_type,
+                    caracterisation = EXCLUDED.caracterisation,
+                    value = EXCLUDED.value, unit_id = EXCLUDED.unit_id,
+                    factor = EXCLUDED.factor, factor_unit = EXCLUDED.factor_unit,
+                    origin = EXCLUDED.origin""",
             [{**c, "unit_id": UNITS[c["unit"]]} for c in cells],
         )
 
@@ -206,8 +211,12 @@ def emit_sql(cells, org) -> None:
     """
     print("BEGIN;")
     for symbol, uid in UNITS.items():
+        # DO UPDATE, jamais DO NOTHING : le passage de « L » à « m3 » laisserait
+        # sinon l'identifiant 1 sur l'ancien symbole, et les cellules porteraient
+        # des mètres cubes étiquetés litres. Une erreur d'unité muette, celle-là
+        # même que le SI existe pour supprimer.
         print(f"INSERT INTO unit (id, symbol) VALUES ({uid}, {sql_literal(symbol)}) "
-              "ON CONFLICT (id) DO NOTHING;")
+              "ON CONFLICT (id) DO UPDATE SET symbol = EXCLUDED.symbol;")
     for d in org.values():
         print(f"INSERT INTO entity (id, label, industrial) VALUES "
               f"({d['id']}, {sql_literal(d['key'])}, {sql_literal(d['industrial'])}) "
@@ -224,9 +233,15 @@ def emit_sql(cells, org) -> None:
             f"{c['entity_id']}, {sql_literal(c['sub_post'])}, {sql_literal(c['part_type'])}, "
             f"{c['caracterisation']}, {c['value']!r}, {UNITS[c['unit']]}, {c['factor']!r}, "
             f"{sql_literal(c['factor_unit'])}, {sql_literal(c['origin'])}) "
+            # Toutes les colonnes, sans exception : un rechargement qui change
+            # d'unité doit changer l'unité. En omettre une laisse une valeur
+            # neuve sous une étiquette ancienne.
             "ON CONFLICT (id) DO UPDATE SET period = EXCLUDED.period, "
-            "entity_id = EXCLUDED.entity_id, value = EXCLUDED.value, "
-            "factor = EXCLUDED.factor, origin = EXCLUDED.origin;"
+            "entity_id = EXCLUDED.entity_id, sub_post = EXCLUDED.sub_post, "
+            "part_type = EXCLUDED.part_type, caracterisation = EXCLUDED.caracterisation, "
+            "value = EXCLUDED.value, unit_id = EXCLUDED.unit_id, "
+            "factor = EXCLUDED.factor, factor_unit = EXCLUDED.factor_unit, "
+            "origin = EXCLUDED.origin;"
         )
     print("COMMIT;")
 
