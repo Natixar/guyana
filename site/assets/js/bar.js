@@ -21,6 +21,16 @@ const $ = (s) => document.querySelector(s);
 const fact = (label, value) =>
   `<div><dt>${label}</dt><dd>${value ?? "—"}</dd></div>`;
 
+/**
+ * Le jour LOCAL de la mine, pas celui du navigateur.
+ *
+ * Un instant affiché dans le fuseau du lecteur ferait apparaître une coulée du
+ * 1er mars comme datée du 28 février à quiconque regarde depuis l'Europe. Les
+ * rapports d'AGM sont en jours guyaniens ; l'écran doit l'être aussi.
+ */
+const localDay = (iso) =>
+  new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Guyana" });
+
 async function loadFixture() {
   const r = await fetch("/engine/erp-fixture.json", { headers: { accept: "application/json" } });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -56,7 +66,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     <dl class="facts">
       ${fact(T.barSubject, `<code>${bar.subjectId}</code>`)}
       ${fact(T.barLot, `${bar.lot} — ${T.registerDrawnFrom} ${lot?.productionMonth ?? "?"}`)}
-      ${fact(T.barPourDate, bar.pourDate)}
+      ${fact(T.barPourDate, localDay(bar.pouredAt))}
       ${fact(T.barOunces, `${bar.ounces.toFixed(2)} oz`)}
       ${fact(T.barWeight, `${bar.weightKg.toFixed(3)} kg`)}
       ${fact(T.barAssay, `${(bar.assay * 100).toFixed(2)} %`)}

@@ -72,7 +72,7 @@ function lotSection(lot, bars, heldRefs, storeSubjects) {
     <summary>
       <strong>${lot.id}</strong>
       <span class="muted">${bars.length} ${T.registerBars} · ${T.registerMonth} ${lot.pourMonth}
-        · ${T.registerDrawnFrom} ${lot.productionMonth}</span>
+        · ${T.registerDrawnFrom} ${lot.productionMonth}${lot.syntheticSource ? ` · ${T.registerSynthetic}` : ""}</span>
       <span class="badge badge--${certified === bars.length ? "verified" : "pending"}">${certified}/${bars.length} ${T.registerCertified}</span>
     </summary>
     <table class="register">

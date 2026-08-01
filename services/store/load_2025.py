@@ -26,7 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import psycopg
@@ -53,13 +53,26 @@ SUBPOST_EXPLOSIVES = 1005
 UNITS = {"L": 1, "kg": 2}
 
 
+#: Le Guyana est à UTC−4 toute l'année, sans heure d'été.
+GUYANA = timezone(timedelta(hours=-4))
+
+
 def month_range(label: str) -> Range:
-    """« 2025-01 » -> [2025-01-01, 2025-02-01). Bornes semi-ouvertes : sans
-    cela une cellule serait comptée deux fois sur deux fenêtres adjacentes."""
+    """« 2025-01 » -> le mois LOCAL, en bornes semi-ouvertes.
+
+    Minuit à Georgetown, pas minuit à Greenwich. Une mine rapporte en jours
+    guyaniens : découper sur des minuits Zulu décalerait chaque frontière de
+    quatre heures et rangerait une nuit de production dans le mois suivant. À
+    l'échelle d'un mois l'erreur est petite ; à la frontière d'un lot elle met
+    du gazole dans la mauvaise barre, ce que le modèle prétend justement éviter.
+
+    Semi-ouvertes parce que sinon une cellule serait comptée deux fois sur deux
+    fenêtres adjacentes.
+    """
     year, month = (int(x) for x in label.split("-"))
-    start = datetime(year, month, 1, tzinfo=timezone.utc)
-    end = datetime(year + (month == 12), (month % 12) + 1, 1, tzinfo=timezone.utc)
-    return Range(start, end, "[)")
+    start = datetime(year, month, 1, tzinfo=GUYANA)
+    end = datetime(year + (month == 12), (month % 12) + 1, 1, tzinfo=GUYANA)
+    return Range(start.astimezone(timezone.utc), end.astimezone(timezone.utc), "[)")
 
 
 def read_pack():
