@@ -124,8 +124,21 @@ def test_no_decimal_crosses_the_boundary(conn):
         assert isinstance(got[0][key], float), f"{key} n'est pas un flottant"
 
 
+SUBJECT = "urn:aurora:dore:abc"
+
+
+def _origin(**over):
+    return {"type": ["VerifiableCredential", "DoreBarOriginCredential"],
+            "credentialSubject": {"id": SUBJECT}, "proof": {"proofValue": "zORIGIN"}, **over}
+
+
+def _carbon(**over):
+    return {"type": ["VerifiableCredential", "CarbonIntensityCredential"],
+            "credentialSubject": {"id": SUBJECT}, "proof": {"proofValue": "zCARBON"}, **over}
+
+
 def test_a_credential_is_stored_verbatim(conn):
-    doc = {"credentialSubject": {"id": "urn:aurora:dore:abc"}, "proof": {"proofValue": "zXYZ"}}
+    doc = _origin()
     db.insert_credential(conn, doc, "agm-randy")
     listed = db.list_credentials(conn)
     assert listed[0]["document"] == doc
@@ -133,7 +146,50 @@ def test_a_credential_is_stored_verbatim(conn):
 
 
 def test_the_same_credential_twice_is_not_duplicated(conn):
-    doc = {"credentialSubject": {"id": "urn:aurora:dore:abc"}}
-    db.insert_credential(conn, doc, None)
-    db.insert_credential(conn, doc, None)
+    db.insert_credential(conn, _origin(), None)
+    db.insert_credential(conn, _origin(), None)
     assert len(db.list_credentials(conn)) == 1
+
+
+def test_both_credentials_of_one_bar_are_kept(conn):
+    """Le défaut que ce fichier n'attrapait pas.
+
+    L'origine et l'intensité carbone d'une barre portent le MÊME
+    `credentialSubject.id` — c'est ce que `derivedFrom` relie. Clé sur le sujet,
+    la seconde arrivée était jetée en silence, et un vérificateur ne recevait que
+    la moitié de ce dont il a besoin. C'est le cas d'usage central, pas un cas
+    limite.
+    """
+    db.insert_credential(conn, _origin(), "agm-randy")
+    db.insert_credential(conn, _carbon(), "natixar")
+
+    kinds = {c["type"] for c in db.list_credentials(conn)}
+    assert kinds == {"DoreBarOriginCredential", "CarbonIntensityCredential"}
+
+
+def test_a_reissue_supersedes_without_erasing(conn):
+    """Une réémission est une ligne de plus ; le registre prend la plus récente."""
+    db.insert_credential(conn, _carbon(), None)
+    db.insert_credential(conn, _carbon(validFrom="2026-09-01T00:00:00Z"), None)
+
+    latest = [c for c in db.list_credentials(conn) if c["type"] == "CarbonIntensityCredential"]
+    assert len(latest) == 1
+    assert latest[0]["document"].get("validFrom") == "2026-09-01T00:00:00Z"
+    assert conn.execute("SELECT count(*) AS n FROM credential").fetchone()["n"] == 2
+
+
+def test_the_index_carries_no_documents(conn):
+    """378 attestations complètes pour peupler un tableau seraient des
+    mégaoctets là où quelques kilo-octets suffisent."""
+    db.insert_credential(conn, _origin(), None)
+    entry = db.credential_index(conn)[0]
+    assert "document" not in entry
+    assert entry["subject"] == SUBJECT and entry["digest"]
+
+
+def test_fetching_one_bar_returns_both_of_its_credentials(conn):
+    db.insert_credential(conn, _origin(), None)
+    db.insert_credential(conn, _carbon(), None)
+    found = db.credential_by_subject(conn, SUBJECT)
+    assert {c["type"] for c in found} == {"DoreBarOriginCredential", "CarbonIntensityCredential"}
+    assert db.credential_by_subject(conn, "urn:aurora:dore:inconnu") == []

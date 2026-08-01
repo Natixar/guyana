@@ -116,13 +116,42 @@ async def receive_credential(request: Request,
     doc = await request.json()
     try:
         with db.connect() as conn:
-            subject = db.insert_credential(conn, doc, x_webauth_user)
+            stored = db.insert_credential(conn, doc, x_webauth_user)
     except ValueError as exc:
         raise HTTPException(422, {"error": "CREDENTIAL_INVALID", "detail": str(exc)}) from exc
-    return {"id": subject}
+    return stored
 
 
 @app.get("/api/v1/credentials")
 def list_credentials(limit: int = 100) -> dict:
     with db.connect() as conn:
         return {"credentials": db.list_credentials(conn, min(limit, 500))}
+
+
+@app.get("/api/v1/credentials/index")
+def credential_index() -> dict:
+    """Ce qui existe, sans les documents.
+
+    Le registre du front interroge ceci pour savoir quelles barres sont
+    certifiées ailleurs — celles dont le navigateur a perdu l'attestation. Trois
+    cent soixante-dix-huit documents complets pour peupler un tableau seraient
+    des mégaoctets là où quelques kilo-octets suffisent.
+    """
+    with db.connect() as conn:
+        return {"index": db.credential_index(conn)}
+
+
+@app.get("/api/v1/credentials/{subject:path}")
+def credential_by_subject(subject: str) -> dict:
+    """Les attestations d'une barre — récupérées une par une, à la demande.
+
+    Le portefeuille ne se repeuple pas tout seul : le navigateur détient ce que
+    l'opérateur y a mis, et « certifiée ailleurs » reste un état visible plutôt
+    qu'un trou comblé en silence. Récupérer est un acte, et il vérifie la
+    signature à l'arrivée.
+    """
+    with db.connect() as conn:
+        found = db.credential_by_subject(conn, subject)
+    if not found:
+        raise HTTPException(404, {"error": "CREDENTIAL_UNKNOWN", "detail": subject})
+    return {"credentials": found}

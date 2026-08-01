@@ -73,13 +73,30 @@ CREATE INDEX IF NOT EXISTS cell_period_gist ON cell USING gist (period);
 
 -- Les attestations reçues de la mine. Stockées telles quelles : elles sont
 -- signées, donc figées, et les reformater les invaliderait.
+-- Les attestations reçues. Stockées telles quelles : elles sont signées, donc
+-- figées, et les reformater les invaliderait.
+--
+-- LA CLÉ N'EST PAS LE SUJET. Une barre porte DEUX attestations — l'origine,
+-- signée par la mine, et l'intensité carbone, signée par Natixar — et toutes
+-- deux portent le même `credentialSubject.id`, puisque c'est ce que `derivedFrom`
+-- relie. Clé sur le sujet, la seconde arrivée était silencieusement jetée, et un
+-- vérificateur ne recevait que la moitié de ce dont il a besoin.
+--
+-- La clé est donc l'empreinte du document, qui est l'identité naturelle d'un
+-- objet signé : renvoyer deux fois le même fichier ne crée rien, alors qu'une
+-- réémission pour le même sujet est une ligne de plus — ce qui est voulu, le
+-- registre prenant la plus récente par (sujet, type).
 CREATE TABLE IF NOT EXISTS credential (
-    id           text PRIMARY KEY,        -- credentialSubject.id, un URN opaque
+    digest       text PRIMARY KEY,        -- SHA-256 de la sérialisation canonique
+    subject      text NOT NULL,           -- credentialSubject.id, un URN opaque
+    type         text NOT NULL,           -- le type W3C significatif, hors « VerifiableCredential »
     received_at  timestamptz NOT NULL DEFAULT now(),
     received_by  text,                    -- X-Webauth-User, ou NULL en mode dégradé
     document     jsonb NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS credential_received_at ON credential (received_at DESC);
+-- L'ordre du registre : la plus récente par barre et par type.
+CREATE INDEX IF NOT EXISTS credential_latest
+    ON credential (subject, type, received_at DESC);
 
 COMMIT;
