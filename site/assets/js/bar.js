@@ -15,6 +15,7 @@
 import T from "./labels.js";
 import { credentialsByRef, putCredential } from "./wallet.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
+import { formatMass } from "./mass.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -83,8 +84,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       ${fact(T.barSubject, `<code>${bar.subjectId}</code>`)}
       ${fact(T.barLot, `${bar.lot} — ${T.registerDrawnFrom} ${lot?.productionMonth ?? "?"}`)}
       ${fact(T.barPourDate, localDay(bar.pouredAt))}
-      ${fact(T.barFineGold, `${bar.fineGoldKg.toFixed(3)} kg`)}
-      ${fact(T.barGrossMass, `${bar.grossMassKg.toFixed(3)} kg`)}
+      ${fact(T.barFineGold, formatMass(bar.fineGoldKg))}
+      ${fact(T.barGrossMass, formatMass(bar.grossMassKg))}
       ${fact(T.barAssay, `${(bar.assay * 100).toFixed(2)} %`)}
     </dl>
 

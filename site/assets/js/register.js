@@ -17,6 +17,7 @@
  */
 import T from "./labels.js";
 import { allCredentials } from "./wallet.js";
+import { massColumn } from "./mass.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -56,6 +57,9 @@ function statusOf(bar, heldRefs, storeSubjects) {
 }
 
 function lotSection(lot, bars, heldRefs, storeSubjects) {
+  // Une colonne, une unité : l'œil compare des nombres, pas des préfixes.
+  const fine = massColumn(bars.map((b) => b.fineGoldKg));
+  const gross = massColumn(bars.map((b) => b.grossMassKg));
   const certified = bars.filter((b) => statusOf(b, heldRefs, storeSubjects).key !== "none").length;
 
   const rows = bars.map((bar) => {
@@ -63,8 +67,8 @@ function lotSection(lot, bars, heldRefs, storeSubjects) {
     const href = `/bar/?id=${encodeURIComponent(bar.internalId)}`;
     return `<tr>
       <td><a href="${href}">${bar.internalId}</a></td>
-      <td class="num">${bar.fineGoldKg.toFixed(3)}</td>
-      <td class="num">${bar.grossMassKg.toFixed(3)}</td>
+      <td class="num">${fine.format(bar.fineGoldKg)}</td>
+      <td class="num">${gross.format(bar.grossMassKg)}</td>
       <td><span class="badge badge--${st.kind}">${st.label}</span></td>
       <td><a class="btn btn--small" href="${href}">${T.registerOpen}</a></td>
     </tr>`;
@@ -79,8 +83,8 @@ function lotSection(lot, bars, heldRefs, storeSubjects) {
     </summary>
     <table class="register">
       <thead><tr>
-        <th>${T.barInternalId}</th><th class="num">${T.barFineGold}</th>
-        <th class="num">${T.barGrossMass}</th><th>Status</th><th></th>
+        <th>${T.barInternalId}</th><th class="num">${T.barFineGold} (${fine.unit})</th>
+        <th class="num">${T.barGrossMass} (${gross.unit})</th><th>Status</th><th></th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
