@@ -1,9 +1,15 @@
 /**
  * La page d'une barre.
  *
- * Elle sert à trois choses : montrer ce que la mine atteste, montrer ce que ce
- * navigateur détient, et — quand l'attestation est ailleurs — permettre de la
- * rapatrier.
+ * Elle sert à quatre choses : montrer ce que la mine atteste, la **certifier**,
+ * montrer ce que ce navigateur détient, et — quand l'attestation est ailleurs —
+ * permettre de la rapatrier.
+ *
+ * CERTIFIER SE FAIT ICI, PAS DANS LE REGISTRE. Le registre montre trois cent
+ * soixante-dix-huit lignes ; un bouton par ligne signerait un lingot que
+ * l'opérateur n'a pas regardé. La règle de `pour.js` vaut pour les barres comme
+ * pour la coulée : celui qui confirme doit voir ce qu'il atteste. Le registre
+ * conduit donc ici, et il reflète ce qui a été signé.
  *
  * RAPATRIER EST UN ACTE, ET IL VÉRIFIE. Le portefeuille ne se remplit pas tout
  * seul depuis le serveur : cela ferait du magasin la source de vérité de ce que
@@ -16,6 +22,12 @@ import T from "./labels.js";
 import { credentialsByRef, putCredential } from "./wallet.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
 import { formatMass } from "./mass.js";
+import { loadKeyPair } from "./keys.js";
+import { fetchMe, issuerDid } from "./me.js";
+import { barClaims } from "./bar-claims.js";
+import { buildCredential, signCredential } from "./credential.js";
+import { signView } from "./sign-state.js";
+import { depositCredential } from "./deposit.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -69,7 +81,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!root) return;
 
   const wanted = new URLSearchParams(location.search).get("id");
-  const fixture = await loadFixture().catch(() => null);
+  // L'identité en même temps que le jeu d'essai : elle décide au nom de qui on
+  // signe, et la page ne peut pas afficher son bouton avant de le savoir.
+  const [fixture, me] = await Promise.all([
+    loadFixture().catch(() => null),
+    fetchMe(),
+  ]);
+  const did = issuerDid(me);
   const bar = fixture?.bars?.find((b) => b.internalId === wanted);
 
   if (!bar) {
@@ -93,41 +111,100 @@ document.addEventListener("DOMContentLoaded", async () => {
     <p><span data-bar-status class="badge badge--pending"></span></p>
     <p class="muted" data-bar-hint hidden>${T.barStatusHint}</p>
     <p class="actions">
+      <button class="btn btn--primary" data-bar-sign hidden>${T.barSign}</button>
       <button class="btn btn--primary" data-bar-fetch hidden>${T.barFetch}</button>
       <span class="muted" data-bar-fetch-status></span>
     </p>
+    <p class="muted" data-bar-sign-status></p>
+    <p class="muted" data-bar-deposit hidden></p>
     <p><a href="/register/">${T.barBackToRegister}</a></p>
   `;
 
   const badge = $("[data-bar-status]");
   const hint = $("[data-bar-hint]");
+  const signBtn = $("[data-bar-sign]");
+  const signStatus = $("[data-bar-sign-status]");
+  const deposit = $("[data-bar-deposit]");
   const fetchBtn = $("[data-bar-fetch]");
   const fetchStatus = $("[data-bar-fetch-status]");
 
-  /** Un seul écrivain de l'état, comme sur la page d'accueil (#64). */
-  async function render() {
-    const current = await credentialsByRef(bar.internalId);
-    if (current.DoreBarOriginCredential) {
-      badge.textContent = T.barStatusHere;
-      badge.className = "badge badge--verified";
-      hint.hidden = true;
-      fetchBtn.hidden = true;
-      return;
-    }
-    // Le magasin l'a-t-il ? On ne le demande que pour CETTE barre : l'index
-    // complet n'a pas sa place sur une page qui en montre une.
+  /**
+   * L'état que l'affichage ne peut pas relire.
+   *
+   * Le compte rendu du dépôt en fait partie : le magasin a répondu une fois, et
+   * l'interroger de nouveau ne dirait pas si CE dépôt-ci a abouti. Il entre
+   * donc dans le contexte plutôt que d'être écrit à côté — règle de `app.js`
+   * après #64 : un état nouveau entre dans `ctx`, il ne s'écrit pas ailleurs.
+   */
+  const ctx = { deposit: null };
+
+  /** Le magasin détient-il CETTE barre ? L'index complet n'a pas sa place ici. */
+  async function storeHasIt() {
     const res = await fetch(`/api/v1/credentials/${encodeURIComponent(bar.subjectId)}`)
       .catch(() => null);
     // Un 200 portant du HTML n'est pas une attestation : c'est le site qui a
     // répondu à la place du magasin.
-    const elsewhere = res?.ok === true
-      && (res.headers.get("content-type") ?? "").includes("json");
+    return res?.ok === true && (res.headers.get("content-type") ?? "").includes("json");
+  }
 
-    badge.textContent = elsewhere ? T.barStatusElsewhere : T.barStatusNone;
-    badge.className = `badge badge--${elsewhere ? "warning" : "pending"}`;
+  /** Un seul écrivain de l'état, comme sur la page d'accueil (#64). */
+  async function render() {
+    const [pair, current] = await Promise.all([loadKeyPair(), credentialsByRef(bar.internalId)]);
+    const mine = current.DoreBarOriginCredential?.document ?? null;
+    // « Ailleurs » ne se demande que faute de l'avoir ici : détenir l'attestation
+    // rend la question sans objet, et l'aller-retour avec elle.
+    const elsewhere = mine ? false : await storeHasIt();
+
+    badge.textContent = mine ? T.barStatusHere : (elsewhere ? T.barStatusElsewhere : T.barStatusNone);
+    badge.className = `badge badge--${mine ? "verified" : (elsewhere ? "warning" : "pending")}`;
     hint.hidden = !elsewhere;
     fetchBtn.hidden = !elsewhere;
+
+    // Certifier une barre que le magasin détient déjà émettrait une seconde
+    // attestation pour le même lingot physique. La récupérer est la bonne
+    // action, et c'est celle que la page propose alors.
+    const view = signView({ pair, did, pour: bar, signed: mine });
+    signBtn.hidden = Boolean(mine);
+    signBtn.disabled = view.disabled || elsewhere;
+    signStatus.textContent = elsewhere ? T.barSignElsewhere : view.text;
+
+    deposit.hidden = !ctx.deposit;
+    if (ctx.deposit) {
+      deposit.textContent = ctx.deposit.ok
+        ? T.barDeposited
+        : `${T.barDepositFailed} — ${ctx.deposit.why}`;
+    }
   }
+
+  signBtn?.addEventListener("click", async () => {
+    signBtn.disabled = true;
+    signStatus.textContent = T.barSigning;
+    try {
+      const pair = await loadKeyPair();
+      const cred = buildCredential({
+        issuerDid: did,
+        // L'identifiant de sujet vient du jeu d'essai, il ne se tire pas ici :
+        // c'est lui que le magasin indexe et que le registre interroge pour
+        // savoir si la barre est certifiée ailleurs. En tirer un nouveau à
+        // chaque signature rendrait cette question sans réponse.
+        subjectId: bar.subjectId,
+        claims: barClaims(bar, fixture),
+        confirmedBy: me.person ? { id: me.person.id, name: me.person.name } : null,
+      });
+      const signed = await signCredential(cred, pair, `${did}#${me.keyPolicy?.keyName ?? "key-1"}`);
+      // Rangée avant d'être déposée : un dépôt réussi que le portefeuille aurait
+      // manqué ferait croire à l'opérateur qu'il ne détient rien.
+      await putCredential(signed, bar.internalId);
+      ctx.deposit = await depositCredential(signed);
+    } catch (err) {
+      // L'échec de signature est la seule écriture directe : il porte un texte
+      // que `render` ne peut pas reconstruire depuis l'état.
+      signStatus.textContent = `${T.signFailed} — ${err.message ?? err}`;
+      signBtn.disabled = false;
+      return;
+    }
+    await render();
+  });
 
   fetchBtn?.addEventListener("click", async () => {
     fetchBtn.disabled = true;

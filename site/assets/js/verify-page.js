@@ -77,7 +77,11 @@ function renderClaims(doc) {
     if (k === "id") continue;
     const value = v && typeof v === "object" ? v.value : v;
     const origin = v && typeof v === "object" ? v.origin : null;
-    rows.push(`<div><dt>${esc(k)}</dt><dd>${esc(value ?? "—")}` +
+    // L'unité voyage à côté de la valeur plutôt que collée dedans : signer
+    // « 12,7 kg » figerait une mise en forme et une langue. C'est donc au rendu
+    // de les réunir, et c'est ici. Une revendication sans unité n'en a pas.
+    const unit = v && typeof v === "object" && v.unit ? ` ${v.unit}` : "";
+    rows.push(`<div><dt>${esc(k)}</dt><dd>${esc(value ?? "—")}${esc(unit)}` +
       (origin && origin !== "MEASURED" ? ` <span class="origin-tag">${esc(origin.toLowerCase())}</span>` : "") +
       `</dd></div>`);
   }

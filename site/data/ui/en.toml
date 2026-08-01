@@ -135,6 +135,14 @@ barCredentials     = "Credentials"
 barBackToRegister  = "Back to the register"
 registerSynthetic  = "source month reconstructed"
 
+# Certifier une barre depuis son écran (#68)
+barSign            = "Certify this bar"
+barSigning         = "Signing…"
+barSignElsewhere   = "Already certified — retrieve it rather than issue a second certificate for the same bar"
+barSignSimulated   = "The figures above are simulated. What you sign here is a demonstration of the chain, not an attestation of a real pour."
+barDeposited       = "Deposited in the store — the certificate can be retrieved after a reset"
+barDepositFailed   = "Signed and held in this browser, but the store did not accept it"
+
 # Navigation (#68)
 navLabel           = "Sections"
 navHome            = "Signing"

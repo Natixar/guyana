@@ -9,6 +9,7 @@ import { fetchPour, renderPour, operatorClaims } from "./pour.js";
 import { buildCredential, signCredential, newSubjectId } from "./credential.js";
 import { signView } from "./sign-state.js";
 import { putCredential, credentialsByRef } from "./wallet.js";
+import { depositCredential } from "./deposit.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -63,7 +64,7 @@ async function showFingerprint(pair) {
  * écrit à côté.
  */
 async function refreshState(ctx) {
-  const { status, createBtn, signBtn, signStatus, did, pour, signed } = ctx;
+  const { status, createBtn, signBtn, signStatus, did, pour, signed, deposit } = ctx;
   const pair = await loadKeyPair();
 
   setBadge(status, pair ? T.envKeyPresent : T.envKeyMissing, pair ? "verified" : "pending");
@@ -81,6 +82,19 @@ async function refreshState(ctx) {
   const view = signView({ pair, did, pour, signed });
   if (signBtn) signBtn.disabled = view.disabled;
   if (signStatus) signStatus.textContent = view.text;
+
+  // Le compte rendu du dépôt est un état que l'affichage ne peut pas relire :
+  // réinterroger le magasin ne dirait pas si CE dépôt-ci a abouti. Il passe donc
+  // par `ctx`, comme tout le reste depuis #64.
+  const depositLine = $("[data-deposit]");
+  if (depositLine) {
+    depositLine.hidden = !deposit;
+    if (deposit) {
+      depositLine.textContent = deposit.ok
+        ? T.barDeposited
+        : `${T.barDepositFailed} — ${deposit.why}`;
+    }
+  }
 
   return pair;
 }
@@ -111,7 +125,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const ctx = { status, createBtn: $("[data-create-key]"), signBtn: $("[data-sign]"),
                 signStatus: $("[data-sign-status]"), did,
-                pour: pour && renderPour(pour) ? pour : null, signed: null };
+                pour: pour && renderPour(pour) ? pour : null, signed: null, deposit: null };
 
   // Le portefeuille est consulté AVANT le premier rendu : une coulée déjà
   // confirmée dans une session précédente doit s'afficher comme telle, et non
@@ -163,6 +177,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Rangée avant tout affichage : une attestation signée qui ne survit pas
       // au rechargement est une attestation que l'opérateur croit détenir.
       await putCredential(ctx.signed, ctx.pour?.pourId ?? null);
+      // Rangée d'abord, déposée ensuite — et un magasin injoignable ne retire
+      // rien à ce qui est signé ici. Voir `deposit.js`.
+      ctx.deposit = await depositCredential(ctx.signed);
       $("[data-signed-subject]").textContent = subjectId;
       $("[data-signed-by]").textContent = me.person?.name ?? T.operatorUnknown;
       $("[data-signed]").hidden = false;

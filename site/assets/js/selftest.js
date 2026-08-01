@@ -10,6 +10,7 @@ import { base58btcEncode } from "./multibase.js";
 import { ephemeralKeyPair, loadKeyPair, publicJwk, thumbprint, readable, sign, verify } from "./keys.js";
 import { buildCredential, signCredential, newSubjectId } from "./credential.js";
 import { fetchPour, operatorClaims } from "./pour.js";
+import { barClaims } from "./bar-claims.js";
 import { fetchMe, issuerDid } from "./me.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
 import { buildDidDocument } from "./did.js";
@@ -299,6 +300,75 @@ test("end to end — identity, pour, signed credential", async () => {
   if ("carbonIntensity" in out.credentialSubject) return "carbon intensity must not be signed by the mine";
   if (!out.proof?.proofValue?.startsWith("z")) return "proof missing or not multibase";
   return null;
+});
+
+// --- Certifier depuis le registre (#68) ----------------------------------
+// Ce que la barre atteste vient du jeu d'essai, où les champs sont nus. Deux
+// choses peuvent y devenir fausses en silence : une origine recopiée à la main,
+// qui mentirait dès qu'AGM livrera son registre de coulées, et une valeur mise
+// en forme pour l'œil, qui figerait trois chiffres significatifs et une langue
+// dans un document signé.
+
+const A_BAR = {
+  subjectId: "urn:aurora:dore:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+  internalId: "AUR-202501-001",
+  lot: "LOT-2024-12",
+  pouredAt: "2025-01-01T04:00:00Z",
+  fineGoldKg: 11.7236,
+  grossMassKg: 12.743,
+  assay: 0.92,
+};
+
+const A_FIXTURE = {
+  units: { mass: "kg" },
+  simulatedFields: ["pouredAt", "internalId", "grossMassKg", "assay"],
+};
+
+test("barre — l'origine est lue du jeu d'essai, pas recopiée", () => {
+  const feint = barClaims(A_BAR, A_FIXTURE);
+  if (feint.weight.origin !== "ESTIMATED") return `masse brute simulée : ${feint.weight.origin}`;
+  if (feint.fineGold.origin !== "DERIVED") return `or fin : ${feint.fineGold.origin}`;
+
+  // Le jour où la masse brute sera pesée, le générateur la retirera de la
+  // liste — et l'attestation doit suivre sans que personne touche à ce module.
+  const reel = barClaims(A_BAR, {
+    ...A_FIXTURE,
+    simulatedFields: ["pouredAt", "internalId", "assay"],
+  });
+  if (reel.weight.origin !== "DERIVED") return "une valeur devenue réelle reste annoncée simulée";
+  return null;
+});
+
+test("barre — les valeurs signées sont brutes, jamais mises en forme", () => {
+  const claims = barClaims(A_BAR, A_FIXTURE);
+  if (typeof claims.weight.value !== "number") return "la masse est signée comme texte";
+  if (claims.weight.value !== A_BAR.grossMassKg) return "la masse signée n'est pas celle du registre";
+  if (claims.fineGold.value !== A_BAR.fineGoldKg) return "l'or fin signé n'est pas celui du registre";
+  if (claims.weight.unit !== "kg") return "l'unité ne voyage pas avec la valeur";
+  // Le jour de la mine, pas celui du lecteur : depuis l'Europe, une coulée du
+  // 1er mars paraîtrait datée du 28 février.
+  if (claims.pourDate.value !== "2025-01-01") return `jour local faux : ${claims.pourDate.value}`;
+  return null;
+});
+
+test("barre — l'attestation signée porte le sujet du registre et se vérifie", async () => {
+  const pair = await ephemeralKeyPair();
+  const did = "did:web:example.org";
+  const signed = await signCredential(
+    buildCredential({
+      issuerDid: did,
+      subjectId: A_BAR.subjectId,
+      claims: barClaims(A_BAR, A_FIXTURE),
+    }),
+    pair, did + "#key-1");
+
+  // L'identifiant de sujet ne se tire pas à la signature : c'est lui que le
+  // magasin indexe et que le registre interroge.
+  if (signed.credentialSubject.id !== A_BAR.subjectId) return "le sujet n'est pas celui du registre";
+  if ("carbonIntensity" in signed.credentialSubject) return "la mine ne signe pas l'intensité carbone";
+
+  const r = await verifyCredential(signed, await buildDidDocument(pair, did));
+  return r.ok ? null : "attestation de barre rejetée : " + r.reason;
 });
 
 test("round trip — a signed credential verifies against its DID document", async () => {
