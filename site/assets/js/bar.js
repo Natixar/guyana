@@ -31,10 +31,26 @@ const fact = (label, value) =>
 const localDay = (iso) =>
   new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Guyana" });
 
+/**
+ * Lit une réponse en exigeant du JSON.
+ *
+ * Le site répond 200 avec sa page d'accueil pour tout chemin inconnu : une
+ * erreur de routage arrive donc ici sous la forme d'un succès contenant du
+ * HTML, et `JSON.parse` répond « Unexpected token '<' » — un message qui ne
+ * nomme ni le routage ni le service absent. On le nomme.
+ */
+async function asJson(res, what) {
+  const type = res.headers.get("content-type") ?? "";
+  if (!type.includes("json")) {
+    throw new Error(`${what} : réponse non JSON (${type || "type absent"}) — routage ?`);
+  }
+  return res.json();
+}
+
 async function loadFixture() {
   const r = await fetch("/engine/erp-fixture.json", { headers: { accept: "application/json" } });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
+  return asJson(r, "erp-fixture.json");
 }
 
 /** Vérifie une attestation rapatriée contre le DID de son émetteur. */
@@ -101,7 +117,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     // complet n'a pas sa place sur une page qui en montre une.
     const res = await fetch(`/api/v1/credentials/${encodeURIComponent(bar.subjectId)}`)
       .catch(() => null);
-    const elsewhere = res?.ok === true;
+    // Un 200 portant du HTML n'est pas une attestation : c'est le site qui a
+    // répondu à la place du magasin.
+    const elsewhere = res?.ok === true
+      && (res.headers.get("content-type") ?? "").includes("json");
 
     badge.textContent = elsewhere ? T.barStatusElsewhere : T.barStatusNone;
     badge.className = `badge badge--${elsewhere ? "warning" : "pending"}`;
@@ -115,7 +134,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const res = await fetch(`/api/v1/credentials/${encodeURIComponent(bar.subjectId)}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const { credentials } = await res.json();
+      const { credentials } = await asJson(res, "credentials");
 
       for (const rec of credentials) {
         const checked = await verifyFetched(rec.document);

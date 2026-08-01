@@ -37,7 +37,9 @@ async function loadFixture() {
 async function loadStoreIndex() {
   try {
     const r = await fetch("/api/v1/credentials/index", { headers: { accept: "application/json" } });
-    if (!r.ok) return null;
+    // Le site répond 200 avec sa page d'accueil pour tout chemin inconnu : sans
+    // ce contrôle, une erreur de routage passerait pour un magasin vide.
+    if (!r.ok || !(r.headers.get("content-type") ?? "").includes("json")) return null;
     const { index } = await r.json();
     return new Set(index.map((e) => e.subject));
   } catch {

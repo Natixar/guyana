@@ -122,3 +122,18 @@ running_image() { remote "docker inspect $1 --format '{{.Config.Image}}'"; }
     # extraction dont l'origine n'est pas établie.
     [[ "$output" == *"HTTP 4"* ]]
 }
+
+@test "l'API est servie par les services, jamais par le site" {
+    # Le site répond 200 avec sa page d'accueil pour TOUT chemin inconnu. Une
+    # erreur de routage y prend donc l'apparence d'un succès, et c'est
+    # exactement ce qui est arrivé : Traefik, faute de priorité explicite, la
+    # calcule sur la longueur de la règle, et le routeur du site — qui ne parle
+    # que d'un hôte — battait ceux de l'API.
+    #
+    # On n'affirme pas la priorité, qui est un moyen : on affirme que /api/v1
+    # ne renvoie pas de HTML, qui est la propriété.
+    run curl_auth -o /dev/null -w '%{content_type}' \
+        "https://$(primary_domain)/api/v1/credentials/index"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"text/html"* ]]
+}

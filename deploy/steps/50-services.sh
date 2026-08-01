@@ -10,10 +10,20 @@
 #   - le signataire est sur `proxy` SEULEMENT ;
 #   - le signataire reçoit la clé publique du magasin, jamais la privée.
 #
-# Le routage se fait par préfixe de chemin, et l'ordre des priorités compte :
-# `/api/v1/sign` doit gagner contre `/api/v1`, sans quoi les requêtes de
-# signature atterriraient dans le magasin — qui n'a pas de clé et répondrait 404,
-# ce qui est un symptôme bien loin de sa cause.
+# LE ROUTAGE PAR PRIORITÉ, ET POURQUOI ELLES SONT SI GRANDES.
+#
+# Traefik, faute de priorité explicite, la CALCULE sur la longueur de la règle.
+# Le routeur du site porte `Host(\`guyana.natixar.pro\`)`, soit une trentaine de
+# caractères, donc une priorité d'une trentaine : des valeurs de 10 et 20 se
+# faisaient battre par un routeur qui ne les mentionnait même pas. Le magasin
+# n'a jamais été joignable depuis le navigateur, et personne ne l'a vu parce que
+# le site répond 200 avec sa page d'accueil pour tout chemin inconnu — une
+# erreur de routage prenait l'apparence d'un succès.
+#
+# Les priorités sont donc explicites et TRÈS au-dessus de toute longueur de
+# règle plausible. `/api/v1/sign` doit en outre gagner contre `/api/v1`, sans
+# quoi les requêtes de signature atterriraient dans le magasin — qui n'a pas de
+# clé et répondrait 404, un symptôme loin de sa cause.
 set -euo pipefail
 
 : "${SIGNER_CONTAINER:?}" "${SIGNER_IMAGE:?}" "${SIGNER_PORT:?}"
@@ -71,7 +81,7 @@ docker run -d --name "$STORE_CONTAINER" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-store.rule=Host(\`${primary}\`) && PathPrefix(\`/api/v1\`)" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-store.entrypoints=websecure" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-store.tls=true" \
-  --label "traefik.http.routers.${ROUTER_PREFIX}-store.priority=10" \
+  --label "traefik.http.routers.${ROUTER_PREFIX}-store.priority=1000" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-store.middlewares=${mw}" \
   --label "traefik.http.services.${ROUTER_PREFIX}-store.loadbalancer.server.port=${STORE_PORT}" \
   "$STORE_IMAGE" >/dev/null
@@ -98,7 +108,7 @@ docker run -d --name "$SIGNER_CONTAINER" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-signer.rule=Host(\`${primary}\`) && PathPrefix(\`/api/v1/sign\`)" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-signer.entrypoints=websecure" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-signer.tls=true" \
-  --label "traefik.http.routers.${ROUTER_PREFIX}-signer.priority=20" \
+  --label "traefik.http.routers.${ROUTER_PREFIX}-signer.priority=2000" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-signer.middlewares=${mw}" \
   --label "traefik.http.services.${ROUTER_PREFIX}-signer.loadbalancer.server.port=${SIGNER_PORT}" \
   "$SIGNER_IMAGE" >/dev/null
@@ -137,4 +147,4 @@ for c in "$STORE_CONTAINER" "$SIGNER_CONTAINER"; do
 done
 
 echo "magasin sur ${PROXY_NETWORK}+${DB_NETWORK}, signataire sur ${PROXY_NETWORK} seul"
-echo "routage : /api/v1/sign -> signataire (priorité 20), /api/v1 -> magasin (10)"
+echo "routage : /api/v1/sign -> signataire (2000), /api/v1 -> magasin (1000), reste -> site"
