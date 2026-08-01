@@ -180,6 +180,16 @@ jobs:
           curl -sf http://127.0.0.1:8080/api/v1/me | grep -q 'did:web'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/inconnu)" = 200
 
+      # LES TESTS DU SIGNATEUR TOURNENT DANS SON IMAGE, pas seulement depuis le
+      # dépôt. Depuis le dépôt tous les fichiers existent ; dans l'image, seuls
+      # ceux que le Dockerfile a copiés. Un module qui gagne une dépendance non
+      # copiée passe alors la CI et redémarre en boucle en production sur
+      # ERR_MODULE_NOT_FOUND — c'est arrivé le 1er août 2026.
+      - name: le signataire tourne dans son image
+        run: |
+          docker build -q -f services/signer/Dockerfile -t aurora-signer:ci .
+          docker run --rm aurora-signer:ci node --test '/app/*.test.mjs'
+
       - name: démonter
         if: always()
         run: docker rm -f skel || true

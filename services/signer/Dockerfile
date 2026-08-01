@@ -14,12 +14,26 @@ WORKDIR /app
 COPY services/signer/package.json services/signer/package-lock.json* ./
 RUN npm ci --omit=dev 2>/dev/null || npm install --omit=dev --no-audit --no-fund
 
+# Les fichiers de test voyagent avec le reste, délibérément : une image qu'on
+# peut interroger — `node --test '/app/*.test.mjs'` — se vérifie après coup,
+# y compris sur la cible. Quelques kilo-octets qui ne s'exécutent jamais seuls.
 COPY services/signer/*.mjs ./
-# Les chemins relatifs des imports (`../../site/assets/js/...`) sont préservés :
-# c'est ce qui garantit que le fichier chargé ici est bien celui du dépôt.
-COPY site/assets/js/canonical.js site/assets/js/multibase.js \
-     site/assets/js/keys.js site/assets/js/credential.js \
-     site/assets/js/engine.js /site/assets/js/
+
+# LE RÉPERTOIRE ENTIER, PAS UNE LISTE. Une liste explicite paraît plus propre et
+# se casse en silence : le jour où un module gagne une dépendance, l'image perd
+# un fichier et le service redémarre en boucle sur ERR_MODULE_NOT_FOUND. C'est
+# arrivé — `keys.js` a commencé à importer `idb.js`, absent de la liste.
+#
+# Les modules purement navigateur embarqués au passage ne coûtent que quelques
+# kilo-octets et ne sont jamais chargés. Les chemins relatifs des imports
+# (`../../site/assets/js/...`) sont préservés : c'est ce qui garantit que le
+# fichier exécuté ici est bien celui du dépôt.
+COPY site/assets/js/ /site/assets/js/
+# La taxonomie et les vecteurs à leur place du dépôt, pour que les chemins
+# relatifs valent ici comme là-bas. La copie dans /app est celle que le service
+# lit au démarrage ; celle sous /site est celle que les tests et les vecteurs
+# partagés attendent — même fichier, deux consommateurs.
+COPY site/static/engine/ /site/static/engine/
 COPY site/static/engine/taxonomy.json /app/taxonomy.json
 
 # `../../site/...` depuis /app/server.mjs se résout en /site/... : la racine
