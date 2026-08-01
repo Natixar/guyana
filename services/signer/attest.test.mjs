@@ -40,7 +40,9 @@ async function extractionOf(cells, signWith = storePair.privateKey) {
 
 const CELL = {
   id: "c1", subPost: 1000, partType: 1, caracterisation: 1,
-  value: 1000, unit: "L", factor: 2.68, factorUnit: "kgCO2e/L", origin: "MEASURED",
+  // Un mètre cube de gazole, 2 680 kgCO2e. Mille m3 seraient absurdes,
+  // et un gabarit invraisemblable rend illisible ce que le cas mesure.
+  value: 1, unit: "m3", factor: 2680, origin: "MEASURED",
 };
 
 async function requestFor(cells, over = {}) {

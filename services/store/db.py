@@ -52,7 +52,7 @@ def cells_overlapping(conn: psycopg.Connection, periods: list[Range]) -> list[di
         """
         SELECT c.id, c.sub_post AS "subPost", c.part_type AS "partType",
                c.caracterisation, c.value, u.symbol AS unit,
-               c.factor, c.factor_unit AS "factorUnit", c.origin,
+               c.factor, c.origin,
                lower(c.period) AS "periodStart", upper(c.period) AS "periodEnd"
           FROM cell c
           JOIN unit u ON u.id = c.unit_id

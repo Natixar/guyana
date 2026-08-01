@@ -42,12 +42,45 @@ FIXTURE = ROOT / "site" / "static" / "engine" / "erp-fixture.json"
 #: Feuille 9 du paquet. Cinq des six sont marqués « provisional » par AGM ;
 #: seul le facteur de combustion du gazole est accepté, et seulement parce que
 #: janvier réconcilie à −0,16 % contre leur propre classeur.
-# TOUT EST EN SI. La feuille 9 donne les facteurs par litre, parce que les bons
-# de sortie comptent en litres ; le cube ne connaît que le mètre cube. Convertir
-# ici, une fois, vaut mieux que de porter deux unités jusqu'au bout.
-DIESEL_COMBUSTION = 2.68 * 1000     # kgCO2e / m3
-DIESEL_UPSTREAM = 0.61 * 1000       # kgCO2e / m3, well-to-tank
-EXPLOSIVE = 0.17                    # kgCO2e / kg, déjà SI
+# LA CONVERSION A LIEU ICI, ET NULLE PART AILLEURS.
+#
+# La feuille 9 donne les facteurs par litre, parce que les bons de sortie
+# comptent en litres. Le cube ne connaît que le mètre cube — et il ne stocke pas
+# « kgCO2e/m3 » à côté du nombre, parce que l'unité d'activité est déjà celle de
+# la cellule. Un facteur y est un NOMBRE : des kgCO2e par unité, et l'unité est
+# dite une seule fois.
+#
+# C'est donc ici, à la frontière, que les unités d'origine existent encore et
+# que la conversion se décide. Au-delà, il n'y a plus rien à convertir ni rien à
+# vérifier.
+SOURCE_FACTORS = {
+    # facteur feuille 9, unité d'origine -> (facteur SI, unité SI)
+    "diesel-combustion": (2.68, "L"),
+    "diesel-upstream": (0.61, "L"),
+    "explosive": (0.17, "kg"),
+}
+
+#: Ce que l'on sait ramener au SI. Une unité absente est REFUSÉE : convertir au
+#: jugé produirait un nombre plausible et faux, que la signature figerait.
+TO_SI = {
+    "L": (1e3, "m3"),      # 1 kgCO2e/L = 1000 kgCO2e/m3
+    "kg": (1.0, "kg"),
+    "kWh": (1.0, "kWh"),
+}
+
+
+def si_factor(name: str) -> tuple[float, str]:
+    """Le facteur ramené au SI, et l'unité d'activité qui va avec."""
+    value, unit = SOURCE_FACTORS[name]
+    if unit not in TO_SI:
+        raise ValueError(f"unité de facteur non convertible : {unit}")
+    scale, si_unit = TO_SI[unit]
+    return value * scale, si_unit
+
+
+DIESEL_COMBUSTION, DIESEL_UNIT = si_factor("diesel-combustion")
+DIESEL_UPSTREAM, _ = si_factor("diesel-upstream")
+EXPLOSIVE, EXPLOSIVE_UNIT = si_factor("explosive")
 
 #: Identifiants de la taxonomie servie, agm-h1-v2.
 PART_COMBUSTION, PART_AMONT = 1, 2
@@ -132,8 +165,8 @@ def build_cells(fuel, explosives, assignment, org):
                 "entity_id": dept["id"],
                 "sub_post": sub_post, "part_type": part,
                 "caracterisation": CARAC_OPERATED,
-                "value": row["m3"], "unit": "m3",
-                "factor": factor, "factor_unit": "kgCO2e/m3",
+                "value": row["m3"], "unit": DIESEL_UNIT,
+                "factor": factor,
                 "origin": "MEASURED",
             })
 
@@ -148,8 +181,8 @@ def build_cells(fuel, explosives, assignment, org):
             "entity_id": blast_dept,
             "sub_post": SUBPOST_EXPLOSIVES, "part_type": None,
             "caracterisation": CARAC_PROCEDEED,
-            "value": row["kg"], "unit": "kg",
-            "factor": EXPLOSIVE, "factor_unit": "kgCO2e/kg",
+            "value": row["kg"], "unit": EXPLOSIVE_UNIT,
+            "factor": EXPLOSIVE,
             "origin": "MEASURED",
         })
 
@@ -176,17 +209,16 @@ def load(conn, cells, org) -> None:
     with conn.cursor() as cur:
         cur.executemany(
             """INSERT INTO cell (id, period, entity_id, sub_post, part_type, caracterisation,
-                                 value, unit_id, factor, factor_unit, origin)
+                                 value, unit_id, factor, origin)
                     VALUES (%(id)s, %(period)s, %(entity_id)s, %(sub_post)s, %(part_type)s,
                             %(caracterisation)s, %(value)s, %(unit_id)s, %(factor)s,
-                            %(factor_unit)s, %(origin)s)
+                            %(origin)s)
                ON CONFLICT (id) DO UPDATE SET
                     period = EXCLUDED.period, entity_id = EXCLUDED.entity_id,
                     sub_post = EXCLUDED.sub_post, part_type = EXCLUDED.part_type,
                     caracterisation = EXCLUDED.caracterisation,
                     value = EXCLUDED.value, unit_id = EXCLUDED.unit_id,
-                    factor = EXCLUDED.factor, factor_unit = EXCLUDED.factor_unit,
-                    origin = EXCLUDED.origin""",
+                    factor = EXCLUDED.factor, origin = EXCLUDED.origin""",
             [{**c, "unit_id": UNITS[c["unit"]]} for c in cells],
         )
 
@@ -227,12 +259,12 @@ def emit_sql(cells, org) -> None:
         hi = c["period"].upper.isoformat()
         print(
             "INSERT INTO cell (id, period, entity_id, sub_post, part_type, caracterisation,"
-            " value, unit_id, factor, factor_unit, origin) VALUES ("
+            " value, unit_id, factor, origin) VALUES ("
             f"{sql_literal(c['id'])}, "
             f"tstzrange({sql_literal(lo)}::timestamptz, {sql_literal(hi)}::timestamptz, '[)'), "
             f"{c['entity_id']}, {sql_literal(c['sub_post'])}, {sql_literal(c['part_type'])}, "
             f"{c['caracterisation']}, {c['value']!r}, {UNITS[c['unit']]}, {c['factor']!r}, "
-            f"{sql_literal(c['factor_unit'])}, {sql_literal(c['origin'])}) "
+            f"{sql_literal(c['origin'])}) "
             # Toutes les colonnes, sans exception : un rechargement qui change
             # d'unité doit changer l'unité. En omettre une laisse une valeur
             # neuve sous une étiquette ancienne.
@@ -240,8 +272,7 @@ def emit_sql(cells, org) -> None:
             "entity_id = EXCLUDED.entity_id, sub_post = EXCLUDED.sub_post, "
             "part_type = EXCLUDED.part_type, caracterisation = EXCLUDED.caracterisation, "
             "value = EXCLUDED.value, unit_id = EXCLUDED.unit_id, "
-            "factor = EXCLUDED.factor, factor_unit = EXCLUDED.factor_unit, "
-            "origin = EXCLUDED.origin;"
+            "factor = EXCLUDED.factor, origin = EXCLUDED.origin;"
         )
     print("COMMIT;")
 

@@ -35,9 +35,11 @@ BEGIN;
 -- (site/static/engine/taxonomy.json) parce qu'un vérificateur doit pouvoir
 -- dériver la ligne GHGP lui-même sans nous appeler.
 
+-- Les unités d'activité. SI, ou monétaires — un facteur en approche monétaire
+-- s'exprime par euro dépensé, et c'est une unité comme une autre.
 CREATE TABLE IF NOT EXISTS unit (
     id      integer PRIMARY KEY,
-    symbol  text NOT NULL UNIQUE          -- « L », « kg », « t.km »
+    symbol  text NOT NULL UNIQUE          -- « kg », « m3 », « kWh », « EUR »
 );
 
 -- La taxonomie d'organisation. Statique pour le PoC, et en clair
@@ -57,8 +59,6 @@ CREATE TABLE IF NOT EXISTS entity (
     industrial  boolean NOT NULL DEFAULT false
 );
 
--- Les colonnes ajoutées après coup : une base du pilote peut précéder ce champ.
-ALTER TABLE entity ADD COLUMN IF NOT EXISTS industrial boolean NOT NULL DEFAULT false;
 
 -- La table de faits. Rien que des nombres et un intervalle.
 CREATE TABLE IF NOT EXISTS cell (
@@ -70,8 +70,12 @@ CREATE TABLE IF NOT EXISTS cell (
     caracterisation  integer NOT NULL,
     value            double precision NOT NULL,
     unit_id          integer NOT NULL REFERENCES unit(id),
+    -- LE FACTEUR EST UN NOMBRE, PAS UNE REPRÉSENTATION. Il est toujours en
+    -- kgCO2e par unité d'activité, et cette unité est déjà dans `unit_id` :
+    -- porter « kgCO2e/m3 » à côté serait une seconde source de vérité, donc
+    -- une occasion de divergence. La conversion se fait à l'ingestion, une
+    -- fois, à la frontière — au-delà, il n'y a qu'un nombre.
     factor           double precision NOT NULL,
-    factor_unit      text NOT NULL,       -- « kgCO2e/L » — l'unité du facteur, pas de l'activité
     origin           text NOT NULL
                      CHECK (origin IN ('MEASURED','DERIVED','ESTIMATED','NOT_MEASURED')),
 
@@ -110,5 +114,13 @@ CREATE TABLE IF NOT EXISTS credential (
 -- L'ordre du registre : la plus récente par barre et par type.
 CREATE INDEX IF NOT EXISTS credential_latest
     ON credential (subject, type, received_at DESC);
+
+-- --- Migrations -----------------------------------------------------------
+-- APRÈS les CREATE, jamais avant : un ALTER sur une table que le même fichier
+-- n'a pas encore créée fait avorter toute la transaction, et le message parle
+-- d'une table absente plutôt que d'un ordre d'exécution.
+ALTER TABLE entity ADD COLUMN IF NOT EXISTS industrial boolean NOT NULL DEFAULT false;
+-- factor_unit a existé : il dupliquait l'unité de la cellule.
+ALTER TABLE cell   DROP COLUMN IF EXISTS factor_unit;
 
 COMMIT;

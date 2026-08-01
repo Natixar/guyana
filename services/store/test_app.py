@@ -43,7 +43,7 @@ def conn():
     with db.connect() as c:
         db.apply_schema(c)
         c.execute("TRUNCATE cell, credential; DELETE FROM entity; DELETE FROM unit;")
-        c.execute("INSERT INTO unit (id, symbol) VALUES (1, 'L') ON CONFLICT DO NOTHING")
+        c.execute("INSERT INTO unit (id, symbol) VALUES (1, 'm3') ON CONFLICT DO NOTHING")
         c.execute("INSERT INTO entity (id, label) VALUES (1, 'lot-1') ON CONFLICT DO NOTHING")
         yield c
 
@@ -51,9 +51,9 @@ def conn():
 def _cell(conn, cell_id: str, start: str, end: str, sub_post: int | None = 1000) -> None:
     conn.execute(
         """INSERT INTO cell (id, period, entity_id, sub_post, part_type, caracterisation,
-                             value, unit_id, factor, factor_unit, origin)
+                             value, unit_id, factor, origin)
            VALUES (%s, tstzrange(%s::timestamptz, %s::timestamptz, '[)'),
-                   1, %s, 1, 1, 1000, 1, 2.68, 'kgCO2e/L', 'MEASURED')""",
+                   1, %s, 1, 1, 1000, 1, 2680, 'MEASURED')""",
         (cell_id, start, end, sub_post),
     )
 
@@ -112,6 +112,16 @@ def test_an_unallocated_cell_is_served_like_any_other(conn):
     _cell(conn, "non-alloué", "2026-01-01", "2026-02-01", sub_post=None)
     got = db.cells_overlapping(conn, [_range("2026-01-01", "2026-02-01")])
     assert got[0]["subPost"] is None
+
+
+def test_a_cell_carries_a_number_not_a_representation(conn):
+    """Le facteur est un nombre en kgCO2e par unité d'activité, et cette unité
+    est déjà celle de la cellule. La porter une seconde fois créerait deux
+    sources de vérité pour une information unique."""
+    _cell(conn, "janvier", "2026-01-01", "2026-02-01")
+    got = db.cells_overlapping(conn, [_range("2026-01-01", "2026-02-01")])[0]
+    assert "factorUnit" not in got
+    assert got["unit"] == "m3" and got["factor"] == 2680
 
 
 def test_no_decimal_crosses_the_boundary(conn):

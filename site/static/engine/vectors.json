@@ -19,8 +19,7 @@
           "value": 1000,
           "unit": "L",
           "factor": 2.68,
-          "origin": "MEASURED",
-          "factorUnit": "kgCO2e/L"
+          "origin": "MEASURED"
         }
       ],
       "expect": {
@@ -42,8 +41,7 @@
           "value": 1000,
           "unit": "L",
           "factor": 2.68,
-          "origin": "MEASURED",
-          "factorUnit": "kgCO2e/L"
+          "origin": "MEASURED"
         },
         {
           "subPost": 1000,
@@ -52,8 +50,7 @@
           "value": 1000,
           "unit": "L",
           "factor": 0.61,
-          "origin": "MEASURED",
-          "factorUnit": "kgCO2e/L"
+          "origin": "MEASURED"
         }
       ],
       "expect": {
@@ -76,8 +73,7 @@
           "value": 1000,
           "unit": "L",
           "factor": 2.68,
-          "origin": "MEASURED",
-          "factorUnit": "kgCO2e/L"
+          "origin": "MEASURED"
         }
       ],
       "expect": {
@@ -99,8 +95,7 @@
           "value": 1000,
           "unit": "kg",
           "factor": 0.17,
-          "origin": "MEASURED",
-          "factorUnit": "kgCO2e/kg"
+          "origin": "MEASURED"
         }
       ],
       "expect": {
@@ -122,8 +117,7 @@
           "value": 1000,
           "unit": "L",
           "factor": 2.68,
-          "origin": "MEASURED",
-          "factorUnit": "kgCO2e/L"
+          "origin": "MEASURED"
         },
         {
           "subPost": 1000,
@@ -132,8 +126,7 @@
           "value": 1000,
           "unit": "L",
           "factor": 2.68,
-          "origin": "ESTIMATED",
-          "factorUnit": "kgCO2e/L"
+          "origin": "ESTIMATED"
         }
       ],
       "expect": {
@@ -155,8 +148,7 @@
           "value": 1000,
           "unit": "L",
           "factor": 2.68,
-          "origin": "MEASURED",
-          "factorUnit": "kgCO2e/L"
+          "origin": "MEASURED"
         },
         {
           "subPost": null,
@@ -166,7 +158,6 @@
           "unit": "L",
           "factor": 2.68,
           "origin": "MEASURED",
-          "factorUnit": "kgCO2e/L",
           "periodStart": "2025-01-01T00:00:00Z",
           "periodEnd": "2025-02-01T00:00:00Z"
         }
@@ -190,8 +181,7 @@
           "value": 1000,
           "unit": "L",
           "factor": 1.0,
-          "origin": "MEASURED",
-          "factorUnit": "kgCO2e/L"
+          "origin": "MEASURED"
         }
       ],
       "expect": {
@@ -209,50 +199,11 @@
           "value": 1000,
           "unit": "L",
           "factor": 2.68,
-          "origin": "MEASURED",
-          "factorUnit": "kgCO2e/L"
+          "origin": "MEASURED"
         }
       ],
       "expect": {
         "error": "CARACTERISATION_REQUIRED"
-      }
-    },
-    {
-      "name": "unités — un facteur qui n'est pas en kgCO2e est refusé, jamais converti",
-      "why": "Convertir supposerait qu'on a compris ce que l'autre voulait dire ; refuser le lui fait dire. Tout est en SI, il n'y a rien à convertir.",
-      "cells": [
-        {
-          "subPost": 1000,
-          "partType": 1,
-          "caracterisation": 1,
-          "value": 3,
-          "unit": "L",
-          "factor": 2.0,
-          "factorUnit": "tCO2e/L",
-          "origin": "MEASURED"
-        }
-      ],
-      "expect": {
-        "error": "FACTOR_UNIT_NOT_SI"
-      }
-    },
-    {
-      "name": "unités — une unité de facteur inconnue est refusée, jamais devinée",
-      "why": "Deviner produirait un chiffre plausible et faux, que la signature figerait.",
-      "cells": [
-        {
-          "subPost": 1000,
-          "partType": 1,
-          "caracterisation": 1,
-          "value": 3,
-          "unit": "L",
-          "factor": 2.0,
-          "factorUnit": "lbCO2e/gal",
-          "origin": "MEASURED"
-        }
-      ],
-      "expect": {
-        "error": "FACTOR_UNIT_NOT_SI"
       }
     },
     {
@@ -266,7 +217,6 @@
           "value": 600,
           "unit": "L",
           "factor": 2.68,
-          "factorUnit": "kgCO2e/L",
           "origin": "MEASURED"
         },
         {
@@ -276,7 +226,6 @@
           "value": 400,
           "unit": "L",
           "factor": 2.68,
-          "factorUnit": "kgCO2e/L",
           "origin": "MEASURED"
         }
       ],
@@ -300,7 +249,6 @@
           "value": 1000,
           "unit": "kg",
           "factor": 0.17,
-          "factorUnit": "kgCO2e/kg",
           "origin": "MEASURED"
         },
         {
@@ -310,7 +258,6 @@
           "value": 1000,
           "unit": "t",
           "factor": 0.17,
-          "factorUnit": "kgCO2e/t",
           "origin": "MEASURED"
         }
       ],
@@ -334,7 +281,6 @@
           "value": 1000,
           "unit": "L",
           "factor": 2.68,
-          "factorUnit": "kgCO2e/L",
           "origin": "MEASURED",
           "periodStart": "2025-01-01T00:00:00Z",
           "periodEnd": "2025-02-01T00:00:00Z"
@@ -366,7 +312,6 @@
           "value": 1000,
           "unit": "L",
           "factor": 2.68,
-          "factorUnit": "kgCO2e/L",
           "origin": "MEASURED",
           "periodStart": "2025-01-01T00:00:00Z",
           "periodEnd": "2025-02-01T00:00:00Z"
@@ -378,7 +323,6 @@
           "value": 1000,
           "unit": "L",
           "factor": 2.68,
-          "factorUnit": "kgCO2e/L",
           "origin": "MEASURED",
           "periodStart": "2025-02-01T00:00:00Z",
           "periodEnd": "2025-03-01T00:00:00Z"
@@ -412,7 +356,6 @@
           "value": 1000,
           "unit": "L",
           "factor": 2.68,
-          "factorUnit": "kgCO2e/L",
           "origin": "MEASURED",
           "periodStart": "2025-01-01T00:00:00Z",
           "periodEnd": "2025-02-01T00:00:00Z"
@@ -435,5 +378,5 @@
     }
   ],
   "resultUnit": "kgCO2e",
-  "_resultUnit": "Tout est en SI : le moteur produit des kgCO2e et ne convertit rien. Publier en tCO2e est une affaire de rendu, pas de calcul."
+  "_resultUnit": "Tout est en SI. Un facteur vaut des kgCO2e par unité d'activité, et cette unité est celle de la cellule : le moteur ne convertit rien et n'a rien à vérifier. La conversion a lieu à l'ingestion — voir services/store/load_2025.py."
 }

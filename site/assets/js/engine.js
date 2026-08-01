@@ -45,28 +45,23 @@ function fault(code, detail) {
 }
 
 /**
- * TOUT EST EN SI. Le moteur produit des kgCO2e, un point c'est tout.
+ * TOUT EST EN SI, ET UN FACTEUR EST UN NOMBRE.
  *
- * Les bases de facteurs sont déjà en kgCO2e par unité d'activité : ne rien
- * convertir supprime la conversion, et avec elle la classe d'erreur qu'elle
- * portait. Un facteur mille silencieux sur un chiffre signé n'est plus
- * possible parce qu'il n'y a plus de facteur mille à appliquer.
+ * Le moteur produit des kgCO2e et ne convertit rien. Un facteur vaut des kgCO2e
+ * par unité d'activité, et cette unité est celle de la cellule : la porter une
+ * seconde fois à côté du facteur créerait deux sources de vérité, donc une
+ * occasion de divergence, pour une information déjà présente.
  *
- * Publier en tCO2e, quand un référentiel l'exige, est une affaire de rendu :
- * cela se divise par mille au moment d'écrire un rapport, pas au moment de
- * calculer, et surtout pas au moment de signer.
+ * Il n'y a donc rien à contrôler ici. La conversion — onces vers kilogrammes,
+ * litres vers mètres cubes, facteurs par litre vers facteurs par mètre cube —
+ * a lieu une fois, à l'ingestion, là où les unités d'origine existent encore.
+ * Au-delà de cette frontière, il n'y a que des nombres, et un nombre n'a pas
+ * d'unité à trahir.
  *
- * Une unité de facteur qui n'est pas en kgCO2e est REFUSÉE plutôt que
- * convertie. Convertir supposerait qu'on a compris ce que l'autre voulait
- * dire ; refuser le lui fait dire.
+ * Publier en tCO2e quand un référentiel l'exige est une affaire de rendu : on
+ * divise par mille en écrivant un rapport, jamais en calculant ni en signant.
  */
 const RESULT_UNIT = "kgCO2e";
-
-/** « kgCO2e/L » -> « kgCO2e ». L'unité d'activité ne regarde pas ce contrôle. */
-function assertMassUnit(factorUnit) {
-  const mass = String(factorUnit ?? "").split("/")[0];
-  if (mass !== RESULT_UNIT) throw fault("FACTOR_UNIT_NOT_SI", String(factorUnit));
-}
 
 const worstOrigin = (a, b) =>
   ORIGIN_RANK.indexOf(a) >= ORIGIN_RANK.indexOf(b) ? a : b;
@@ -150,7 +145,6 @@ export function aggregate(cells, taxonomy) {
   let origin = ORIGIN_RANK[0];
 
   for (const cell of cells) {
-    assertMassUnit(cell.factorUnit);
     const emission = cell.value * cell.factor;
     origin = worstOrigin(origin, cell.origin ?? "NOT_MEASURED");
 
