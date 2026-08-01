@@ -37,6 +37,7 @@ import db
 ROOT = Path(__file__).resolve().parents[2]
 PACK = ROOT / "poc-data" / "AGM_PoC_Physical_Data_Pack_Completed.xlsx"
 ASSIGNMENT = ROOT / "poc-data" / "agm-h1-subpost-assignment.json"
+FIXTURE = ROOT / "site" / "static" / "engine" / "erp-fixture.json"
 
 #: Feuille 9 du paquet. Cinq des six sont marqués « provisional » par AGM ;
 #: seul le facteur de combustion du gazole est accepté, et seulement parce que
@@ -89,7 +90,18 @@ def read_pack():
     return fuel, explosives
 
 
-def build_cells(fuel, explosives, assignment):
+def organisation() -> dict[str, dict]:
+    """Les départements, avec leurs identifiants — lus, jamais redevinés.
+
+    Le fixture du front est la source unique. Attribuer les identifiants ici
+    aussi produirait deux numérotations qui coïncideraient jusqu'au jour où un
+    département serait ajouté, et la divergence serait silencieuse.
+    """
+    fx = json.loads(FIXTURE.read_text("utf-8"))
+    return {d["key"]: d for d in fx["organisation"]}
+
+
+def build_cells(fuel, explosives, assignment, org):
     """La correspondance département → sous-poste vient du fichier d'affectation,
     relu et non redeviné : c'est lui qui porte les 14 départements marqués
     « needs AGM confirmation », et il a été vérifié séparément."""
@@ -102,6 +114,10 @@ def build_cells(fuel, explosives, assignment):
             print(f"  département inconnu, ignoré : {row['department']}", file=sys.stderr)
             continue
         sub_post = {"CombustiblesFossiles": 1000, "FretInterne": 1002}[spec["subPost"]]
+        dept = org.get(row["department"])
+        if dept is None:
+            print(f"  département hors taxonomie, ignoré : {row['department']}", file=sys.stderr)
+            continue
         slug = row["department"].replace(" ", "_")[:40]
         # Deux cellules par litre : la combustion, et l'amont. Charger seulement
         # la première perdrait 22,8 % de l'empreinte sans que rien ne le signale.
@@ -110,6 +126,7 @@ def build_cells(fuel, explosives, assignment):
             cells.append({
                 "id": f"d/{row['month']}/{slug}/{tag}",
                 "period": month_range(row["month"]),
+                "entity_id": dept["id"],
                 "sub_post": sub_post, "part_type": part,
                 "caracterisation": CARAC_OPERATED,
                 "value": row["litres"], "unit": "L",
@@ -117,10 +134,15 @@ def build_cells(fuel, explosives, assignment):
                 "origin": "MEASURED",
             })
 
+    blast_dept = org["Sinohydro"]["id"]
     for row in explosives:
         cells.append({
             "id": f"x/{row['month']}/{row['product'].replace(' ', '_')}",
             "period": month_range(row["month"]),
+            # Le paquet donne les explosifs par produit et par mois, jamais par
+            # département : ils vont au département de minage. Les répartir
+            # entre plusieurs inventerait une ventilation que personne n'a.
+            "entity_id": blast_dept,
             "sub_post": SUBPOST_EXPLOSIVES, "part_type": None,
             "caracterisation": CARAC_PROCEDEED,
             "value": row["kg"], "unit": "kg",
@@ -131,21 +153,27 @@ def build_cells(fuel, explosives, assignment):
     return cells
 
 
-def load(conn, cells) -> None:
+def load(conn, cells, org) -> None:
     db.apply_schema(conn)
     for symbol, uid in UNITS.items():
         conn.execute("INSERT INTO unit (id, symbol) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                      (uid, symbol))
-    # Une seule entité : la fenêtre pilote entière. Les lots viendront avec le
-    # registre de coulée G-01, encore partiel chez AGM.
-    conn.execute("INSERT INTO entity (id, label) VALUES (1, 'perimetre-pilote-2025') "
-                 "ON CONFLICT DO NOTHING")
+    # La taxonomie d'organisation. Les noms sont en clair PROVISOIREMENT : ce
+    # sont eux que le chiffrement des dimensions couvrira. Le client n'en connaît
+    # déjà que les entiers.
+    with conn.cursor() as cur:
+        cur.executemany(
+            """INSERT INTO entity (id, label, industrial) VALUES (%(id)s, %(key)s, %(industrial)s)
+               ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label,
+                                              industrial = EXCLUDED.industrial""",
+            list(org.values()),
+        )
 
     with conn.cursor() as cur:
         cur.executemany(
             """INSERT INTO cell (id, period, entity_id, sub_post, part_type, caracterisation,
                                  value, unit_id, factor, factor_unit, origin)
-                    VALUES (%(id)s, %(period)s, 1, %(sub_post)s, %(part_type)s,
+                    VALUES (%(id)s, %(period)s, %(entity_id)s, %(sub_post)s, %(part_type)s,
                             %(caracterisation)s, %(value)s, %(unit_id)s, %(factor)s,
                             %(factor_unit)s, %(origin)s)
                ON CONFLICT (id) DO UPDATE SET
@@ -168,12 +196,15 @@ def main() -> int:
 
     fuel, explosives = read_pack()
     assignment = json.loads(ASSIGNMENT.read_text("utf-8"))
-    cells = build_cells(fuel, explosives, assignment)
+    org = organisation()
+    cells = build_cells(fuel, explosives, assignment, org)
 
     litres = sum(c["value"] for c in cells if c["unit"] == "L" and c["part_type"] == PART_COMBUSTION)
     tonnes = sum(c["value"] * c["factor"] for c in cells) / 1000
 
     print(f"{len(cells)} cellules — {litres:,.0f} L de gazole, {tonnes:,.0f} tCO2e au total")
+    industrial = sum(1 for d in org.values() if d["industrial"])
+    print(f"  organisation : {len(org)} départements, dont {industrial} industriels")
     print(f"  affectation : {assignment['version']} ({assignment['status'].split(' - ')[0]})")
 
     if args.dry_run:
@@ -181,7 +212,7 @@ def main() -> int:
         return 0
 
     with db.connect() as conn:
-        load(conn, cells)
+        load(conn, cells, org)
         n = conn.execute("SELECT count(*) AS n FROM cell").fetchone()["n"]
     print(f"\nchargé. {n} cellules dans le cube.")
     return 0

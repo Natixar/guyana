@@ -40,13 +40,25 @@ CREATE TABLE IF NOT EXISTS unit (
     symbol  text NOT NULL UNIQUE          -- « L », « kg », « t.km »
 );
 
+-- La taxonomie d'organisation. Statique pour le PoC, et en clair
+-- PROVISOIREMENT : c'est elle qui porte les noms révélant l'organigramme du
+-- client, et c'est elle que le chiffrement des dimensions couvrira le jour où
+-- D1 de l'issue #6 sera tranchée. Le client, lui, n'en connaît déjà que les
+-- identifiants entiers — rien du front ne changera ce jour-là.
+--
+-- `industrial` distingue ce que la matière traverse de ce qui la soutient. Un
+-- département de soutien émet réellement et n'appartient à aucun lot : ses
+-- émissions deviennent le non-alloué, que la règle du 1er août 2026 divise
+-- entre les barres coulées le mois même.
 CREATE TABLE IF NOT EXISTS entity (
-    id      integer PRIMARY KEY,
-    -- Un lot, ou le seau non-alloué. Jamais un nom de département : la
-    -- hiérarchie d'organisation est une provision H2 (périmètres).
-    label   text NOT NULL,
-    parent  integer REFERENCES entity(id)
+    id          integer PRIMARY KEY,
+    label       text NOT NULL,
+    parent      integer REFERENCES entity(id),
+    industrial  boolean NOT NULL DEFAULT false
 );
+
+-- Les colonnes ajoutées après coup : une base du pilote peut précéder ce champ.
+ALTER TABLE entity ADD COLUMN IF NOT EXISTS industrial boolean NOT NULL DEFAULT false;
 
 -- La table de faits. Rien que des nombres et un intervalle.
 CREATE TABLE IF NOT EXISTS cell (
