@@ -66,7 +66,24 @@ p  { margin: 0 0 1rem; }
   border: 1px solid color-mix(in srgb, var(--status-pending) 45%, transparent);
   color: var(--foreground);
 }
+.banner--warning {
+  background: color-mix(in srgb, var(--status-warning) 12%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--status-warning) 45%, transparent);
+  color: var(--foreground);
+}
 .banner[hidden] { display: none; }
+
+/* Empreintes : lues à voix haute et comparées caractère par caractère, donc
+   chasse fixe et coupure autorisée n'importe où. */
+.mono { font-family: var(--font-mono, ui-monospace, monospace); word-break: break-all; }
+
+/* Fusion du document DID : replié par défaut — la plupart des exploitants
+   n'ont pas encore de document publié. */
+.merge { margin: 1rem 0; padding: .875rem 1.125rem;
+  border: 1px solid var(--border); border-radius: var(--radius); }
+.merge > summary { cursor: pointer; font-weight: 600; }
+.merge textarea { width: 100%; font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: .8125rem; }
 
 /* Contenu ------------------------------------------------------------- */
 main { flex: 1; padding: 2.5rem 0 3rem; }

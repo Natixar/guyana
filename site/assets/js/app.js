@@ -3,6 +3,7 @@
 import T from "./labels.js";
 import { loadKeyPair, createKeyPair, thumbprint, readable } from "./keys.js";
 import { buildDidDocument, downloadJson } from "./did.js";
+import { wireDidMerge } from "./did-merge.js";
 import { fetchMe, issuerDid, isDemo } from "./me.js";
 import { fetchPour, renderPour, operatorClaims } from "./pour.js";
 import { buildCredential, signCredential, newSubjectId } from "./credential.js";
@@ -180,13 +181,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (ctx.signed) downloadJson(ctx.signed, demo ? "credential.demo.json" : "credential.json");
   });
 
+  // La fusion se branche une fois ; `merge.previous()` rend le document que
+  // l'exploitant a chargé, ou null s'il n'y en a pas.
+  const merge = wireDidMerge(document, () => did);
+
   $("[data-download-did]")?.addEventListener("click", async () => {
     const p = await loadKeyPair();
     if (!p) return;
     if (!did) { setBadge(status, T.issuerUnknown, "warning"); return; }
     // En mode dégradé le nom du fichier porte la mention : rien de ce qui sort
     // d'ici sans authentification ne doit pouvoir être publié par inadvertance.
-    downloadJson(await buildDidDocument(p, did, me.keyPolicy?.keyName ?? "key-1"),
+    downloadJson(await buildDidDocument(p, did, me.keyPolicy?.keyName ?? "key-1", merge.previous()),
                  demo ? T.downloadDemoName : "did.json");
   });
 });

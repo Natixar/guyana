@@ -101,7 +101,15 @@ function provenance() {
   }[state.didSource];
   if (!label) return "";
   const [text, kind] = label;
-  return `<p><span class="badge badge--${kind}">${esc(text)}</span></p>`;
+  const badge = `<p><span class="badge badge--${kind}">${esc(text)}</span></p>`;
+
+  // Le bandeau. La pastille suffit à qui sait la lire ; le bandeau s'adresse à
+  // qui regarde l'écran sans connaître le montage. Tant qu'AGM n'a pas déposé
+  // son document — l'installation n'est que partielle — le « téléchargement »
+  // affiché plus haut n'a pas eu lieu, et le taire ferait de cette page une
+  // démonstration truquée.
+  if (state.didSource === "network" || state.didSource === "supplied") return badge;
+  return badge + `<p class="banner banner--warning">${esc(T.vDidSimulated)}</p>`;
 }
 
 async function refresh() {

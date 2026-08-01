@@ -11,6 +11,23 @@
       <div><dt>{{ partial "t" "fingerprint" }}</dt><dd data-fingerprint>—</dd></div>
     </dl>
     <p class="muted">{{ partial "t" "readAloud" }}</p>
+
+    {{/* Une clé s'AJOUTE. Publier un document qui ne porte que la nouvelle clé
+         rend invérifiables toutes les attestations déjà émises. */}}
+    <details class="merge" data-did-merge>
+      <summary>{{ partial "t" "didMergeTitle" }}</summary>
+      <p class="muted">{{ partial "t" "didMergeWhy" }}</p>
+      <p><input type="file" accept=".json,application/json" data-did-previous-file></p>
+      <details><summary>{{ partial "t" "didMergePaste" }}</summary>
+        <textarea rows="5" data-did-previous-text spellcheck="false"></textarea></details>
+      <p><span data-did-previous-status class="badge badge--warning">{{ partial "t" "didMergeNone" }}</span></p>
+      <dl class="facts" data-did-previous-facts hidden>
+        <div><dt>{{ partial "t" "didPreviousDigest" }}</dt><dd data-did-previous-digest class="mono">—</dd></div>
+        <div><dt>{{ partial "t" "didKeysKept" }}</dt><dd data-did-keys-kept>—</dd></div>
+      </dl>
+      <p class="muted">{{ partial "t" "didMergeAtomic" }}</p>
+    </details>
+
     <p><button class="btn btn--primary" data-download-did>{{ partial "t" "downloadDid" }}</button></p>
     <p class="muted">{{ partial "t" "thenPublish" }}
        <a href="{{ (site.GetPage "/installation").RelPermalink }}">{{ (site.GetPage "/installation").Title }}</a>.</p>

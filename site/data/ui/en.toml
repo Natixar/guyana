@@ -157,3 +157,19 @@ vDidFromBundle     = "Key from a copy shipped with this page — not fetched fro
 vDidFromBrowser    = "Key rebuilt from this browser's own key — verifier and signer are the same machine"
 vDidFromSupplied   = "Key from the document you supplied"
 vDidUnresolved     = "No key found — the issuer has not published one, and none is held here"
+
+# Fusion du document DID — une clé s'ajoute, elle ne remplace pas (#68)
+didMergeTitle      = "Adding this key to an existing DID document"
+didMergeWhy        = "If a DID document is already published, load it here. The new key is ADDED to it. Publishing a document without the earlier keys makes every credential already issued impossible to verify — permanently, because the signing keys never leave the browsers that hold them."
+didMergePaste      = "Paste it instead"
+didMergeNone       = "No previous document — the file produced will contain this key only"
+didMergeLoaded     = "Previous document loaded — its keys will be kept"
+didMergeRejected   = "Not usable as a previous document"
+didMergeNotJson    = "not a JSON object"
+didMergeWrongDid   = "this document belongs to another identifier"
+didMergeNoKeys     = "no verificationMethod array"
+didPreviousDigest  = "Fingerprint of the document being replaced"
+didKeysKept        = "Keys carried over"
+didMergeAtomic     = "Before publishing, check that the online file still has this fingerprint. Reading, editing and publishing are three steps, and nothing here can make them one: if someone else adds a key in between, publishing this file would silently drop theirs. Open the file with an editor that locks it, and keep it locked until the new one is in place."
+
+vDidSimulated      = "Simulated fetch. The issuer has not published a DID document at its own domain yet, so the key shown above was not downloaded from there — it comes from this machine. Everything else on this page is real: the signature is checked, and the figures are recalculated."

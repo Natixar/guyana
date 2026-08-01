@@ -92,10 +92,37 @@ yet. Send us a screenshot and we will work out what happened.
 If the computer is replaced, the browser is reset, or the profile is cleared,
 the private key is gone. This is not a disaster and it is not unusual.
 
-**Do not delete anything.** Tell us, create a new key by repeating steps 1 to 3,
-and we will add it alongside the old one. Certificates signed with the previous
-key stay verifiable — which is exactly why the old entry is kept rather than
-replaced.
+**Do not delete anything.** Create a new key by repeating steps 1 to 3 — but at
+step 2, first load the `did.json` that is currently published. The new key is
+then **added** to it, and certificates signed with the previous key stay
+verifiable. The old entry is kept rather than replaced, and that is the whole
+point: the signing keys never leave the browsers that hold them, so a key
+dropped from the published file cannot be put back.
+
+### Do this one at a time
+
+Reading the published file, adding a key, and publishing the result are three
+separate steps, and nothing in the tool can make them one — the file lives on
+your web server, not ours. If a colleague adds a key between your reading and
+your publishing, your file overwrites theirs, silently.
+
+Two habits close the gap:
+
+1. **Open the published file with an editor that locks it**, and keep it locked
+   until the new version is in place. On a shared drive this is usually enough
+   on its own.
+2. **Compare the fingerprint before publishing.** When you load the existing
+   document, the tool shows the fingerprint of what it read, and records it in
+   the new file as `previousVersionDigest`. Load the online file again just
+   before publishing: if its fingerprint still matches, nothing changed
+   underneath you.
+
+That fingerprint covers **the whole document**, not the key — which is what
+makes it useful. A key fingerprint would tell you which key was there; only a
+document fingerprint changes when a key you never saw has been added, and that
+is precisely the case you are trying to catch. Reformatting the file does not
+change it: the fingerprint is taken on the canonical form, so indentation and
+key order are irrelevant.
 
 ## Questions worth asking us
 
