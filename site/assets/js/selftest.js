@@ -14,7 +14,7 @@ import { fetchMe, issuerDid } from "./me.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
 import { buildDidDocument } from "./did.js";
 import { signBlocker, signView } from "./sign-state.js";
-import { aggregate } from "./engine.js";
+import { aggregate, allocateUnallocated } from "./engine.js";
 import { runVectors } from "./vectors.js";
 
 
@@ -193,7 +193,7 @@ test("moteur — chaque vecteur redonne le profil attendu", async () => {
   // Ni les cas ni la comparaison ne sont écrits ici : les deux sont partagés
   // avec la suite du signataire, sans quoi « un moteur, deux hôtes » ne serait
   // qu'une intention.
-  const failures = runVectors(aggregate, v, taxonomy);
+  const failures = runVectors(aggregate, v, taxonomy, allocateUnallocated);
   return failures.length ? failures.join(" | ") : null;
 });
 

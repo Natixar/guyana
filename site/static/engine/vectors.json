@@ -166,7 +166,9 @@
           "unit": "L",
           "factor": 2.68,
           "origin": "MEASURED",
-          "factorUnit": "kgCO2e/L"
+          "factorUnit": "kgCO2e/L",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-02-01T00:00:00Z"
         }
       ],
       "expect": {
@@ -323,6 +325,116 @@
         "origin": "MEASURED",
         "unallocated": 0,
         "groups": 1
+      }
+    },
+    {
+      "name": "allocation — le non-alloué du mois se divise entre les barres de ce mois",
+      "why": "Règle §14.2 « spécifique validée », décidée le 1er août 2026. C'est ce qui fait qu'une barre porte sa part des frais généraux.",
+      "cells": [
+        {
+          "subPost": null,
+          "partType": null,
+          "caracterisation": 1,
+          "value": 1000,
+          "unit": "L",
+          "factor": 2.68,
+          "factorUnit": "kgCO2e/L",
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-02-01T00:00:00Z"
+        }
+      ],
+      "expect": {
+        "lines": {},
+        "origin": "MEASURED",
+        "unallocated": 2.68,
+        "unallocatedByPeriod": {
+          "2025-01": 2.68
+        }
+      },
+      "allocate": {
+        "bars": {
+          "2025-01": 4
+        },
+        "expectPerBar": 0.67
+      }
+    },
+    {
+      "name": "allocation — deux mois, deux productions, deux parts distinctes",
+      "why": "Le non-alloué ne se moyenne pas sur l'année : un mois creux en production charge davantage chaque barre coulée ce mois-là.",
+      "cells": [
+        {
+          "subPost": null,
+          "partType": null,
+          "caracterisation": 1,
+          "value": 1000,
+          "unit": "L",
+          "factor": 2.68,
+          "factorUnit": "kgCO2e/L",
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-02-01T00:00:00Z"
+        },
+        {
+          "subPost": null,
+          "partType": null,
+          "caracterisation": 1,
+          "value": 1000,
+          "unit": "L",
+          "factor": 2.68,
+          "factorUnit": "kgCO2e/L",
+          "origin": "MEASURED",
+          "periodStart": "2025-02-01T00:00:00Z",
+          "periodEnd": "2025-03-01T00:00:00Z"
+        }
+      ],
+      "expect": {
+        "lines": {},
+        "origin": "MEASURED",
+        "unallocated": 5.36,
+        "unallocatedByPeriod": {
+          "2025-01": 2.68,
+          "2025-02": 2.68
+        }
+      },
+      "allocate": {
+        "bars": {
+          "2025-01": 4,
+          "2025-02": 2
+        },
+        "expectPerBar": 2.01
+      }
+    },
+    {
+      "name": "allocation — un mois sans coulée est refusé, jamais divisé par zéro",
+      "why": "Ses émissions existent et n'ont aucune barre à porter. Les taire donnerait un total par barre plus flatteur que la réalité.",
+      "cells": [
+        {
+          "subPost": null,
+          "partType": null,
+          "caracterisation": 1,
+          "value": 1000,
+          "unit": "L",
+          "factor": 2.68,
+          "factorUnit": "kgCO2e/L",
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-02-01T00:00:00Z"
+        }
+      ],
+      "expect": {
+        "lines": {},
+        "origin": "MEASURED",
+        "unallocated": 2.68,
+        "unallocatedByPeriod": {
+          "2025-01": 2.68
+        }
+      },
+      "allocate": {
+        "bars": {
+          "2025-01": 0
+        },
+        "expectError": "PRODUCTION_EMPTY"
       }
     }
   ],
