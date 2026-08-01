@@ -42,6 +42,18 @@ secret_put() { # $1 = image, $2 = utilisateur, $3 = volume, $4 = nom de fichier
     sh -c "umask 077; cat > /s/$4 && chown \$(id -u $2):\$(id -g $2) /s/$4 && chmod 400 /s/$4"
 }
 
+# La chaîne de connexion en forme MOT-CLÉ, jamais en URI.
+#
+# Un mot de passe engendré au hasard contient tôt ou tard « / » ou « + ». Dans
+# `postgresql://user:pass@hote/base`, un « / » termine la partie utilisateur et
+# décale tout ce qui suit : la connexion échoue sur « Servname not supported »,
+# un message qui ne parle ni de mot de passe ni d'échappement. C'est arrivé.
+#
+# La forme mot-clé n'a pas de grammaire d'URI à respecter — seulement des
+# guillemets simples, qu'on échappe ici.
+escaped_password=$(printf '%s' "$DB_PASSWORD" | sed "s/\\\\/\\\\\\\\/g; s/'/\\\\'/g")
+store_dsn="host=${DB_CONTAINER} user=${DB_USER} dbname=${DB_NAME} password='${escaped_password}'"
+
 # --- le magasin : la base, aucune clé d'attestation ------------------------
 docker rm -f "$STORE_CONTAINER" >/dev/null 2>&1 || true
 printf '%s' "$STORE_KEY" | secret_put "$STORE_IMAGE" store "${STORE_CONTAINER}-secrets" store_key.pem
@@ -51,7 +63,7 @@ docker run -d --name "$STORE_CONTAINER" \
   --restart unless-stopped \
   --read-only --tmpfs /tmp \
   --security-opt no-new-privileges:true \
-  -e STORE_DSN="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_CONTAINER}/${DB_NAME}" \
+  -e STORE_DSN="$store_dsn" \
   -e STORE_KEY_PATH=/run/secrets/store_key.pem \
   -e STORE_PORT="$STORE_PORT" \
   -v "${STORE_CONTAINER}-secrets:/run/secrets:ro" \

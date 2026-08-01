@@ -183,10 +183,57 @@ def load(conn, cells, org) -> None:
         )
 
 
+def sql_literal(value) -> str:
+    if value is None:
+        return "NULL"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return repr(value)
+    # Les apostrophes des noms de département — « BH Contractor - Ping An » n'en
+    # a pas, mais rien ne garantit que le prochain n'en aura pas.
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def emit_sql(cells, org) -> None:
+    """Le chargement, en SQL, sur stdout.
+
+    Une seule transaction : un chargement à moitié appliqué laisserait un cube
+    dont personne ne saurait dire s'il est complet.
+    """
+    print("BEGIN;")
+    for symbol, uid in UNITS.items():
+        print(f"INSERT INTO unit (id, symbol) VALUES ({uid}, {sql_literal(symbol)}) "
+              "ON CONFLICT (id) DO NOTHING;")
+    for d in org.values():
+        print(f"INSERT INTO entity (id, label, industrial) VALUES "
+              f"({d['id']}, {sql_literal(d['key'])}, {sql_literal(d['industrial'])}) "
+              "ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label, "
+              "industrial = EXCLUDED.industrial;")
+    for c in cells:
+        lo = c["period"].lower.isoformat()
+        hi = c["period"].upper.isoformat()
+        print(
+            "INSERT INTO cell (id, period, entity_id, sub_post, part_type, caracterisation,"
+            " value, unit_id, factor, factor_unit, origin) VALUES ("
+            f"{sql_literal(c['id'])}, "
+            f"tstzrange({sql_literal(lo)}::timestamptz, {sql_literal(hi)}::timestamptz, '[)'), "
+            f"{c['entity_id']}, {sql_literal(c['sub_post'])}, {sql_literal(c['part_type'])}, "
+            f"{c['caracterisation']}, {c['value']!r}, {UNITS[c['unit']]}, {c['factor']!r}, "
+            f"{sql_literal(c['factor_unit'])}, {sql_literal(c['origin'])}) "
+            "ON CONFLICT (id) DO UPDATE SET period = EXCLUDED.period, "
+            "entity_id = EXCLUDED.entity_id, value = EXCLUDED.value, "
+            "factor = EXCLUDED.factor, origin = EXCLUDED.origin;"
+        )
+    print("COMMIT;")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dry-run", action="store_true",
                     help="compte et résume sans écrire — le défaut serait dangereux dans l'autre sens")
+    ap.add_argument("--sql", action="store_true",
+                    help="émet le SQL sur stdout au lieu de se connecter ; le paquet AGM reste ici")
     args = ap.parse_args()
 
     if not PACK.exists():
@@ -202,19 +249,30 @@ def main() -> int:
     litres = sum(c["value"] for c in cells if c["unit"] == "L" and c["part_type"] == PART_COMBUSTION)
     tonnes = sum(c["value"] * c["factor"] for c in cells) / 1000
 
-    print(f"{len(cells)} cellules — {litres:,.0f} L de gazole, {tonnes:,.0f} tCO2e au total")
+    # Le résumé est un diagnostic, pas une donnée : il va sur stderr, sinon il
+    # se mêle au SQL quand celui-ci part dans un tuyau.
     industrial = sum(1 for d in org.values() if d["industrial"])
-    print(f"  organisation : {len(org)} départements, dont {industrial} industriels")
-    print(f"  affectation : {assignment['version']} ({assignment['status'].split(' - ')[0]})")
+    say = lambda m: print(m, file=sys.stderr)
+    say(f"{len(cells)} cellules — {litres:,.0f} L de gazole, {tonnes:,.0f} tCO2e au total")
+    say(f"  organisation : {len(org)} départements, dont {industrial} industriels")
+    say(f"  affectation : {assignment['version']} ({assignment['status'].split(' - ')[0]})")
 
     if args.dry_run:
-        print("\n--dry-run : rien n'a été écrit")
+        say("\n--dry-run : rien n'a été écrit")
+        return 0
+
+    if args.sql:
+        # Le classeur AGM est confidentiel au titre de la clause 9 : il ne quitte
+        # pas ce poste. Seules les données dérivées traversent, par stdin, et
+        # rien ne s'écrit sur le système de fichiers de la cible — c'est la
+        # doctrine de deploy/, elle vaut ici aussi.
+        emit_sql(cells, org)
         return 0
 
     with db.connect() as conn:
         load(conn, cells, org)
         n = conn.execute("SELECT count(*) AS n FROM cell").fetchone()["n"]
-    print(f"\nchargé. {n} cellules dans le cube.")
+    say(f"\nchargé. {n} cellules dans le cube.")
     return 0
 
 
