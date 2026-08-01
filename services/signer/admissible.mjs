@@ -17,8 +17,21 @@ export const CLAIMS = {
     subjectKind: "dore-bar",
     /** Le référentiel et le contexte sous lesquels le chiffre a un sens. */
     conditions: { export: "GHGP", control: "Operational" },
-    /** Bornes de vraisemblance, en tCO2e/oz. Voir plus bas pourquoi. */
-    plausible: { min: 0, max: 100 },
+    /**
+     * Bornes de vraisemblance, PAR UNITÉ DE DÉNOMINATEUR.
+     *
+     * Une borne unique supposait une unité que la requête ne déclare pas. Un
+     * chiffre divisé par des barres au lieu d'onces est ~355 fois plus grand,
+     * et rien dans la requête ne permettait de trancher : le garde censé
+     * attraper une unité que personne n'a voulue en supposait une lui-même.
+     *
+     * Les ordres de grandeur viennent du pilote : une once de doré porte de
+     * l'ordre de l'unité en tCO2e, une barre de 355 onces quelques centaines.
+     */
+    plausible: {
+      "tCO2e/oz": { min: 0, max: 100 },
+      "tCO2e/bar": { min: 0, max: 35000 },
+    },
   },
 };
 
@@ -52,7 +65,8 @@ export function assertAdmissible(request) {
     }
   }
 
-  for (const field of ["subjectId", "derivedFrom", "extraction", "dispositions", "value"]) {
+  for (const field of ["subjectId", "derivedFrom", "extraction", "dispositions",
+                       "value", "denominatorUnit"]) {
     if (request[field] === undefined || request[field] === null) throw fault("FIELD_MISSING", field);
   }
 
@@ -60,9 +74,13 @@ export function assertAdmissible(request) {
   // l'est. Elle attrape la classe d'erreur que le recalcul ne peut pas voir :
   // une extraction correctement signée, correctement couverte, correctement
   // recalculée, et portant une unité que personne n'a voulue.
-  const { min, max } = spec.plausible;
+  const bounds = spec.plausible[request.denominatorUnit];
+  if (!bounds) throw fault("DENOMINATOR_UNIT_UNKNOWN", String(request.denominatorUnit));
+
+  const { min, max } = bounds;
   if (!(typeof request.value === "number") || !(request.value >= min && request.value <= max)) {
-    throw fault("VALUE_IMPLAUSIBLE", `${request.value} hors de [${min}, ${max}]`);
+    throw fault("VALUE_IMPLAUSIBLE",
+                `${request.value} ${request.denominatorUnit} hors de [${min}, ${max}]`);
   }
 
   return spec;

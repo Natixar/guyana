@@ -53,6 +53,7 @@ async function requestFor(cells, over = {}) {
     extraction: await extractionOf(cells),
     dispositions: cells.map((c) => ({ id: c.id, use: "USED" })),
     denominator: 1,
+    denominatorUnit: "tCO2e/oz",
     value: cells.length * 2.68,
     ...over,
   };
@@ -136,6 +137,26 @@ test("refuse une disposition qui parle d'une cellule jamais servie", async () =>
 
 test("refuse un chiffre que le recalcul ne redonne pas", async () => {
   await refuses(await requestFor([CELL], { value: 0.94 }), "VALUE_MISMATCH");
+});
+
+test("refuse une requête qui ne dit pas l'unité de son dénominateur", async () => {
+  // Sans elle, la borne de vraisemblance supposait une unité : un chiffre
+  // divisé par des barres au lieu d'onces est ~355 fois plus grand, et le
+  // garde censé attraper une unité que personne n'a voulue en devinait une.
+  const r = await requestFor([CELL]);
+  delete r.denominatorUnit;
+  await refuses(r, "FIELD_MISSING");
+});
+
+test("refuse une unité de dénominateur qu'elle ne sait pas borner", async () => {
+  await refuses(await requestFor([CELL], { denominatorUnit: "tCO2e/tonne" }),
+                "DENOMINATOR_UNIT_UNKNOWN");
+});
+
+test("la borne suit l'unité : ce qui est absurde par once passe par barre", async () => {
+  const perBar = await requestFor([CELL], { denominatorUnit: "tCO2e/bar", value: 500 });
+  await refuses(perBar, "VALUE_MISMATCH");           // borne franchie, recalcul non
+  await refuses(await requestFor([CELL], { value: 500 }), "VALUE_IMPLAUSIBLE");
 });
 
 test("refuse une valeur hors des bornes de vraisemblance", async () => {

@@ -68,6 +68,7 @@ async function request(over = {}) {
     extraction: await signedExtraction([CELL]),
     dispositions: [{ id: "c1", use: "USED" }],
     denominator: 2,
+    denominatorUnit: "tCO2e/oz",
     value: 1.34,
     ...over,
   };
