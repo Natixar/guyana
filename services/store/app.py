@@ -41,11 +41,19 @@ app = FastAPI(title="Aurora — magasin", docs_url=None, redoc_url=None)
 #: `ressource.action`, portée en base — est l'issue #39 et relève de H2. Ce qui
 #: suit tient en dix lignes et rend l'énoncé vrai.
 ROLES = {
-    # La mine : ses propres données, ses propres attestations.
-    "agm-randy": {"cube", "credentials", "counts"},
+    # La mine : ses propres données, ses propres attestations. Ni « counts » ni
+    # « tenants » — la vue de qualité porte sur la PLATEFORME, donc sur les
+    # autres clients aussi, et un client n'a rien à savoir de qui d'autre est
+    # là. Le commentaire disait déjà « ses propres données » et l'ensemble
+    # contenait « counts » : la table contredisait sa propre légende, et
+    # `test_the_mine_reaches_its_own_data` l'affirmait depuis le début sans
+    # jamais s'exécuter — rien ne déclenche la CI sur une branche sans PR.
+    "agm-randy": {"cube", "credentials"},
     # Natixar exploite la plateforme et ne parcourt pas les lingots du client.
-    # Des dénombrements et des indicateurs de qualité, rien de nominatif.
-    "natixar": {"counts"},
+    # Des dénombrements et des indicateurs de qualité, rien de nominatif — sauf
+    # le nom des organisations de tête, sans lequel on ne peut pas intervenir
+    # auprès du client dont les données se dégradent.
+    "natixar": {"counts", "tenants"},
     # Le vérificateur indépendant ne consulte RIEN chez nous : on lui a remis
     # une attestation pour une barre, et il la vérifie hors ligne — clé publique
     # depuis le domaine de l'émetteur, signature, recalcul. Lui ouvrir le cube
@@ -145,11 +153,23 @@ async def ranges(request: Request, x_webauth_user: str | None = Header(default=N
 
 @app.get("/api/v1/counts")
 def counts(x_webauth_user: str | None = Header(default=None)) -> dict:
-    """Des dénombrements et la répartition des origines. Rien de nominatif.
+    """Des dénombrements, la répartition des origines, et la même chose par client.
 
     C'est la vue de l'exploitant : combien d'objets, de quelle qualité. Aucun
     identifiant de lingot, aucun nom de département — de quoi surveiller une
     plateforme sans lire les affaires d'un client.
+
+    POURQUOI LE TOTAL NE SUFFIT PAS. Une moyenne sur toute la plateforme ne
+    bouge pas quand un client sur vingt se dégrade : elle noie exactement le
+    signal pour lequel on la regarde, et elle le noie d'autant mieux qu'il y a
+    plus de clients. Or on n'intervient pas auprès d'une moyenne. La répartition
+    par organisation de tête est donc l'instrument, et le total n'en est que le
+    résumé.
+
+    CE QU'ELLE DIVULGUE, ET À QUI. Elle nomme les organisations de tête, donc les
+    clients. C'est réservé au grant `tenants`, que l'exploitant a et qu'un client
+    n'a pas : apprendre à AGM qui d'autre est sur la plateforme n'est pas une
+    fonctionnalité. Les départements, eux, restent invisibles des deux côtés.
     """
     _require(x_webauth_user, "counts")
     with db.connect() as conn:
@@ -161,7 +181,38 @@ def counts(x_webauth_user: str | None = Header(default=None)) -> dict:
                       (SELECT count(*) FROM entity)     AS entities,
                       (SELECT count(*) FROM credential) AS credentials"""
         ).fetchone()
-    return {"totals": totals, "byOrigin": rows}
+
+        by_org = []
+        if "tenants" in _grants(x_webauth_user):
+            by_org = conn.execute(
+                # Le client d'une cellule est la RACINE de son entité. Remonter
+                # l'arbre plutôt que porter un `tenant_id` sur la cellule : la
+                # colonne dupliquerait ce que `parent` sait déjà, et le jour où
+                # les deux divergeraient, c'est la colonne qu'on croirait.
+                """
+                WITH RECURSIVE root_of(id, root) AS (
+                        SELECT id, id FROM entity WHERE parent IS NULL
+                    UNION ALL
+                        SELECT e.id, r.root
+                          FROM entity e JOIN root_of r ON e.parent = r.id
+                )
+                SELECT head.label AS organisation,
+                       count(*)                                             AS cells,
+                       count(*) FILTER (WHERE c.origin = 'MEASURED')        AS measured,
+                       count(*) FILTER (WHERE c.origin = 'DERIVED')         AS derived,
+                       count(*) FILTER (WHERE c.origin = 'ESTIMATED')       AS estimated,
+                       count(*) FILTER (WHERE c.origin = 'NOT_MEASURED')    AS "notMeasured",
+                       count(*) FILTER (WHERE c.coverage = 'INCOMPLETE')    AS incomplete,
+                       count(*) FILTER (WHERE c.coverage = 'MISSING')       AS missing
+                  FROM cell c
+                  JOIN root_of r  ON r.id = c.entity_id
+                  JOIN entity head ON head.id = r.root
+                 GROUP BY head.label
+                 ORDER BY count(*) DESC
+                """
+            ).fetchall()
+
+    return {"totals": totals, "byOrigin": rows, "byOrganisation": by_org}
 
 
 @app.post("/api/v1/credentials", status_code=201)

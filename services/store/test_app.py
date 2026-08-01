@@ -247,6 +247,82 @@ def test_the_mine_reaches_its_own_data(client):
     assert _as(client, "agm-randy", "/api/v1/counts").status_code == 403
 
 
+# --- La répartition par client -------------------------------------------
+# Ce que le total ne peut pas dire, et ce que la répartition ne doit pas dire.
+
+
+def _tenants(conn):
+    """Deux clients, et une entité PETITE-FILLE d'une tête.
+
+    Le petit-enfant n'est pas un ornement : c'est le seul cas qui distingue une
+    remontée récursive d'une jointure à un niveau. Sans lui, un `JOIN` naïf
+    passerait le test et perdrait en production toutes les cellules d'un atelier
+    rattaché à un département.
+    """
+    conn.execute("INSERT INTO entity (id, label) VALUES (100, 'AGM Inc.'), (200, 'Autre Mine')")
+    conn.execute("INSERT INTO entity (id, label, parent) VALUES "
+                 "(10, 'Power Generation', 100), (11, 'Atelier', 10), (20, 'Dept X', 200)")
+
+
+def _quality_cell(conn, cell_id, entity, origin="MEASURED", coverage="COMPLETE"):
+    conn.execute(
+        """INSERT INTO cell (id, period, entity_id, sub_post, part_type, caracterisation,
+                             value, unit_id, factor, origin, coverage)
+           VALUES (%s, tstzrange('2025-01-01'::timestamptz, '2025-02-01'::timestamptz, '[)'),
+                   %s, 1000, 1, 1, 10, 1, 2680, %s, %s)""",
+        (cell_id, entity, origin, coverage),
+    )
+
+
+def test_a_client_is_the_subtree_under_its_head(conn, client):
+    """Une cellule appartient au client à la RACINE de son entité."""
+    _tenants(conn)
+    _quality_cell(conn, "q1", 10)
+    _quality_cell(conn, "q2", 11, origin="ESTIMATED")     # petite-fille d'AGM
+    _quality_cell(conn, "q3", 20, origin="NOT_MEASURED")  # l'autre client
+
+    rows = _as(client, "natixar", "/api/v1/counts").json()["byOrganisation"]
+    by_name = {r["organisation"]: r for r in rows}
+
+    assert by_name["AGM Inc."]["cells"] == 2, "l'atelier rattaché au département a été perdu"
+    assert by_name["AGM Inc."]["measured"] == 1
+    assert by_name["AGM Inc."]["estimated"] == 1
+    assert by_name["Autre Mine"]["cells"] == 1
+    assert by_name["Autre Mine"]["notMeasured"] == 1
+
+
+def test_coverage_is_a_second_axis_not_a_fifth_origin(conn, client):
+    """Une cellule MEASURED peut être MISSING : le mois recopié était mesuré.
+
+    Si les deux axes étaient un seul, cette cellule devrait choisir, et le
+    dénombrement des origines cesserait de faire 100 %.
+    """
+    _tenants(conn)
+    _quality_cell(conn, "q1", 10, origin="MEASURED", coverage="MISSING")
+    _quality_cell(conn, "q2", 10, origin="MEASURED", coverage="INCOMPLETE")
+
+    row = _as(client, "natixar", "/api/v1/counts").json()["byOrganisation"][0]
+    assert row["cells"] == 2
+    assert row["measured"] == 2, "la couverture a mangé l'origine"
+    assert row["missing"] == 1
+    assert row["incomplete"] == 1
+
+
+def test_a_client_never_learns_who_else_is_on_the_platform(conn, client):
+    """La répartition nomme les clients : elle est réservée à l'exploitant.
+
+    Le contrôle porte sur le CONTENU et pas seulement sur le code de retour :
+    servir la liste avec un 200 en espérant que le front ne l'affiche pas serait
+    une confidentialité de façade.
+    """
+    _tenants(conn)
+    _quality_cell(conn, "q1", 10)
+
+    assert _as(client, "agm-randy", "/api/v1/counts").status_code == 403
+    assert _as(client, "demo", "/api/v1/counts").status_code == 403
+    assert _as(client, "natixar", "/api/v1/counts").json()["byOrganisation"]
+
+
 def test_an_unknown_user_gets_nothing(client):
     """Un nom inconnu n'hérite d'aucun droit — le défaut est le refus."""
     assert _as(client, "inconnu", "/api/v1/credentials/index").status_code == 403

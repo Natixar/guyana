@@ -89,6 +89,46 @@ SUBPOST_EXPLOSIVES = 1005
 
 UNITS = {"m3": 1, "kg": 2}
 
+#: L'organisation de tête du client, racine de son sous-arbre.
+#:
+#: C'est elle qui rend le cube multi-client lisible : un client est le sous-arbre
+#: suspendu à sa tête, et « compter par client » se dit « remonter les parents
+#: jusqu'à la racine ». Les départements d'AGM portent les identifiants 1 à 34,
+#: qui viennent du fixture ; la tête prend 100 pour qu'ajouter un département
+#: n'entre jamais en collision avec elle.
+#:
+#: L'identité légale est ici et non dans le dépôt côté front : c'est une donnée
+#: du client, elle vit dans SA taxonomie — celle-là même que le chiffrement des
+#: dimensions couvrira le jour où D1 de l'issue #6 sera tranchée. En clair
+#: aujourd'hui, comme les noms de départements, et pour la même raison.
+HEAD = {
+    "id": 100,
+    "key": "AGM Inc.",
+    "industrial": False,
+    "legal_name": "AGM Inc",
+    "jurisdiction": "Co-operative Republic of Guyana",
+    "registered_office": ("3rd Floor R & S Mall Apartment District Track "
+                          "JW Mandela Avenue, Durban Backlands, Georgetown, Guyana"),
+}
+
+#: Les règles de calcul qui exigent PLUSIEURS grandeurs.
+#:
+#: Une émission dont la règle demande deux entrées n'est pas calculable si une
+#: seule est présente : un tonnage transporté sans la distance parcourue est une
+#: donnée exacte dont on ne peut rien tirer. La cellule survivante est alors
+#: marquée INCOMPLETE — elle existe, elle est juste, et elle ne suffit pas.
+#:
+#: Le gazole est le cas qui existe dans le paquet AGM : chaque litre porte une
+#: combustion ET un amont, et charger la première sans la seconde perdrait 22,8 %
+#: de l'empreinte. Le chargeur produit toujours les deux, donc le compte vaut
+#: zéro aujourd'hui — mais c'est un zéro CALCULÉ. Le jour où une source n'en
+#: fournit qu'une, ou lorsque le fret arrivera avec son tonnage et sa distance,
+#: le compte cesse de valoir zéro sans que personne ait à y penser.
+MULTI_PART_RULES = {
+    1000: frozenset({PART_COMBUSTION, PART_AMONT}),   # CombustiblesFossiles
+    1002: frozenset({PART_COMBUSTION, PART_AMONT}),   # FretInterne
+}
+
 
 #: Le Guyana est à UTC−4 toute l'année, sans heure d'été.
 GUYANA = timezone(timedelta(hours=-4))
@@ -132,9 +172,83 @@ def organisation() -> dict[str, dict]:
     Le fixture du front est la source unique. Attribuer les identifiants ici
     aussi produirait deux numérotations qui coïncideraient jusqu'au jour où un
     département serait ajouté, et la divergence serait silencieuse.
+
+    Chacun est rattaché à l'organisation de tête : c'est ce rattachement, et lui
+    seul, qui permet de compter par client.
     """
     fx = json.loads(FIXTURE.read_text("utf-8"))
-    return {d["key"]: d for d in fx["organisation"]}
+    return {d["key"]: {**d, "parent": HEAD["id"]} for d in fx["organisation"]}
+
+
+def synthetic_months() -> dict[str, str]:
+    """Les mois absents du paquet et le mois d'où chacun se reconstitue.
+
+    DÉCLARÉS PAR LE GÉNÉRATEUR, PAS REDEVINÉS ICI. `make_fixture.py` a déjà
+    tranché quels mois manquent — la fenêtre de production commence en février
+    parce que janvier puiserait dans un décembre 2024 que le paquet ne contient
+    pas — et il l'écrit dans `model.syntheticMonths`. Recalculer la même chose
+    depuis le classeur donnerait deux vérités qui coïncideraient jusqu'au jour
+    où l'une changerait.
+
+    Le donneur est le même mois de l'année suivante : décembre 2024 se reconstitue
+    depuis décembre 2025, ce qui est la seule saisonnalité que douze mois de
+    données permettent d'invoquer.
+    """
+    fx = json.loads(FIXTURE.read_text("utf-8"))
+    missing = fx.get("model", {}).get("syntheticMonths", [])
+    return {m: f"{int(m.split('-')[0]) + 1}-{m.split('-')[1]}" for m in missing}
+
+
+def reconstruct(rows, donors):
+    """Ajoute les mois manquants, recopiés de leur donneur et marqués MISSING.
+
+    LA CELLULE EXISTE, ET ELLE LE DIT. Ne rien charger pour décembre 2024
+    laisserait un trou qu'aucun dénombrement ne verrait : une couverture calculée
+    sur les cellules présentes vaudrait 100 % en ignorant le mois absent. Charger
+    la reconstitution SANS la marquer serait pire — le trou deviendrait invisible
+    tout en pesant sur les chiffres publiés.
+
+    Le seul choix honnête est de porter la valeur et l'aveu ensemble.
+    """
+    made = []
+    for missing, donor in donors.items():
+        source = [r for r in rows if r["month"] == donor]
+        if not source:
+            print(f"  aucun donneur {donor} pour {missing} — mois laissé vide",
+                  file=sys.stderr)
+            continue
+        made += [{**r, "month": missing, "coverage": "MISSING"} for r in source]
+    return rows + made
+
+
+def mark_incomplete(cells) -> int:
+    """Marque les cellules dont la règle de calcul attend une compagne absente.
+
+    Le groupe est (entité, période, sous-poste) : c'est la maille d'UNE émission.
+    Si les `part_type` réunis ne couvrent pas ce que la règle exige, chacune des
+    cellules du groupe est incomplète — pas seulement celle qui manque, qui par
+    définition n'est pas là pour être marquée.
+    """
+    from collections import defaultdict
+
+    seen = defaultdict(set)
+    for c in cells:
+        if c["sub_post"] in MULTI_PART_RULES:
+            seen[(c["entity_id"], c["period"], c["sub_post"])].add(c["part_type"])
+
+    n = 0
+    for c in cells:
+        required = MULTI_PART_RULES.get(c["sub_post"])
+        if not required:
+            continue
+        if required - seen[(c["entity_id"], c["period"], c["sub_post"])]:
+            # MISSING l'emporte : une cellule qui comble un trou de calendrier
+            # est d'abord un trou de calendrier. Le dire deux fois en une colonne
+            # est impossible, et c'est l'absence de la date qui explique l'autre.
+            if c["coverage"] == "COMPLETE":
+                c["coverage"] = "INCOMPLETE"
+                n += 1
+    return n
 
 
 def build_cells(fuel, explosives, assignment, org):
@@ -168,6 +282,7 @@ def build_cells(fuel, explosives, assignment, org):
                 "value": row["m3"], "unit": DIESEL_UNIT,
                 "factor": factor,
                 "origin": "MEASURED",
+                "coverage": row.get("coverage", "COMPLETE"),
             })
 
     blast_dept = org["Sinohydro"]["id"]
@@ -184,6 +299,7 @@ def build_cells(fuel, explosives, assignment, org):
             "value": row["kg"], "unit": EXPLOSIVE_UNIT,
             "factor": EXPLOSIVE,
             "origin": "MEASURED",
+            "coverage": row.get("coverage", "COMPLETE"),
         })
 
     return cells
@@ -198,10 +314,27 @@ def load(conn, cells, org) -> None:
     # La taxonomie d'organisation. Les noms sont en clair PROVISOIREMENT : ce
     # sont eux que le chiffrement des dimensions couvrira. Le client n'en connaît
     # déjà que les entiers.
+    #
+    # LA TÊTE AVANT LES DÉPARTEMENTS, et pas par habitude : `parent` référence
+    # `entity(id)`, donc insérer un département avant sa tête viole la clé
+    # étrangère et fait avorter le chargement entier.
+    conn.execute(
+        """INSERT INTO entity (id, label, industrial, legal_name, jurisdiction,
+                               registered_office)
+                VALUES (%(id)s, %(key)s, %(industrial)s, %(legal_name)s,
+                        %(jurisdiction)s, %(registered_office)s)
+           ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label,
+                industrial = EXCLUDED.industrial, legal_name = EXCLUDED.legal_name,
+                jurisdiction = EXCLUDED.jurisdiction,
+                registered_office = EXCLUDED.registered_office""",
+        HEAD,
+    )
     with conn.cursor() as cur:
         cur.executemany(
-            """INSERT INTO entity (id, label, industrial) VALUES (%(id)s, %(key)s, %(industrial)s)
+            """INSERT INTO entity (id, label, parent, industrial)
+                    VALUES (%(id)s, %(key)s, %(parent)s, %(industrial)s)
                ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label,
+                                              parent = EXCLUDED.parent,
                                               industrial = EXCLUDED.industrial""",
             list(org.values()),
         )
@@ -209,16 +342,17 @@ def load(conn, cells, org) -> None:
     with conn.cursor() as cur:
         cur.executemany(
             """INSERT INTO cell (id, period, entity_id, sub_post, part_type, caracterisation,
-                                 value, unit_id, factor, origin)
+                                 value, unit_id, factor, origin, coverage)
                     VALUES (%(id)s, %(period)s, %(entity_id)s, %(sub_post)s, %(part_type)s,
                             %(caracterisation)s, %(value)s, %(unit_id)s, %(factor)s,
-                            %(origin)s)
+                            %(origin)s, %(coverage)s)
                ON CONFLICT (id) DO UPDATE SET
                     period = EXCLUDED.period, entity_id = EXCLUDED.entity_id,
                     sub_post = EXCLUDED.sub_post, part_type = EXCLUDED.part_type,
                     caracterisation = EXCLUDED.caracterisation,
                     value = EXCLUDED.value, unit_id = EXCLUDED.unit_id,
-                    factor = EXCLUDED.factor, origin = EXCLUDED.origin""",
+                    factor = EXCLUDED.factor, origin = EXCLUDED.origin,
+                    coverage = EXCLUDED.coverage""",
             [{**c, "unit_id": UNITS[c["unit"]]} for c in cells],
         )
 
@@ -249,22 +383,33 @@ def emit_sql(cells, org) -> None:
         # même que le SI existe pour supprimer.
         print(f"INSERT INTO unit (id, symbol) VALUES ({uid}, {sql_literal(symbol)}) "
               "ON CONFLICT (id) DO UPDATE SET symbol = EXCLUDED.symbol;")
+    # La tête d'abord : `parent` la référence.
+    print("INSERT INTO entity (id, label, industrial, legal_name, jurisdiction, "
+          "registered_office) VALUES "
+          f"({HEAD['id']}, {sql_literal(HEAD['key'])}, {sql_literal(HEAD['industrial'])}, "
+          f"{sql_literal(HEAD['legal_name'])}, {sql_literal(HEAD['jurisdiction'])}, "
+          f"{sql_literal(HEAD['registered_office'])}) "
+          "ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label, "
+          "industrial = EXCLUDED.industrial, legal_name = EXCLUDED.legal_name, "
+          "jurisdiction = EXCLUDED.jurisdiction, "
+          "registered_office = EXCLUDED.registered_office;")
     for d in org.values():
-        print(f"INSERT INTO entity (id, label, industrial) VALUES "
-              f"({d['id']}, {sql_literal(d['key'])}, {sql_literal(d['industrial'])}) "
+        print(f"INSERT INTO entity (id, label, parent, industrial) VALUES "
+              f"({d['id']}, {sql_literal(d['key'])}, {sql_literal(d['parent'])}, "
+              f"{sql_literal(d['industrial'])}) "
               "ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label, "
-              "industrial = EXCLUDED.industrial;")
+              "parent = EXCLUDED.parent, industrial = EXCLUDED.industrial;")
     for c in cells:
         lo = c["period"].lower.isoformat()
         hi = c["period"].upper.isoformat()
         print(
             "INSERT INTO cell (id, period, entity_id, sub_post, part_type, caracterisation,"
-            " value, unit_id, factor, origin) VALUES ("
+            " value, unit_id, factor, origin, coverage) VALUES ("
             f"{sql_literal(c['id'])}, "
             f"tstzrange({sql_literal(lo)}::timestamptz, {sql_literal(hi)}::timestamptz, '[)'), "
             f"{c['entity_id']}, {sql_literal(c['sub_post'])}, {sql_literal(c['part_type'])}, "
             f"{c['caracterisation']}, {c['value']!r}, {UNITS[c['unit']]}, {c['factor']!r}, "
-            f"{sql_literal(c['origin'])}) "
+            f"{sql_literal(c['origin'])}, {sql_literal(c['coverage'])}) "
             # Toutes les colonnes, sans exception : un rechargement qui change
             # d'unité doit changer l'unité. En omettre une laisse une valeur
             # neuve sous une étiquette ancienne.
@@ -272,7 +417,8 @@ def emit_sql(cells, org) -> None:
             "entity_id = EXCLUDED.entity_id, sub_post = EXCLUDED.sub_post, "
             "part_type = EXCLUDED.part_type, caracterisation = EXCLUDED.caracterisation, "
             "value = EXCLUDED.value, unit_id = EXCLUDED.unit_id, "
-            "factor = EXCLUDED.factor, origin = EXCLUDED.origin;"
+            "factor = EXCLUDED.factor, origin = EXCLUDED.origin, "
+            "coverage = EXCLUDED.coverage;"
         )
     print("COMMIT;")
 
@@ -293,7 +439,17 @@ def main() -> int:
     fuel, explosives = read_pack()
     assignment = json.loads(ASSIGNMENT.read_text("utf-8"))
     org = organisation()
+
+    # Les mois absents entrent AVANT la construction : ils produisent de vraies
+    # cellules, avec un vrai identifiant déterministe, qui disent seulement
+    # d'où elles viennent.
+    donors = synthetic_months()
+    fuel = reconstruct(fuel, donors)
+    explosives = reconstruct(explosives, donors)
+
     cells = build_cells(fuel, explosives, assignment, org)
+    incomplete = mark_incomplete(cells)
+    missing = sum(1 for c in cells if c["coverage"] == "MISSING")
 
     m3 = sum(c["value"] for c in cells if c["unit"] == "m3" and c["part_type"] == PART_COMBUSTION)
     tonnes = sum(c["value"] * c["factor"] for c in cells) / 1000
@@ -303,7 +459,9 @@ def main() -> int:
     industrial = sum(1 for d in org.values() if d["industrial"])
     say = lambda m: print(m, file=sys.stderr)
     say(f"{len(cells)} cellules — {m3:,.0f} m3 de gazole, {tonnes:,.0f} tCO2e au total")
-    say(f"  organisation : {len(org)} départements, dont {industrial} industriels")
+    say(f"  organisation : {HEAD['key']} + {len(org)} départements, dont {industrial} industriels")
+    say(f"  couverture : {missing} MISSING ({', '.join(donors) or 'aucun mois reconstitué'}), "
+        f"{incomplete} INCOMPLETE")
     say(f"  affectation : {assignment['version']} ({assignment['status'].split(' - ')[0]})")
 
     if args.dry_run:

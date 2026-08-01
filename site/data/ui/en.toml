@@ -159,6 +159,15 @@ qualityByOrigin    = "Records by origin"
 qualityDenied      = "This account does not have access to the data-quality view."
 qualityLoading     = "Reading…"
 
+# Répartition par client — l'instrument, pas le résumé
+qualityByOrganisation    = "Records by client"
+qualityByOrganisationWhy = "A platform-wide average does not move when one client in twenty degrades — the more clients there are, the better it hides exactly the signal it is read for. And you do not intervene with an average. This is where a client whose data is slipping becomes visible while it is still one client."
+qualityOrganisation      = "Organization"
+qualityAxisOrigin        = "Where the value comes from"
+qualityAxisCoverage      = "Whether it is enough to compute with"
+qualityAxesNote          = "The four origin columns share 100 % of a row. The last two do not belong to that share and are not part of it: a MEASURED record can also be MISSING, because the month it was copied from was itself measured. INCOMPLETE means the calculation rule needs several quantities and one of them is absent — a haulage tonnage without the distance travelled is exact and unusable. MISSING means a date is absent from a periodic series and the record reconstructs it, as December 2024 is reconstructed from December 2025."
+qualityNoTenants         = "This account sees platform totals only. The per-client breakdown names the clients, so it is reserved to the operator — a client has no business learning who else is on the platform."
+
 # Provenance de la clé de vérification (#68)
 vDidFromNetwork    = "Key fetched from the issuer's own domain"
 vDidFromBundle     = "Key from a copy shipped with this page — not fetched from the issuer"

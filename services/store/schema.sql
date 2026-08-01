@@ -52,11 +52,23 @@ CREATE TABLE IF NOT EXISTS unit (
 -- département de soutien émet réellement et n'appartient à aucun lot : ses
 -- émissions deviennent le non-alloué, que la règle du 1er août 2026 divise
 -- entre les barres coulées le mois même.
+-- L'ORGANISATION DE TÊTE EST CE QUI REND LE MULTI-CLIENT LISIBLE. Le cloisonnement
+-- n'est pas une colonne de `cell` : c'est la racine de l'arbre. Un client est le
+-- sous-arbre suspendu à son organisation de tête, et tout dénombrement par client
+-- se dit « remonte les parents jusqu'à la racine, puis groupe ». Une colonne
+-- `tenant_id` dupliquerait ce que `parent` sait déjà, et les deux divergeraient.
+--
+-- La tête porte l'identité légale ; les départements ne la portent pas, puisqu'ils
+-- n'en ont pas. Ces trois colonnes sont nulles partout ailleurs, et c'est la forme
+-- qui dit laquelle des entités est une personne morale.
 CREATE TABLE IF NOT EXISTS entity (
-    id          integer PRIMARY KEY,
-    label       text NOT NULL,
-    parent      integer REFERENCES entity(id),
-    industrial  boolean NOT NULL DEFAULT false
+    id                integer PRIMARY KEY,
+    label             text NOT NULL,
+    parent            integer REFERENCES entity(id),
+    industrial        boolean NOT NULL DEFAULT false,
+    legal_name        text,
+    jurisdiction      text,
+    registered_office text
 );
 
 
@@ -78,6 +90,25 @@ CREATE TABLE IF NOT EXISTS cell (
     factor           double precision NOT NULL,
     origin           text NOT NULL
                      CHECK (origin IN ('MEASURED','DERIVED','ESTIMATED','NOT_MEASURED')),
+
+    -- DEUX AXES, ET LES CONFONDRE SERAIT UNE ERREUR DE MODÈLE. `origin` dit d'où
+    -- vient LA VALEUR d'une cellule — mesurée, dérivée, estimée, pas mesurée
+    -- (#46). `coverage` dit tout autre chose : si la cellule, si juste soit-elle,
+    -- suffit à calculer l'émission dont elle fait partie.
+    --
+    --   INCOMPLETE — la règle de calcul demande plusieurs grandeurs et l'une
+    --   manque. Un tonnage transporté sans la distance parcourue est une donnée
+    --   exacte dont on ne peut rien tirer : la connaître ne dit pas qu'on sait.
+    --
+    --   MISSING — la série est périodique et une date manque. Décembre 2024 est
+    --   absent du paquet et se reconstitue depuis décembre 2025 ; la cellule
+    --   existe donc, elle porte une valeur défendable, et elle doit dire qu'elle
+    --   comble un trou plutôt que de le taire.
+    --
+    -- Une cellule MEASURED peut être MISSING — le mois d'où on la recopie était
+    -- bien mesuré — ce qui est précisément pourquoi un seul axe ne suffit pas.
+    coverage         text NOT NULL DEFAULT 'COMPLETE'
+                     CHECK (coverage IN ('COMPLETE','INCOMPLETE','MISSING')),
 
     -- Un intervalle vide ne porte aucun flux : ce serait une ligne qui existe
     -- sans rien dire, et qui fausserait un dénombrement de couverture.
@@ -122,5 +153,22 @@ CREATE INDEX IF NOT EXISTS credential_latest
 ALTER TABLE entity ADD COLUMN IF NOT EXISTS industrial boolean NOT NULL DEFAULT false;
 -- factor_unit a existé : il dupliquait l'unité de la cellule.
 ALTER TABLE cell   DROP COLUMN IF EXISTS factor_unit;
+
+-- L'identité légale de l'organisation de tête, et la couverture des cellules.
+-- Ajoutées après coup sur une base déjà chargée : les colonnes doivent exister
+-- avant que le chargeur ne les écrive.
+ALTER TABLE entity ADD COLUMN IF NOT EXISTS legal_name        text;
+ALTER TABLE entity ADD COLUMN IF NOT EXISTS jurisdiction      text;
+ALTER TABLE entity ADD COLUMN IF NOT EXISTS registered_office text;
+ALTER TABLE cell   ADD COLUMN IF NOT EXISTS coverage text NOT NULL DEFAULT 'COMPLETE';
+DO $$ BEGIN
+    ALTER TABLE cell ADD CONSTRAINT cell_coverage_known
+        CHECK (coverage IN ('COMPLETE','INCOMPLETE','MISSING'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Remonter d'une cellule à son client se fait à chaque dénombrement : sans cet
+-- index, le parcours récursif relit l'arbre entier à chaque niveau.
+CREATE INDEX IF NOT EXISTS entity_parent ON entity (parent);
 
 COMMIT;
