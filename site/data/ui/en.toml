@@ -150,3 +150,10 @@ qualityCredentials = "Credentials held"
 qualityByOrigin    = "Records by origin"
 qualityDenied      = "This account does not have access to the data-quality view."
 qualityLoading     = "Reading…"
+
+# Provenance de la clé de vérification (#68)
+vDidFromNetwork    = "Key fetched from the issuer's own domain"
+vDidFromBundle     = "Key from a copy shipped with this page — not fetched from the issuer"
+vDidFromBrowser    = "Key rebuilt from this browser's own key — verifier and signer are the same machine"
+vDidFromSupplied   = "Key from the document you supplied"
+vDidUnresolved     = "No key found — the issuer has not published one, and none is held here"
