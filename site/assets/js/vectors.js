@@ -26,7 +26,7 @@ const near = (a, b) => Math.abs((a ?? 0) - (b ?? 0)) <= 1e-9;
  * @param {object} taxonomy la taxonomie servie
  * @returns {string[]} un message par écart constaté
  */
-export function runVectors(aggregate, vectors, taxonomy) {
+export function runVectors(aggregate, vectors, taxonomy, allocate) {
   const failures = [];
 
   // La dérive de version rendrait toutes les attentes silencieusement fausses
@@ -65,6 +65,29 @@ export function runVectors(aggregate, vectors, taxonomy) {
       }
       if (c.expect.groups !== undefined && got.groups !== c.expect.groups) {
         failures.push(`${c.name} : ${got.groups} groupe(s), ${c.expect.groups} attendu(s)`);
+      }
+      if (c.expect.unallocatedByPeriod) {
+        for (const [m, want] of Object.entries(c.expect.unallocatedByPeriod)) {
+          if (!near(got.unallocatedByPeriod?.[m], want)) {
+            failures.push(`${c.name} : non-alloué ${m} = ${got.unallocatedByPeriod?.[m]}, attendu ${want}`);
+          }
+        }
+      }
+      // L'allocation est une étape distincte de l'agrégation : la règle peut
+      // changer sans que le cube bouge, et le vecteur la teste séparément.
+      if (c.allocate && allocate) {
+        try {
+          const out = allocate(got.unallocatedByPeriod, c.allocate.bars);
+          if (c.allocate.expectError) {
+            failures.push(`${c.name} : allocation aurait dû lever ${c.allocate.expectError}`);
+          } else if (Math.abs(out.perBar - c.allocate.expectPerBar) > 5e-3) {
+            failures.push(`${c.name} : ${out.perBar.toFixed(3)} par barre, ${c.allocate.expectPerBar} attendu`);
+          }
+        } catch (e) {
+          if (e.code !== c.allocate.expectError) {
+            failures.push(`${c.name} : allocation ${e.code ?? "erreur"} — ${e.message}`);
+          }
+        }
       }
     } catch (e) {
       // Le code compte, pas le texte : un message reformulé ne doit pas faire

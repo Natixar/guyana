@@ -21,13 +21,13 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => JSON.parse(readFileSync(resolve(root, p), "utf8"));
 
-const { aggregate } = await import(resolve(root, "site/assets/js/engine.js"));
+const { aggregate, allocateUnallocated } = await import(resolve(root, "site/assets/js/engine.js"));
 const { runVectors } = await import(resolve(root, "site/assets/js/vectors.js"));
 
 const vectors = read("site/static/engine/vectors.json");
 const taxonomy = read("site/static/engine/taxonomy.json");
 
-const failures = runVectors(aggregate, vectors, taxonomy);
+const failures = runVectors(aggregate, vectors, taxonomy, allocateUnallocated);
 const total = vectors.cases.length;
 
 console.log(`vecteurs v${vectors.version}, taxonomie ${taxonomy.version}, ${total} cas`);
