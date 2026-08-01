@@ -118,6 +118,29 @@ main { flex: 1; padding: 2.5rem 0 3rem; }
   background: color-mix(in srgb, var(--status-pending) 10%, transparent);
 }
 
+/* Registre --------------------------------------------------------------- */
+/* Onze lots repliés : la maille du calcul est le lot, et 378 lignes ouvertes
+   d'emblée feraient une page qu'on parcourt au lieu d'une page qu'on lit. */
+.lot { margin: .5rem 0; border: 1px solid var(--border); border-radius: 8px; }
+.lot > summary {
+  display: flex; flex-wrap: wrap; gap: .75rem; align-items: baseline;
+  padding: .75rem 1rem; cursor: pointer;
+}
+.lot > summary::-webkit-details-marker { color: var(--muted-foreground); }
+.lot[open] > summary { border-bottom: 1px solid var(--border); }
+
+table.register { width: 100%; border-collapse: collapse; font-size: .9375rem; }
+table.register th, table.register td {
+  padding: .5rem 1rem; text-align: left; border-bottom: 1px solid var(--border);
+}
+table.register th { font-weight: 600; color: var(--muted-foreground); }
+table.register tr:last-child td { border-bottom: 0; }
+table.register .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* Un tableau ne doit jamais faire déborder la page horizontalement. */
+.lot[open] { overflow-x: auto; }
+
+.btn--small { padding: .25rem .625rem; font-size: .875rem; }
+
 /* Actions -------------------------------------------------------------- */
 .btn {
   font: inherit; font-family: var(--font-heading); font-weight: var(--fw-medium);
