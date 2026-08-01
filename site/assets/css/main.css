@@ -100,6 +100,24 @@ main { flex: 1; padding: 2.5rem 0 3rem; }
 .badge--warning  { color: var(--status-warning);  background: color-mix(in srgb, var(--status-warning) 12%, transparent); }
 .badge--info     { color: var(--status-info);     background: color-mix(in srgb, var(--status-info) 12%, transparent); }
 
+/* Encadrés ------------------------------------------------------------- */
+/* Un encadré de feuille de route dit qu'une garantie n'est PAS encore là. Sur
+   une page de vente, cette phrase est la seule que le lecteur pressé ne doit
+   pas pouvoir sauter — d'où la barre latérale, la couleur d'état et le fond
+   teinté, plutôt qu'une note de bas de page. */
+.callout {
+  margin: 1.25rem 0;
+  padding: .875rem 1.125rem;
+  border-left: 4px solid var(--status-info);
+  border-radius: 0 6px 6px 0;
+  background: color-mix(in srgb, var(--status-info) 8%, transparent);
+}
+.callout p { margin: 0; }
+.callout--roadmap {
+  border-left-color: var(--status-pending);
+  background: color-mix(in srgb, var(--status-pending) 10%, transparent);
+}
+
 /* Actions -------------------------------------------------------------- */
 .btn {
   font: inherit; font-family: var(--font-heading); font-weight: var(--fw-medium);
