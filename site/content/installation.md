@@ -2,6 +2,7 @@
 title: "Installation guide"
 description: "How to publish the mine's public key, step by step."
 layout: "page"
+jsEntry: "js/did-check.js"
 ---
 
 This guide is written for whoever manages the `guygold.com` domain and website.
@@ -123,6 +124,33 @@ document fingerprint changes when a key you never saw has been added, and that
 is precisely the case you are trying to catch. Reformatting the file does not
 change it: the fingerprint is taken on the canonical form, so indentation and
 key order are irrelevant.
+
+### Do not use a file-hashing tool for this
+
+`Get-FileHash` in PowerShell, `certutil -hashfile` on Windows, `sha256sum` on
+Linux and macOS all give a **different answer**, and no amount of care with the
+options will make them agree. They hash the bytes of a file. The fingerprint
+above is taken on the document in canonical form — the same content saved with
+different indentation, a different key order, or Windows line endings gives the
+same fingerprint, which is exactly the property that makes it usable by someone
+who opened the file in an editor.
+
+The consequence is that no general-purpose hashing tool can compute it, on any
+operating system. Use the check below instead. It runs entirely in this browser,
+on Windows as on anything else, and neither file leaves your computer.
+
+{{< did-check >}}
+
+The check reads the two files and compares them for you. What it tells you:
+
+- **Match** — the file you are about to publish was built on exactly the
+  document that is online. Publish it.
+- **Mismatch** — the online document changed after you loaded it. Someone added
+  a key. Load the online file into the signing page again, download a fresh
+  `did.json`, and check once more before publishing.
+- **No previous document declared** — the new file will replace whatever is
+  online rather than add to it. That is correct for a first publication and
+  wrong for every one after it.
 
 ## Questions worth asking us
 

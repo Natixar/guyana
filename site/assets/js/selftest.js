@@ -13,7 +13,7 @@ import { fetchPour, operatorClaims } from "./pour.js";
 import { barClaims } from "./bar-claims.js";
 import { fetchMe, issuerDid } from "./me.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
-import { buildDidDocument } from "./did.js";
+import { buildDidDocument, verificationMethodId } from "./did.js";
 import { signBlocker, signView } from "./sign-state.js";
 import { deleteDatabase } from "./idb.js";
 import { allCredentials, putCredential, credentialsFor, credentialsByRef, credentialType } from "./wallet.js";
@@ -290,7 +290,7 @@ test("end to end — identity, pour, signed credential", async () => {
     claims: operatorClaims(pour),
     confirmedBy: me.person ? { id: me.person.id, name: me.person.name } : null,
   });
-  const out = await signCredential(cred, pair, did + "#key-1");
+  const out = await signCredential(cred, pair, await verificationMethodId(pair, did));
 
   if (out.issuer !== did) return "issuer does not match /api/me";
   if (!out.credentialSubject?.barId?.value) return "bar claims missing";
@@ -360,7 +360,7 @@ test("barre — l'attestation signée porte le sujet du registre et se vérifie"
       subjectId: A_BAR.subjectId,
       claims: barClaims(A_BAR, A_FIXTURE),
     }),
-    pair, did + "#key-1");
+    pair, await verificationMethodId(pair, did));
 
   // L'identifiant de sujet ne se tire pas à la signature : c'est lui que le
   // magasin indexe et que le registre interroge.
@@ -378,7 +378,7 @@ test("round trip — a signed credential verifies against its DID document", asy
     issuerDid: did, subjectId: newSubjectId(),
     claims: { barId: { value: "X-1", origin: "MEASURED" } },
   });
-  const signed = await signCredential(cred, pair, did + "#key-1");
+  const signed = await signCredential(cred, pair, await verificationMethodId(pair, did));
   const didDoc = await buildDidDocument(pair, did);
 
   const r = await verifyCredential(signed, didDoc);
@@ -392,12 +392,64 @@ test("round trip — a signed credential verifies against its DID document", asy
   return null;
 });
 
+// --- Rotation de clé : ce que la fusion doit préserver --------------------
+// LE DÉFAUT QU'ILS ATTRAPENT. Le fragment de l'identifiant venait d'une
+// politique serveur, « key-1 », la même pour toutes les clés. La fusion écarte
+// les entrées de même identifiant pour ne pas publier deux fois la même clé :
+// elle supprimait donc l'ancienne à chaque rotation, en annonçant
+// `previousVersionDigest`, ce qui donnait l'apparence d'une fusion réussie.
+// Toute attestation signée par la clé perdue devenait invérifiable.
+
+test("rotation — la clé précédente survit à la publication de la nouvelle", async () => {
+  const did = "did:web:guygold.com";
+  const ancienne = await ephemeralKeyPair();
+  const nouvelle = await ephemeralKeyPair();
+
+  const publie = await buildDidDocument(ancienne, did);
+  const apres = await buildDidDocument(nouvelle, did, publie);
+
+  if (apres.verificationMethod.length !== 2) {
+    return `${apres.verificationMethod.length} clé(s) après rotation au lieu de 2`;
+  }
+  const ids = apres.verificationMethod.map((m) => m.id);
+  if (!ids.includes(await verificationMethodId(ancienne, did))) return "l'ancienne clé a disparu";
+  if (!ids.includes(await verificationMethodId(nouvelle, did))) return "la nouvelle clé est absente";
+  // Publier une clé sans l'autoriser à attester revient à ne pas la publier.
+  if (apres.assertionMethod.length !== 2) return "assertionMethod n'a pas suivi";
+  if (!apres.previousVersionDigest) return "le chaînage vers le document précédent manque";
+  return null;
+});
+
+test("rotation — une attestation de l'ancienne clé se vérifie encore", async () => {
+  const did = "did:web:guygold.com";
+  const ancienne = await ephemeralKeyPair();
+  const nouvelle = await ephemeralKeyPair();
+
+  const signee = await signCredential(
+    buildCredential({ issuerDid: did, subjectId: newSubjectId(), claims: { a: { value: "1" } } }),
+    ancienne, await verificationMethodId(ancienne, did));
+
+  const apres = await buildDidDocument(nouvelle, did, await buildDidDocument(ancienne, did));
+  const r = await verifyCredential(signee, apres);
+  return r.ok ? null : "attestation rendue invérifiable par la rotation : " + r.reason;
+});
+
+test("rotation — republier la MÊME clé n'ajoute pas de doublon", async () => {
+  const did = "did:web:guygold.com";
+  const pair = await ephemeralKeyPair();
+  const une = await buildDidDocument(pair, did);
+  const deux = await buildDidDocument(pair, did, une);
+  return deux.verificationMethod.length === 1
+    ? null
+    : `${deux.verificationMethod.length} entrées pour une seule clé`;
+});
+
 test("a key not authorised for assertions is rejected", async () => {
   const pair = await ephemeralKeyPair();
   const did = "did:web:example.org";
   const signed = await signCredential(
     buildCredential({ issuerDid: did, subjectId: newSubjectId(), claims: { a: { value: "1" } } }),
-    pair, did + "#key-1");
+    pair, await verificationMethodId(pair, did));
 
   // Exactly the defect found in review: assertionMethod misspelled, so the
   // document publishes the key without authorising it for assertions.
@@ -414,7 +466,7 @@ test("a proof made for another purpose is rejected", async () => {
   const did = "did:web:example.org";
   const signed = await signCredential(
     buildCredential({ issuerDid: did, subjectId: newSubjectId(), claims: { a: { value: "1" } } }),
-    pair, did + "#key-1");
+    pair, await verificationMethodId(pair, did));
   signed.proof.proofPurpose = "authentication";
   const r = await verifyCredential(signed, await buildDidDocument(pair, did));
   return r.ok ? "a proof declared for authentication was accepted as an assertion" : null;
@@ -425,7 +477,7 @@ test("a key belonging to another controller is rejected", async () => {
   const did = "did:web:example.org";
   const signed = await signCredential(
     buildCredential({ issuerDid: did, subjectId: newSubjectId(), claims: { a: { value: "1" } } }),
-    pair, did + "#key-1");
+    pair, await verificationMethodId(pair, did));
   const doc = await buildDidDocument(pair, did);
   doc.verificationMethod[0].controller = "did:web:elsewhere.example";
   const r = await verifyCredential(signed, doc);

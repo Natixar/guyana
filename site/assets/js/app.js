@@ -2,7 +2,7 @@
 
 import T from "./labels.js";
 import { loadKeyPair, createKeyPair, thumbprint, readable } from "./keys.js";
-import { buildDidDocument, downloadJson } from "./did.js";
+import { buildDidDocument, downloadJson, verificationMethodId } from "./did.js";
 import { wireDidMerge } from "./did-merge.js";
 import { fetchMe, issuerDid, isDemo } from "./me.js";
 import { fetchPour, renderPour, operatorClaims } from "./pour.js";
@@ -173,7 +173,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         claims: operatorClaims(ctx.pour),
         confirmedBy: me.person ? { id: me.person.id, name: me.person.name } : null,
       });
-      ctx.signed = await signCredential(cred, pair, `${did}#${me.keyPolicy?.keyName ?? "key-1"}`);
+      // L'identifiant de la clé est son empreinte, pas un nom de politique :
+      // deux clés portant le même nom se supprimaient l'une l'autre à la
+      // publication. Voir `verificationMethodId`.
+      ctx.signed = await signCredential(cred, pair, await verificationMethodId(pair, did));
       // Rangée avant tout affichage : une attestation signée qui ne survit pas
       // au rechargement est une attestation que l'opérateur croit détenir.
       await putCredential(ctx.signed, ctx.pour?.pourId ?? null);
@@ -208,7 +211,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!did) { setBadge(status, T.issuerUnknown, "warning"); return; }
     // En mode dégradé le nom du fichier porte la mention : rien de ce qui sort
     // d'ici sans authentification ne doit pouvoir être publié par inadvertance.
-    downloadJson(await buildDidDocument(p, did, me.keyPolicy?.keyName ?? "key-1", merge.previous()),
+    downloadJson(await buildDidDocument(p, did, merge.previous()),
                  demo ? T.downloadDemoName : "did.json");
   });
 });

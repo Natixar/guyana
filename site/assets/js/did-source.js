@@ -74,27 +74,27 @@ async function fromBundle(did, url) {
  * local qui puisse vérifier quoi que ce soit — et dit exactement ce qu'il est :
  * le vérificateur et le signataire sont la même machine.
  */
-async function fromBrowser(did, url, keyName = "key-1") {
+async function fromBrowser(did, url) {
   const pair = await loadKeyPair();
   if (!pair) return null;
-  return { document: await buildDidDocument(pair, did, keyName), source: "browser", url };
+  return { document: await buildDidDocument(pair, did), source: "browser", url };
 }
 
 /**
  * Résout un `did:web` : réseau, puis exemplaire embarqué, puis clé locale.
  *
  * @param {string} did
- * @param {{keyName?: string, allowLocal?: boolean}} [options] `allowLocal` à
- *        false interdit les deux replis — ce que fera un vérificateur qui exige
- *        une résolution réelle.
+ * @param {{allowLocal?: boolean}} [options] `allowLocal` à false interdit les
+ *        deux replis — ce que fera un vérificateur qui exige une résolution
+ *        réelle.
  * @returns {Promise<Resolved>}
  * @throws {Error} `DID_UNRESOLVABLE`
  */
-export async function resolveDid(did, { keyName = "key-1", allowLocal = true } = {}) {
+export async function resolveDid(did, { allowLocal = true } = {}) {
   const url = didWebUrl(did);
 
   const found = await fromNetwork(did, url)
-    ?? (allowLocal ? (await fromBundle(did, url)) ?? (await fromBrowser(did, url, keyName)) : null);
+    ?? (allowLocal ? (await fromBundle(did, url)) ?? (await fromBrowser(did, url)) : null);
 
   if (found) return found;
 

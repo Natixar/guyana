@@ -26,6 +26,7 @@ import { loadKeyPair } from "./keys.js";
 import { fetchMe, issuerDid } from "./me.js";
 import { barClaims } from "./bar-claims.js";
 import { buildCredential, signCredential } from "./credential.js";
+import { verificationMethodId } from "./did.js";
 import { signView } from "./sign-state.js";
 import { depositCredential } from "./deposit.js";
 
@@ -191,7 +192,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         claims: barClaims(bar, fixture),
         confirmedBy: me.person ? { id: me.person.id, name: me.person.name } : null,
       });
-      const signed = await signCredential(cred, pair, `${did}#${me.keyPolicy?.keyName ?? "key-1"}`);
+      const signed = await signCredential(cred, pair, await verificationMethodId(pair, did));
       // Rangée avant d'être déposée : un dépôt réussi que le portefeuille aurait
       // manqué ferait croire à l'opérateur qu'il ne détient rien.
       await putCredential(signed, bar.internalId);

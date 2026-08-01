@@ -9,7 +9,7 @@
 // attestations déjà émises deviennent invérifiables. Sur un poste où la clé
 // vit dans un navigateur, la perte est le risque principal.
 
-import { publicJwk } from "./keys.js";
+import { publicJwk, thumbprint } from "./keys.js";
 import { canonicalBytes } from "./canonical.js";
 import { multibase58 } from "./multibase.js";
 
@@ -44,16 +44,44 @@ async function documentDigest(doc) {
 /** Publique : la page l'affiche pour que l'opérateur compare avant de publier. */
 export { documentDigest };
 
-export async function buildDidDocument(pair, did, keyName = "key-1", previous = null) {
+/**
+ * L'identifiant d'une clé dans le document — son empreinte, jamais un nom.
+ *
+ * LE DÉFAUT QUE CECI CORRIGE. Le fragment venait de `keyPolicy.keyName`, que le
+ * serveur fixe à « key-1 ». Deux clés différentes recevaient donc le MÊME
+ * identifiant, et la fusion — qui écarte les entrées de même identifiant pour
+ * ne pas publier deux fois la même clé — supprimait l'ancienne à tous les
+ * coups. Le document annonçait `previousVersionDigest`, ce qui donnait toutes
+ * les apparences d'une fusion réussie, et ne portait qu'une clé : exactement la
+ * perte que la fusion existait pour empêcher.
+ *
+ * L'EMPREINTE EST LA SEULE CHOSE QUE LES DEUX CÔTÉS CONNAISSENT. Le signataire
+ * doit inscrire dans la preuve l'identifiant sous lequel sa clé sera publiée ;
+ * il ne connaît pas le document en ligne, et l'aller chercher ferait dépendre
+ * une signature d'un accès réseau. Un numéro d'ordre — `key-2`, `key-3` — se
+ * calcule au moment de publier et pas avant ; l'empreinte RFC 7638, elle, est
+ * une fonction de la clé, donc les deux côtés tombent d'accord sans se parler.
+ *
+ * Conséquence voulue : une clé déjà publiée sous `#key-1` garde cette entrée —
+ * on n'enlève rien — et se republie sous son empreinte. Deux entrées pour une
+ * même clé sont sans danger ; une attestation orpheline ne l'est pas.
+ */
+export async function verificationMethodId(pair, did) {
+  return `${did}#${await thumbprint(pair)}`;
+}
+
+export async function buildDidDocument(pair, did, previous = null) {
   const jwk = await publicJwk(pair);
   const vm = {
-    id: `${did}#${keyName}`,
+    id: await verificationMethodId(pair, did),
     type: "JsonWebKey",
     controller: did,
     publicKeyJwk: jwk,
   };
 
-  // Fusion avec un document existant : on ajoute, on ne remplace jamais.
+  // Fusion avec un document existant : on ajoute, on ne remplace jamais. Le
+  // filtre ne vise plus que la republication de LA MÊME clé, puisque deux clés
+  // distinctes ont désormais deux empreintes distinctes.
   const existing = previous?.verificationMethod ?? [];
   const kept = existing.filter((m) => m.id !== vm.id);
 
