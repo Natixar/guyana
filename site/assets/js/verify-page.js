@@ -3,6 +3,7 @@
 import T from "./labels.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
 import { resolveDid } from "./did-source.js";
+import { esc } from "./escape.js";
 
 const $ = (s) => document.querySelector(s);
 const state = { credential: null, didDoc: null, didSource: null };
@@ -25,7 +26,8 @@ function looksComplete(raw) {
   return !inStr && depth === 0;
 }
 
-const esc = (s) => String(s).replace(/[<&]/g, (c) => ({ "<": "&lt;", "&": "&amp;" })[c]);
+// L'échappement vit dans son propre module : trois versions partielles
+// valaient moins qu'une complète. Celle-ci couvre aussi les attributs.
 
 /** Accepts either a chosen file or pasted text — pasting is the easier path. */
 function wireInput(name, onLoad) {

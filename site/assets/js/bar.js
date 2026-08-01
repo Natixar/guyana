@@ -27,6 +27,7 @@ import { fetchMe, issuerDid } from "./me.js";
 import { barClaims } from "./bar-claims.js";
 import { buildCredential, signCredential } from "./credential.js";
 import { verificationMethodId } from "./did.js";
+import { esc } from "./escape.js";
 import { signView } from "./sign-state.js";
 import { depositCredential } from "./deposit.js";
 
@@ -92,16 +93,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   const bar = fixture?.bars?.find((b) => b.internalId === wanted);
 
   if (!bar) {
-    root.innerHTML = `<p class="badge badge--warning">${T.barUnknown} — ${wanted ?? ""}</p>`;
+    // ÉCHAPPÉ : `wanted` vient de l'URL. Sans cela, un lien fabriqué exécute
+    // du script sur la page qui détient la clé de signature.
+    root.innerHTML = `<p class="badge badge--warning">${T.barUnknown} — ${esc(wanted)}</p>`;
     return;
   }
 
   const lot = fixture.lots.find((l) => l.id === bar.lot);
   root.innerHTML = `
-    <h2>${bar.internalId}</h2>
+    <h2>${esc(bar.internalId)}</h2>
     <dl class="facts">
-      ${fact(T.barSubject, `<code>${bar.subjectId}</code>`)}
-      ${fact(T.barLot, `${bar.lot} — ${T.registerDrawnFrom} ${lot?.productionMonth ?? "?"}`)}
+      ${fact(T.barSubject, `<code>${esc(bar.subjectId)}</code>`)}
+      ${fact(T.barLot, `${esc(bar.lot)} — ${T.registerDrawnFrom} ${esc(lot?.productionMonth ?? "?")}`)}
       ${fact(T.barPourDate, localDay(bar.pouredAt))}
       ${fact(T.barFineGold, formatMass(bar.fineGoldKg))}
       ${fact(T.barGrossMass, formatMass(bar.grossMassKg))}

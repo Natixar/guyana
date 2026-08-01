@@ -114,7 +114,12 @@ jobs:
         env:
           STORE_DSN: postgresql://postgres:test@localhost:5432/aurora
         run: |
-          python3 -m pip install --quiet pytest cryptography 'psycopg[binary]'
+          # Les dépendances du service viennent de son requirements.txt, épinglé :
+          # les réénumérer ici en produit une seconde liste, qui diverge. C'est
+          # arrivé — fastapi y manquait, le module de test l'importe, et la
+          # collecte échouait avant le premier cas. Rien ne l'avait vu parce que
+          # ce job ne s'était jamais exécuté sur la branche.
+          python3 -m pip install --quiet -r requirements.txt pytest httpx
           python3 -m pytest -q
 
       # Les deux moitiés d'un seul contrôle. Python signe, JavaScript vérifie —

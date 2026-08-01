@@ -18,6 +18,7 @@
 import T from "./labels.js";
 import { allCredentials } from "./wallet.js";
 import { massColumn } from "./mass.js";
+import { esc } from "./escape.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -66,7 +67,7 @@ function lotSection(lot, bars, heldRefs, storeSubjects) {
     const st = statusOf(bar, heldRefs, storeSubjects);
     const href = `/bar/?id=${encodeURIComponent(bar.internalId)}`;
     return `<tr>
-      <td><a href="${href}">${bar.internalId}</a></td>
+      <td><a href="${href}">${esc(bar.internalId)}</a></td>
       <td class="num">${fine.format(bar.fineGoldKg)}</td>
       <td class="num">${gross.format(bar.grossMassKg)}</td>
       <td><span class="badge badge--${st.kind}">${st.label}</span></td>
@@ -76,9 +77,9 @@ function lotSection(lot, bars, heldRefs, storeSubjects) {
 
   return `<details class="lot">
     <summary>
-      <strong>${lot.id}</strong>
-      <span class="muted">${bars.length} ${T.registerBars} · ${T.registerMonth} ${lot.pourMonth}
-        · ${T.registerDrawnFrom} ${lot.productionMonth}${lot.syntheticSource ? ` · ${T.registerSynthetic}` : ""}</span>
+      <strong>${esc(lot.id)}</strong>
+      <span class="muted">${bars.length} ${T.registerBars} · ${T.registerMonth} ${esc(lot.pourMonth)}
+        · ${T.registerDrawnFrom} ${esc(lot.productionMonth)}${lot.syntheticSource ? ` · ${T.registerSynthetic}` : ""}</span>
       <span class="badge badge--${certified === bars.length ? "verified" : "pending"}">${certified}/${bars.length} ${T.registerCertified}</span>
     </summary>
     <table class="register">
@@ -118,6 +119,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const count = $("[data-register-count]");
     if (count) count.textContent = `${done} / ${total}`;
   } catch (err) {
-    target.innerHTML = `<p class="badge badge--warning">${T.registerEmpty} — ${err.message}</p>`;
+    target.innerHTML = `<p class="badge badge--warning">${T.registerEmpty} — ${esc(err.message)}</p>`;
   }
 });

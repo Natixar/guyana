@@ -27,6 +27,7 @@
  * un 403 même en tapant l'adresse. La page se contente de le dire lisiblement.
  */
 import T from "./labels.js";
+import { esc } from "./escape.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -56,7 +57,7 @@ function organisationRow(r) {
     return `<td class="num${flag ? " num--warning" : ""}">${share(value, r.cells)}</td>`;
   }).join("");
 
-  return `<tr><td>${r.organisation}</td>${cells}<td class="num">${r.cells.toLocaleString("fr-FR")}</td></tr>`;
+  return `<tr><td>${esc(r.organisation)}</td>${cells}<td class="num">${r.cells.toLocaleString("fr-FR")}</td></tr>`;
 }
 
 function breakdown(byOrganisation) {
@@ -94,7 +95,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     res = await fetch("/api/v1/counts", { headers: { accept: "application/json" } });
   } catch (err) {
-    target.innerHTML = `<p class="badge badge--warning">${err.message}</p>`;
+    target.innerHTML = `<p class="badge badge--warning">${esc(err.message)}</p>`;
     return;
   }
 
@@ -123,7 +124,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     <table class="register">
       <thead><tr><th>Origin</th><th class="num">Records</th><th class="num">Share</th></tr></thead>
       <tbody>${byOrigin.map((r) => `<tr>
-        <td>${r.origin}</td>
+        <td>${esc(r.origin)}</td>
         <td class="num">${r.n.toLocaleString("fr-FR")}</td>
         <td class="num">${((100 * r.n) / total).toFixed(1)} %</td>
       </tr>`).join("")}</tbody>
