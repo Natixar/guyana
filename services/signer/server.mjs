@@ -52,8 +52,13 @@ export async function createApp({ signingKey, storeKey, taxonomy }) {
       // engagements. Les sels naissent ici, à l'émission, et une seule fois.
       const { cells, disposition } = matrixOf(verdict);
       const { commitments, disclosures } = await commitMatrix(cells, disposition);
+      // L'unité vient du VERDICT et n'est pas récrite ici. C'est celle du
+      // calcul qu'on vient de refaire ; la retaper en littéral créerait la
+      // seconde source de vérité que retirer l'unité des cellules avait
+      // justement supprimée, et l'engagement sur le total serait le premier
+      // endroit où les deux divergeraient sans bruit.
       const totalCommitment = await commitTotal(
-        commitments, verdict.total, "kgCO2e");
+        commitments, verdict.total, verdict.unit);
 
       const credential = buildCarbonCredential({
         issuerDid: ISSUER_DID,
