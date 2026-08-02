@@ -205,13 +205,42 @@ document.addEventListener("DOMContentLoaded", async () => {
   // l'exploitant a chargé, ou null s'il n'y en a pas.
   const merge = wireDidMerge(document, () => did);
 
+  /**
+   * Le téléchargement du document DID — et POURQUOI il refuse, le cas échéant.
+   *
+   * CE BOUTON NE FAISAIT RIEN, SANS RIEN DIRE. Trois chemins menaient au
+   * silence : pas de clé (`return` nu), pas d'identité d'émetteur (une pastille
+   * écrite en HAUT de la page, à trois blocs du bouton qu'on vient de cliquer),
+   * et une exception dans la construction — avalée en rejet non traité par un
+   * écouteur `async`, donc visible seulement dans la console.
+   *
+   * Depuis la place de l'opérateur, les trois se ressemblent : « le bouton ne
+   * marche plus ». C'est le pire compte rendu possible, parce qu'il ne distingue
+   * pas une panne d'un refus légitime — et le cas le plus fréquent EST un refus
+   * légitime : seul un compte rattaché à une organisation émettrice possède un
+   * DID, et l'exploitant de la plateforme n'en est pas une.
+   *
+   * Le message s'écrit donc à côté du bouton, et il nomme la cause.
+   */
+  const didStatus = $("[data-download-did-status]");
+  const sayDid = (text, kind) => setBadge(didStatus, text, kind);
+
   $("[data-download-did]")?.addEventListener("click", async () => {
-    const p = await loadKeyPair();
-    if (!p) return;
-    if (!did) { setBadge(status, T.issuerUnknown, "warning"); return; }
-    // En mode dégradé le nom du fichier porte la mention : rien de ce qui sort
-    // d'ici sans authentification ne doit pouvoir être publié par inadvertance.
-    downloadJson(await buildDidDocument(p, did, merge.previous()),
-                 demo ? T.downloadDemoName : "did.json");
+    try {
+      const p = await loadKeyPair();
+      if (!p) { sayDid(T.envKeyMissing, "warning"); return; }
+      if (!did) { sayDid(T.issuerUnknown, "warning"); return; }
+      // En mode dégradé le nom du fichier porte la mention : rien de ce qui sort
+      // d'ici sans authentification ne doit pouvoir être publié par inadvertance.
+      const doc = await buildDidDocument(p, did, merge.previous());
+      downloadJson(doc, demo ? T.downloadDemoName : "did.json");
+      // Le compte des clés est le fait qui rassure ou qui alerte : publier un
+      // document qui n'en porte qu'une, alors qu'on vient d'en fusionner deux,
+      // rend invérifiables toutes les attestations de l'autre.
+      sayDid(`${T.didDownloaded} — ${doc.verificationMethod.length} ${T.didKeysInFile}`,
+             "verified");
+    } catch (err) {
+      sayDid(`${T.didDownloadFailed} — ${err.message ?? err}`, "warning");
+    }
   });
 });
