@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 
 import { canonicalBytes } from "../../site/assets/js/canonical.js";
 import { multibase58, multibase58Decode } from "../../site/assets/js/multibase.js";
-import { verifyMatrix, recomputeTotal } from "../../site/assets/js/commitments.js";
+import { verifyMatrix, recomputeTotal, commitTotal } from "../../site/assets/js/commitments.js";
 import { createApp } from "./server.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -263,6 +263,48 @@ test("retirer une divulgation n'invalide pas la signature", async () => {
     { name: "ECDSA", hash: "SHA-256" }, natixarPair.publicKey,
     multibase58Decode(proof.proofValue), toSign);
   assert.equal(ok, true, "la signature ne tient plus après redaction");
+});
+
+// --- Le chemin complet du vérificateur ------------------------------------
+// Il n'a AUCUN droit sur la plateforme : son compte ne peut rien demander. Ce
+// que ces cas exercent est donc exactement ce dont il dispose — l'attestation
+// qu'on lui a remise, et rien d'autre.
+
+test("le vérificateur refait le total et le rattache au total signé", async () => {
+  const cells = [CELL, { ...CELL, id: "c2", partType: 2 }];
+  const r = await call("/api/v1/sign", await request({
+    extraction: await signedExtraction(cells),
+    dispositions: [{ id: "c1", use: "USED" }, { id: "c2", use: "USED" }],
+    value: (2 * 2680) / 2,
+  }));
+  const { credential, disclosures, totalSalt } = r.body;
+  const matrix = credential.credentialSubject.breakdown;
+
+  // 1 — chaque engagement se recalcule depuis sa divulgation
+  assert.equal((await verifyMatrix(matrix, disclosures)).ok, true);
+
+  // 2 — le total se refait depuis les cellules qui comptent
+  const sum = recomputeTotal(matrix, disclosures);
+  assert.equal(sum.known, true);
+  assert.equal(sum.total, 2 * 2680);
+
+  // 3 — et ce total est bien CELUI QUI A ÉTÉ SIGNÉ. Sans cette étape, on
+  // pourrait divulguer un sous-ensemble et annoncer le total de son choix :
+  // chaque engagement de cellule tiendrait, et rien ne dirait que leur somme
+  // n'est pas celle annoncée.
+  const again = await commitTotal(matrix, sum.total, "kgCO2e", totalSalt);
+  assert.equal(again.commitment, credential.credentialSubject.totalCommitment);
+});
+
+test("un total annoncé qui n'est pas la somme des cellules ne se rattache pas", async () => {
+  const r = await call("/api/v1/sign", await request());
+  const { credential, disclosures, totalSalt } = r.body;
+  const matrix = credential.credentialSubject.breakdown;
+
+  const sum = recomputeTotal(matrix, disclosures);
+  const forged = await commitTotal(matrix, sum.total + 1, "kgCO2e", totalSalt);
+  assert.notEqual(forged.commitment, credential.credentialSubject.totalCommitment,
+                  "un total falsifié a produit le même engagement");
 });
 
 test("une divulgation altérée est refusée", async () => {

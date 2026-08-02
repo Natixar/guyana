@@ -4,9 +4,32 @@ import T from "./labels.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
 import { resolveDid } from "./did-source.js";
 import { esc } from "./escape.js";
+import { verifyMatrix, recomputeTotal, commitTotal } from "./commitments.js";
 
 const $ = (s) => document.querySelector(s);
-const state = { credential: null, didDoc: null, didSource: null };
+const state = { credential: null, didDoc: null, didSource: null,
+                disclosures: [], totalSalt: null };
+
+/**
+ * Ce que le porteur remet : une PRÉSENTATION, ou une attestation nue.
+ *
+ * Le signataire rend `{credential, disclosures, totalSalt}`, et c'est ce triplet
+ * que le porteur transmet — après en avoir retiré les divulgations qu'il ne veut
+ * pas remettre. Le distinguer d'une attestation nue par la présence de
+ * `credential` évite un second dépôt de fichier : le vérificateur reçoit UN
+ * objet et le dépose tel quel, ce qui est le seul geste qu'on puisse lui
+ * demander de faire juste.
+ */
+function unwrap(json) {
+  if (json && typeof json === "object" && json.credential) {
+    state.disclosures = Array.isArray(json.disclosures) ? json.disclosures : [];
+    state.totalSalt = json.totalSalt ?? null;
+    return json.credential;
+  }
+  state.disclosures = [];
+  state.totalSalt = null;
+  return json;
+}
 
 /** Accolades équilibrées, en ignorant celles qui sont dans une chaîne. */
 function looksComplete(raw) {
@@ -118,6 +141,72 @@ function provenance() {
   return badge + `<p class="banner banner--warning">${esc(T.vDidSimulated)}</p>`;
 }
 
+/**
+ * Le recalcul — ce que cette page existe pour rendre possible.
+ *
+ * LE VÉRIFICATEUR NE NOUS APPELLE PAS. C'est l'énoncé central du dossier, et
+ * c'est ici qu'il devient constatable : le compte du vérificateur n'a AUCUN
+ * droit sur la plateforme, il ne peut donc rien demander. Tout ce que cette
+ * section affiche vient de l'attestation qu'on lui a remise, et de rien d'autre.
+ *
+ * TROIS RÉPONSES, ET LA TROISIÈME EST CELLE QUI MANQUE PARTOUT AILLEURS. Une
+ * signature vérifiée dit que le document n'a pas bougé ; elle ne dit pas que le
+ * total est la somme de ses parts. Le recalcul le dit — quand toutes les
+ * cellules qui comptent ont été divulguées. Sinon la réponse honnête est « on ne
+ * peut pas savoir », et la distinguer de « faux » est essentiel : une
+ * divulgation partielle est un droit du porteur, pas une fraude, et l'afficher
+ * en rouge apprendrait au lecteur à ignorer l'alerte.
+ */
+async function renderMatrix(doc) {
+  const matrix = doc?.credentialSubject?.breakdown;
+  if (!Array.isArray(matrix) || !matrix.length || !("commitment" in (matrix[0] ?? {}))) {
+    return "";                                   // pas une attestation à matrice
+  }
+
+  const checked = await verifyMatrix(matrix, state.disclosures);
+  const sum = recomputeTotal(matrix, state.disclosures);
+
+  const rows = [];
+  const badge = (kind, text) => `<span class="badge badge--${kind}">${esc(text)}</span>`;
+
+  rows.push(`<div><dt>${T.vCells}</dt><dd>${matrix.length} — ` +
+            `${checked.disclosed} ${T.vDisclosed}, ${checked.withheld} ${T.vWithheld}</dd></div>`);
+
+  rows.push(`<div><dt>${T.vCommitments}</dt><dd>` +
+    (checked.ok ? badge("verified", T.vCommitmentsOk)
+                : badge("warning", `${T.vCommitmentsBad} — ${checked.mismatched.join(", ")}`)) +
+    `</dd></div>`);
+
+  if (sum.known) {
+    // L'engagement sur le total lie le chiffre à la matrice : sans lui, on
+    // pourrait divulguer un sous-ensemble et annoncer le total de son choix.
+    let bound = null;
+    if (state.totalSalt) {
+      const again = await commitTotal(matrix, sum.total, "kgCO2e", state.totalSalt);
+      bound = again.commitment === doc.credentialSubject.totalCommitment;
+    }
+    rows.push(`<div><dt>${T.vRecomputed}</dt><dd>${sum.total.toLocaleString("fr-FR")} kgCO2e ` +
+      (bound === null ? badge("info", T.vNoTotalSalt)
+       : bound ? badge("verified", T.vTotalBound) : badge("warning", T.vTotalUnbound)) +
+      `</dd></div>`);
+  } else {
+    rows.push(`<div><dt>${T.vRecomputed}</dt><dd>` +
+      badge("info", `${T.vCannotKnow} — ${sum.withheld} ${T.vWithheldCounted}`) + `</dd></div>`);
+  }
+
+  // Ce que la décision 1 de #61 demande de rendre appréciable : ce qui n'a pas
+  // compté, et pourquoi — visible même sur une cellule non divulguée.
+  const unusable = checked.unusable.length
+    ? `<h3 class="subhead">${T.vNotCounted}</h3><ul>` +
+      checked.unusable.map((c) => `<li>${T.vCell} ${c.index} — ${esc(c.reason || T.vNoReason)}</li>`).join("") +
+      `</ul>`
+    : "";
+
+  return `<h3 class="subhead">${T.vMatrix}</h3>
+          <p class="muted">${T.vMatrixBody}</p>
+          <dl class="facts">${rows.join("")}</dl>${unusable}`;
+}
+
 async function refresh() {
   const hint = $("[data-did-hint]");
   const out = $("[data-verdict]");
@@ -167,7 +256,9 @@ async function refresh() {
 
   const d = r.document;
   body.hidden = false;
+  const matrix = await renderMatrix(d);
   body.innerHTML = `
+    ${matrix}
     <h3 class="subhead">${T.vAttested}</h3>
     <dl class="facts">${renderClaims(d)}</dl>
     <h3 class="subhead">${T.vProvenance}</h3>
@@ -180,7 +271,7 @@ async function refresh() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  wireInput("vc", (j) => { state.credential = j; });
+  wireInput("vc", (j) => { state.credential = unwrap(j); });
   // Un document déposé à la main l'emporte : le vérificateur qui apporte le
   // sien sait ce qu'il fait, et la provenance devient « fourni ».
   wireInput("did", (j) => { state.didDoc = j; state.didSource = "supplied"; });
