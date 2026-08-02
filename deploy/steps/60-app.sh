@@ -136,7 +136,25 @@ done
 # vérification. C'est exactement ce que la démonstration doit montrer.
 for domain in $APP_DOMAINS; do
   r="${ROUTER_PREFIX}-public"
-  labels+=( --label "traefik.http.routers.${r}.rule=Host(\`${domain}\`) && (PathPrefix(\`/verify\`) || PathPrefix(\`/css/\`) || PathPrefix(\`/js/\`) || Path(\`/favicon.svg\`))" )
+  # UNE PAGE PUBLIQUE, C'EST LA PAGE **ET TOUT CE QU'ELLE CHARGE**.
+  #
+  # Correction du 3 août 2026. `/verify/`, sa feuille de style et ses modules
+  # étaient ouverts ; le logo et les polices ne l'étaient pas. Un navigateur qui
+  # reçoit 401 avec `WWW-Authenticate: Basic` sur un `<img>` ou une `@font-face`
+  # OUVRE LA FENÊTRE D'IDENTIFICATION — pour la ressource, pas pour la page. Le
+  # vérificateur voyait donc une demande de mot de passe sur une page qui
+  # répondait 200, ce qui est le contraire de ce que cette page démontre.
+  #
+  # Le contrôle par `curl` sur la page seule ne pouvait pas le voir : il ne suit
+  # pas les sous-ressources. C'est `verify-public.bats` qui les suit maintenant,
+  # et qui suit aussi les `url()` de la feuille de style — les polices y étaient,
+  # et nulle part dans le HTML.
+  #
+  # `/engine/` reste FERMÉ, délibérément : il porte l'exemplaire embarqué du
+  # document DID, et la page publique ne doit pas pouvoir s'y rabattre. Le
+  # vérificateur apporte le document de l'émetteur, ou il n'y a pas de
+  # vérification.
+  labels+=( --label "traefik.http.routers.${r}.rule=Host(\`${domain}\`) && (PathPrefix(\`/verify\`) || PathPrefix(\`/css/\`) || PathPrefix(\`/js/\`) || PathPrefix(\`/fonts/\`) || PathPrefix(\`/img/\`) || Path(\`/favicon.svg\`))" )
   labels+=( --label "traefik.http.routers.${r}.entrypoints=websecure" )
   labels+=( --label "traefik.http.routers.${r}.tls=true" )
   labels+=( --label "traefik.http.routers.${r}.tls.certresolver=${CERT_RESOLVER}" )
