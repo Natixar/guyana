@@ -63,6 +63,18 @@ function fault(code, detail) {
  */
 const RESULT_UNIT = "kgCO2e";
 
+/**
+ * Le mode d'impact — UN champ d'annotation, jamais sept colonnes.
+ *
+ * Décision 3 de l'issue #61. Les facteurs par gaz sont rares dans les bases :
+ * sept colonnes seraient vides presque partout. On n'émet sept cellules que là
+ * où un facteur est réellement décomposé, ce qui répète la mesure de base et
+ * reste acceptable puisque le cas est rare. Le champ nomme aussi le fluide dans
+ * une cellule de fuite directe, et c'est par lui que les impacts non
+ * climatiques entreront.
+ */
+const MODE_DEFAULT = "aggregate";
+
 const worstOrigin = (a, b) =>
   ORIGIN_RANK.indexOf(a) >= ORIGIN_RANK.indexOf(b) ? a : b;
 
@@ -73,7 +85,26 @@ const worstOrigin = (a, b) =>
  * dire exactement les entrées de la fonction de traduction. Regrouper sur moins
  * que cela fusionnerait des cellules qui n'aboutissent pas à la même ligne.
  */
-const groupKey = (cell) => `${cell.subPost}/${cell.partType}/${cell.caracterisation}`;
+/**
+ * La maille d'agrégation, et ce qu'elle refuse de fondre ensemble.
+ *
+ * LA PÉRIODE Y ENTRE, ET C'EST UNE CORRECTION. Sans elle, douze cellules
+ * mensuelles de même position pivot se fondaient en une seule dont personne ne
+ * pouvait plus dire à quel mois elle appartenait. Or la période est un axe de la
+ * matrice de l'issue #61 : une cellule porte un flux moyen SUR UN INTERVALLE, et
+ * une intégration sur un intervalle quelconque n'a de sens que si l'intervalle
+ * a survécu à l'agrégation.
+ *
+ * L'UNITÉ D'ACTIVITÉ N'Y ENTRE PAS, et le vecteur qui l'affirme a raison : ce
+ * qui se somme dans un groupe est l'ÉMISSION, pas la donnée d'activité. Mille
+ * kilogrammes d'explosif et mille tonnes ont deux unités et une seule somme en
+ * kgCO2e. Séparer les groupes par unité d'activité produirait deux cellules là
+ * où le référentiel n'en voit qu'une.
+ */
+const groupKey = (cell) =>
+  [cell.subPost, cell.partType, cell.caracterisation,
+   cell.periodStart ?? "", cell.periodEnd ?? "",
+   cell.mode ?? MODE_DEFAULT].join("/");
 
 /** Le mois d'une cellule, « 2025-01 », depuis le début de sa période. */
 const monthOf = (cell) => String(cell.periodStart ?? "").slice(0, 7) || "undated";
@@ -184,10 +215,25 @@ export function aggregate(cells, taxonomy) {
     const line = translate(cell, taxonomy);
     lines[line] = (lines[line] ?? 0) + emission;
     pivot.push({
+      // La catégorie : une position dans la taxonomie pivot, JAMAIS une ligne
+      // de référentiel. C'est `lines` qui porte la ligne dérivée, et elle ne se
+      // signe pas — un cadre qui change épinglerait tout inventaire passé.
       subPost: cell.subPost,
       partType: cell.partType ?? null,
       caracterisation: cell.caracterisation,
+      // L'intervalle, pas un instant : c'est ce qui rend l'intégration sur une
+      // fenêtre quelconque bien définie, y compris à cheval sur deux mesures.
+      period: cell.periodStart
+        ? { start: cell.periodStart, end: cell.periodEnd ?? null }
+        : null,
       amount: emission,
+      // L'unité DU MONTANT, et non celle de l'activité dont il est issu. Une
+      // cellule divulguée seule doit se décrire seule : le porteur peut ne
+      // remettre que celle-ci, et un vérificateur qui reçoit un nombre sans son
+      // unité n'a rien reçu. La redondance avec l'unité de l'attestation est le
+      // prix de l'autonomie de la cellule, et il est faible.
+      unit: RESULT_UNIT,
+      mode: cell.mode ?? MODE_DEFAULT,
       origin: groupOrigin,
     });
   }

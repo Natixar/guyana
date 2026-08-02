@@ -170,6 +170,41 @@ test("une cellule écartée reste dans la matrice, dénombrable et motivée", as
   assert.ok(withheld[0].commitment.startsWith("z"));
 });
 
+test("une cellule divulguée se décrit seule", async () => {
+  // Le porteur peut ne remettre que celle-ci. Un vérificateur qui reçoit un
+  // montant sans son unité, sans sa période et sans son mode n'a rien reçu.
+  const r = await call("/api/v1/sign", await request());
+  const cell = r.body.disclosures[0];
+
+  assert.equal(cell.unit, "kgCO2e", "le montant ne dit pas son unité");
+  assert.equal(cell.mode, "aggregate", "le mode d'impact manque");
+  assert.equal(cell.subPost, 1000, "la position pivot manque");
+  assert.ok("period" in cell, "l'intervalle manque");
+  assert.ok("origin" in cell, "l'origine manque");
+  // Et jamais une ligne de référentiel : c'est la propriété centrale de #61.
+  assert.ok(!("line" in cell) && !("ghgp" in cell));
+});
+
+test("l'intervalle survit à l'agrégation", async () => {
+  // Sans période dans la maille, douze cellules mensuelles de même position se
+  // fondaient en une seule dont personne ne pouvait plus dire le mois — alors
+  // que la période est un axe de la matrice.
+  const janvier = { ...CELL, id: "j", periodStart: "2025-01-01T04:00:00Z",
+                    periodEnd: "2025-02-01T04:00:00Z" };
+  const fevrier = { ...CELL, id: "f", periodStart: "2025-02-01T04:00:00Z",
+                    periodEnd: "2025-03-01T04:00:00Z" };
+  const r = await call("/api/v1/sign", await request({
+    extraction: await signedExtraction([janvier, fevrier]),
+    dispositions: [{ id: "j", use: "USED" }, { id: "f", use: "USED" }],
+    value: (2 * 2680) / 2,
+  }));
+  assert.equal(r.status, 201);
+  assert.equal(r.body.credential.credentialSubject.breakdown.length, 2,
+               "deux mois ont fondu en une cellule");
+  assert.equal(r.body.disclosures[0].period.start, "2025-01-01T04:00:00Z");
+  assert.equal(r.body.disclosures[1].period.start, "2025-02-01T04:00:00Z");
+});
+
 test("chaque engagement se recalcule depuis sa divulgation", async () => {
   const r = await call("/api/v1/sign", await request());
   const { credential, disclosures } = r.body;
