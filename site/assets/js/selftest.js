@@ -18,9 +18,11 @@ import { wireDidMerge } from "./did-merge.js";
 import { signBlocker, signView } from "./sign-state.js";
 import { allCredentials, putCredential, credentialsFor, credentialsByRef, credentialType,
          orphanedCredentials, removeCredentials } from "./wallet.js";
-import { aggregate, allocateUnallocated } from "./engine.js";
+import { aggregate, allocateToBar } from "./engine.js";
 import { runVectors } from "./vectors.js";
 import { renderCertificates } from "./certificate-view.js";
+import { planForBar, disposeCells, departmentsOnPath, tally } from "./lot-selection.js";
+import { computeForBar } from "./carbon-request.js";
 
 
 const cases = [];
@@ -278,6 +280,156 @@ test("portefeuille — l'auto-test ne laisse pas ses attestations derrière lui"
     : null;
 });
 
+// --- La sélection automatique des données d'une barre ---------------------
+//
+// LE CALCUL QUI MANQUAIT AU 1er AOÛT. Sans lui, faire signer le contenu carbone
+// d'une barre exigeait de décocher à la main le non-alloué d'un des deux mois,
+// avec un motif que personne n'aurait su écrire dans une attestation. Ces cas
+// exercent la jointure qui rend ce geste inutile.
+
+/** Un ERP minuscule : deux lots, deux étapes, un département de soutien. */
+const ERP = {
+  eventModel: "period",
+  process: { id: 1, key: "essai", steps: [
+    { id: 1, key: "extraction", departments: [1, 2] },
+    { id: 2, key: "transport", departments: [3] },
+  ] },
+  // Le département 9 n'est cité par aucune étape : il est HORS du chemin de la
+  // matière, et c'est ce qui en fait du partagé.
+  organisation: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 9 }],
+  lots: [
+    { id: "LOT-A", productionMonth: "2025-01", pourMonth: "2025-02",
+      period: { start: "2025-01-01T00:00:00Z", end: "2025-02-01T00:00:00Z" } },
+    { id: "LOT-B", productionMonth: "2025-02", pourMonth: "2025-03",
+      period: { start: "2025-02-01T00:00:00Z", end: "2025-03-01T00:00:00Z" } },
+  ],
+  bars: [
+    { internalId: "A-1", lot: "LOT-A", fineGoldKg: 10 },
+    { internalId: "A-2", lot: "LOT-A", fineGoldKg: 10 },
+    { internalId: "B-1", lot: "LOT-B", fineGoldKg: 10 },
+  ],
+};
+
+/** Une cellule servie, mille secondes, débit 1 : mille unités exactement. */
+const served = (id, step, month, subPost = 1000) => ({
+  id, step, subPost, partType: null, caracterisation: 1,
+  flux: 1, factor: 2.68, origin: "MEASURED",
+  periodStart: `${month}-01T00:00:00Z`, periodEnd: `${month}-01T00:16:40Z`,
+});
+
+test("sélection — la fenêtre est le mois de production ET le mois de coulée", () => {
+  const plan = planForBar(ERP.bars[0], ERP);
+  if (plan.window.start !== "2025-01-01T00:00:00Z") return `début ${plan.window.start}`;
+  if (!plan.window.end.startsWith("2025-03-01")) return `fin ${plan.window.end}`;
+  return null;
+});
+
+test("sélection — deux lots sont vus sur cette fenêtre, et ils sont comptés", () => {
+  // LE COMPTAGE QUI MANQUAIT. C'est lui qui divise le partagé, et sans lui la
+  // barre porterait les frais généraux d'un lot qui n'est pas le sien.
+  const plan = planForBar(ERP.bars[0], ERP);
+  if (plan.lotsInWindow.length !== 2) return `${plan.lotsInWindow.length} lot(s) : ${plan.lotsInWindow}`;
+  if (plan.barsInLot !== 2) return `${plan.barsInLot} barre(s) dans le lot`;
+  return null;
+});
+
+test("sélection — le procédé, et lui seul, dit ce qui est sur le chemin de la matière", () => {
+  const onPath = departmentsOnPath(ERP);
+  if (!onPath.has(1) || !onPath.has(3)) return "un département d'étape manque";
+  if (onPath.has(9)) return "un département de soutien est compté sur le chemin";
+  return null;
+});
+
+test("sélection — trois dispositions, dérivées et jamais saisies", () => {
+  const plan = planForBar(ERP.bars[0], ERP);
+  const cells = [
+    served("own", 1, "2025-01"),        // chemin de la matière, mois du lot
+    served("other", 1, "2025-02"),      // chemin de la matière, AUTRE lot
+    served("support", 9, "2025-01"),    // hors chemin : aucun lot
+  ];
+  const d = disposeCells(cells, plan);
+  const by = Object.fromEntries(d.map((x) => [x.id, x]));
+  if (by.own.use !== "USED") return `own : ${by.own.use}`;
+  if (by.other.use !== "EXCLUDED") return `other : ${by.other.use}`;
+  if (!by.other.reason?.includes("LOT-B")) return `motif muet sur le lot : ${by.other.reason}`;
+  if (by.support.use !== "SHARED") return `support : ${by.support.use}`;
+  // Une disposition sans motif est refusée par le signataire : la produire sans
+  // motif ferait échouer la signature loin d'ici, sur un code peu parlant.
+  if (!by.support.reason) return "une cellule partagée part sans motif";
+  return null;
+});
+
+test("sélection — une cellule écartée l'est POUR SON LOT, pas pour son mois", () => {
+  // Ce qui distingue la règle d'un filtre de dates : la barre B-1 retient
+  // février et écarte janvier, exactement à l'inverse de A-1, SUR LA MÊME
+  // extraction. Un filtre par mois ne saurait pas faire les deux.
+  const cells = [served("jan", 1, "2025-01"), served("fev", 1, "2025-02")];
+  const forA = disposeCells(cells, planForBar(ERP.bars[0], ERP));
+  const forB = disposeCells(cells, planForBar(ERP.bars[2], ERP));
+  if (forA[0].use !== "USED" || forA[1].use !== "EXCLUDED") return "A-1 mal classée";
+  if (forB[0].use !== "EXCLUDED" || forB[1].use !== "USED") return "B-1 mal classée";
+  return null;
+});
+
+test("sélection — le partagé se divise par les lots vus, puis par les barres", async () => {
+  const taxonomy = await fetch("/engine/taxonomy.json").then((r) => r.json());
+  const plan = planForBar(ERP.bars[0], ERP);
+  const cells = [
+    served("own", 1, "2025-01"),
+    served("support", 9, "2025-01"),
+  ];
+  const dispositions = disposeCells(cells, plan);
+  const out = computeForBar({ cells, dispositions, plan, bar: ERP.bars[0], taxonomy });
+
+  // Chaque cellule vaut 1 x 2.68 x 1000 = 2680 kgCO2e sur sa période.
+  // Retenue : 2680 / 2 barres. Partagée : 2680 / 2 lots / 2 barres.
+  const expected = (2680 + 2680 / 2) / 2 / 10;
+  if (Math.abs(out.value - expected) > 1e-9) return `${out.value} au lieu de ${expected}`;
+  if (out.alloc.shareUsed !== 0.5) return `part retenue ${out.alloc.shareUsed}`;
+  if (out.alloc.shareShared !== 0.25) return `part partagée ${out.alloc.shareShared}`;
+  return null;
+});
+
+test("sélection — élargir la fenêtre ne déplace pas le chiffre de la barre", async () => {
+  // La même exigence que l'invariance de fenêtre du cube, une couche plus haut.
+  // C'est ce que l'ancienne règle ratait, et ce qui aurait imposé une case à
+  // décocher devant la caméra.
+  const taxonomy = await fetch("/engine/taxonomy.json").then((r) => r.json());
+  const plan = planForBar(ERP.bars[0], ERP);
+  const bar = ERP.bars[0];
+
+  const oneMonth = [served("support", 9, "2025-01")];
+  const twoMonths = [served("support", 9, "2025-01"), served("support2", 9, "2025-02")];
+
+  // Un mois : un seul lot actif. Deux mois : deux lots, et deux fois le partagé.
+  const a = computeForBar({
+    cells: oneMonth, dispositions: disposeCells(oneMonth, plan),
+    plan: { ...plan, lotsInWindow: ["LOT-A"] }, bar, taxonomy });
+  const b = computeForBar({
+    cells: twoMonths, dispositions: disposeCells(twoMonths, plan),
+    plan, bar, taxonomy });
+
+  return Math.abs(a.value - b.value) < 1e-9
+    ? null : `un mois ${a.value}, deux mois ${b.value}`;
+});
+
+test("sélection — un lot inconnu est refusé, jamais deviné", () => {
+  try {
+    planForBar({ internalId: "X", lot: "LOT-INCONNU" }, ERP);
+    return "aurait dû lever";
+  } catch (e) { return e.code === "LOT_UNKNOWN" ? null : `code ${e.code}`; }
+});
+
+test("sélection — le dénombrement rend compte de toutes les cellules servies", () => {
+  const plan = planForBar(ERP.bars[0], ERP);
+  const cells = [served("a", 1, "2025-01"), served("b", 1, "2025-02"), served("c", 9, "2025-01")];
+  const n = tally(disposeCells(cells, plan));
+  // Le signataire refuse une requête qui ne rend pas compte de tout ce qui a été
+  // servi : la somme des dispositions DOIT être le nombre de cellules.
+  return n.USED + n.SHARED + n.EXCLUDED === cells.length
+    ? null : `${JSON.stringify(n)} pour ${cells.length} cellules`;
+});
+
 // --- Le moteur, côté navigateur (#66) -------------------------------------
 // Ces cas ne sont pas écrits ici : ils viennent de `/engine/vectors.json`, le
 // même fichier que la suite du signataire exécute dans Node. C'est ce qui rend
@@ -323,7 +475,7 @@ test("moteur — chaque vecteur redonne le profil attendu", async () => {
   // Ni les cas ni la comparaison ne sont écrits ici : les deux sont partagés
   // avec la suite du signataire, sans quoi « un moteur, deux hôtes » ne serait
   // qu'une intention.
-  const failures = runVectors(aggregate, v, taxonomy, allocateUnallocated);
+  const failures = runVectors(aggregate, v, taxonomy, allocateToBar);
   return failures.length ? failures.join(" | ") : null;
 });
 

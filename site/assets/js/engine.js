@@ -344,12 +344,40 @@ export function aggregate(cells, taxonomy) {
 }
 
 /**
- * La règle d'allocation du non-alloué — §14.2, « règle spécifique validée ».
+ * La règle d'allocation — §14.2, « règle spécifique validée ».
  *
- * DÉCISION DU 1er AOÛT 2026 : le non-alloué d'un mois se divise entre les
- * barres coulées CE mois-là. Ni au prorata de la masse, ni de l'énergie : au
- * nombre de barres, parce que c'est l'unité que la mine produit et que le
- * chiffre phare est en tCO2e par once.
+ * ─── CE QU'ELLE REMPLACE, ET POURQUOI ────────────────────────────────────
+ *
+ * La règle du 1er août divisait le non-alloué d'un mois entre les barres
+ * coulées CE mois-là, puis sommait les mois de la fenêtre. Elle ne savait pas
+ * COMPTER LES LOTS, et c'est la faute : le contenu carbone d'une barre se
+ * calcule sur une fenêtre de deux mois — celui où son lot est produit, celui où
+ * il est coulé — et sur cette fenêtre DEUX lots sont actifs. Sommer les deux
+ * mois faisait porter à la barre les frais généraux d'un lot qui n'est pas le
+ * sien, et l'unique échappatoire était une case à décocher, dans une interface,
+ * avec un motif que personne n'aurait su rédiger.
+ *
+ * Élargir la fenêtre ne doit rien changer au résultat. C'est la même exigence
+ * que l'invariance de fenêtre du cube, une couche plus haut : l'utilisateur
+ * choisit ses bornes, et son choix ne déplace pas le chiffre.
+ *
+ * ─── LA RÈGLE ────────────────────────────────────────────────────────────
+ *
+ * Trois dispositions, et donc trois parts. Ce que la barre porte d'une cellule
+ * est le produit de son montant par sa PART, et rien d'autre :
+ *
+ *   - RETENUE — la cellule appartient au lot de la barre. Part `1/barsInLot` :
+ *     le lot se divise entre ses barres, au nombre, parce que c'est l'unité que
+ *     la mine produit et que le chiffre phare est par once ;
+ *   - PARTAGÉE — la cellule n'appartient à aucun lot : un département hors du
+ *     chemin de la matière consomme sans qu'on puisse dire pour quel lot. Elle
+ *     se divise D'ABORD entre les lots actifs sur la fenêtre, PUIS entre les
+ *     barres du lot. Part `1/(lotsInWindow × barsInLot)` ;
+ *   - ÉCARTÉE — la cellule appartient à un AUTRE lot. Part nulle, et elle reste
+ *     dans la matrice avec son motif (décision 1 de l'issue #61).
+ *
+ * La division par `lotsInWindow` est exactement ce qui rend la fenêtre neutre :
+ * doubler la fenêtre double le partagé et double le nombre de lots vus.
  *
  * Ce n'est pas une contradiction avec « le non-alloué se déclare et ne se
  * répartit jamais en silence ». Les deux énoncés vivent à des niveaux
@@ -359,30 +387,39 @@ export function aggregate(cells, taxonomy) {
  *     réconciliation d'#48 compare au classeur d'AGM, et le répartir là
  *     rendrait l'écart invisible ;
  *   - au niveau de la BARRE, il est réparti — par une règle nommée, versionnée,
- *     et inscrite dans l'attestation. « En silence » est le mot qui compte.
+ *     et dont les deux diviseurs voyagent dans l'attestation. « En silence » est
+ *     le mot qui compte : un vérificateur lit `lotsInWindow` et `barsInLot`, et
+ *     refait la division.
  *
- * Un mois sans production coulée est refusé plutôt que divisé par zéro : ses
- * émissions non allouées existent et n'ont aucune barre à porter. Les taire
- * donnerait un total par barre plus flatteur que la réalité.
+ * Un lot sans barre, une fenêtre sans lot : refusés plutôt que divisés par
+ * zéro. Les émissions existent et n'ont personne à porter ; les taire donnerait
+ * un chiffre par barre plus flatteur que la réalité.
  *
- * @param {Record<string, number>} unallocatedByPeriod  « 2025-01 » -> tCO2e
- * @param {Record<string, number>} barsByPeriod         « 2025-01 » -> nombre de barres
- * @returns {{perBar: number, byPeriod: Record<string, number>, rule: string}}
- * @throws {Error} `PRODUCTION_MISSING`, `PRODUCTION_EMPTY`
+ * @param {{allocated?: number, shared?: number,
+ *          lotsInWindow?: number, barsInLot?: number}} input
+ *        `allocated` et `shared` en kgCO2e, avant application des parts.
+ * @returns {{perBar: number, lotTotal: number, shareUsed: number,
+ *            shareShared: number, lotsInWindow: number, barsInLot: number,
+ *            rule: string}}
+ * @throws {Error} `LOTS_IN_WINDOW_INVALID`, `BARS_IN_LOT_INVALID`
  */
-export function allocateUnallocated(unallocatedByPeriod, barsByPeriod) {
-  const byPeriod = {};
-  let perBar = 0;
-
-  for (const [month, amount] of Object.entries(unallocatedByPeriod)) {
-    if (amount === 0) continue;
-    const bars = barsByPeriod?.[month];
-    if (bars === undefined || bars === null) throw fault("PRODUCTION_MISSING", month);
-    if (!(bars > 0)) throw fault("PRODUCTION_EMPTY", `${month} : ${bars} barre(s)`);
-    const share = amount / bars;
-    byPeriod[month] = share;
-    perBar += share;
+export function allocateToBar({ allocated = 0, shared = 0,
+                                lotsInWindow = 1, barsInLot = 1 } = {}) {
+  if (!Number.isInteger(lotsInWindow) || lotsInWindow < 1) {
+    throw fault("LOTS_IN_WINDOW_INVALID", String(lotsInWindow));
+  }
+  if (!Number.isInteger(barsInLot) || barsInLot < 1) {
+    throw fault("BARS_IN_LOT_INVALID", String(barsInLot));
   }
 
-  return { perBar, byPeriod, rule: "unallocated/bars-poured-same-month" };
+  const lotTotal = allocated + shared / lotsInWindow;
+  return {
+    lotTotal,
+    perBar: lotTotal / barsInLot,
+    shareUsed: 1 / barsInLot,
+    shareShared: 1 / (lotsInWindow * barsInLot),
+    lotsInWindow,
+    barsInLot,
+    rule: "lot/shared-over-lots-in-window-then-bars-in-lot",
+  };
 }

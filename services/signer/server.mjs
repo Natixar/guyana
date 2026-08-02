@@ -78,7 +78,30 @@ export async function createApp({ signingKey, storeKey, taxonomy }) {
           // La méthode dit la vérité sur ce qu'elle a fait. `period` tant que
           // les événements matière n'existent pas ; `flow` le jour où ils
           // existent. Le passage devient lisible au lieu d'être silencieux.
+          //
           allocation: request.allocation ?? "period",
+          // DEUX ALLOCATIONS DISTINCTES, ET IL FAUT LES NOMMER SÉPARÉMENT.
+          // `allocation` dit comment le TEMPS a été alloué — par période tant
+          // que les événements matière n'existent pas, par flux le jour où ils
+          // existent. `lotRule` dit comment les émissions ont été réparties
+          // entre les LOTS et les barres. Les écrire dans le même champ ferait
+          // disparaître l'une des deux sans que rien ne le signale.
+          //
+          // LA RÈGLE VIENT DU VERDICT, PAS DE LA REQUÊTE : ce qui est écrit est
+          // le nom de la règle réellement appliquée. Recopier le nom fourni
+          // permettrait d'attester « lot » en ayant divisé autrement.
+          //
+          // LES DEUX DIVISEURS VOYAGENT, et c'est ce qui rend la règle
+          // vérifiable au lieu d'être seulement nommée. Sans eux, « réparti
+          // entre les lots vus » est une phrase ; avec eux, c'est une division
+          // qu'un tiers refait.
+          ...(verdict.alloc ? {
+            lotRule: verdict.alloc.rule,
+            divisors: {
+              lotsInWindow: verdict.alloc.lotsInWindow,
+              barsInLot: verdict.alloc.barsInLot,
+            },
+          } : {}),
           ...(request.eventModel ? { eventModel: request.eventModel } : {}),
         },
       });
