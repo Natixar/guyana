@@ -399,15 +399,39 @@ test("sélection — trois dispositions, dérivées et jamais saisies", () => {
 });
 
 test("sélection — une cellule écartée l'est POUR SON LOT, pas pour son mois", () => {
-  // Ce qui distingue la règle d'un filtre de dates : la barre B-1 retient
-  // février et écarte janvier, exactement à l'inverse de A-1, SUR LA MÊME
-  // extraction. Un filtre par mois ne saurait pas faire les deux.
-  const cells = [served("jan", 1, "2025-01"), served("fev", 1, "2025-02")];
-  const forA = disposeCells(cells, planForBar(ERP.bars[0], ERP));
-  const forB = disposeCells(cells, planForBar(ERP.bars[2], ERP));
-  if (forA[0].use !== "USED" || forA[1].use !== "EXCLUDED") return "A-1 mal classée";
-  if (forB[0].use !== "EXCLUDED" || forB[1].use !== "USED") return "B-1 mal classée";
-  return null;
+  // CE QUI DISTINGUE LA RÈGLE D'UN FILTRE DE DATES. Le MÊME mois de février,
+  // dans la MÊME extraction, est écarté pour A-1 et retenu pour B-1. Un filtre
+  // par dates ne saurait pas rendre deux réponses opposées sur une seule
+  // cellule ; c'est le lot, et lui seul, qui décide.
+  //
+  // Février est le seul mois que les deux fenêtres partagent — A-1 va de
+  // janvier à mars, B-1 de février à avril — et c'est donc le seul endroit où
+  // la comparaison a un sens. La version précédente de ce cas donnait à B-1 une
+  // cellule de janvier, hors de sa fenêtre : le magasin ne la lui servirait
+  // jamais, et la classer « écartée » plutôt que « partagée » aurait été une
+  // exigence inventée.
+  const fev = served("fev", 1, "2025-02");
+  const forA = disposeCells([fev], planForBar(ERP.bars[0], ERP));
+  const forB = disposeCells([fev], planForBar(ERP.bars[2], ERP));
+
+  if (forA[0].use !== "EXCLUDED") return `février pour A-1 : ${forA[0].use}`;
+  if (!forA[0].reason?.includes("LOT-B")) return `motif muet sur le lot : ${forA[0].reason}`;
+  if (forB[0].use !== "USED") return `février pour B-1 : ${forB[0].use}`;
+
+  // Et janvier, qui n'appartient qu'à la fenêtre de A-1, y est bien retenu.
+  const jan = disposeCells([served("jan", 1, "2025-01")], planForBar(ERP.bars[0], ERP));
+  return jan[0].use === "USED" ? null : `janvier pour A-1 : ${jan[0].use}`;
+});
+
+test("sélection — sur le chemin de la matière mais hors de tout lot, c'est du partagé", () => {
+  // Le cas de bord réel : la fenêtre du dernier lot déborde sur un mois qu'aucun
+  // lot ne produit. La cellule est bien sur le chemin de la matière, et pourtant
+  // personne ne la revendique. La faire disparaître réduirait le chiffre sans le
+  // dire ; elle est donc PARTAGÉE, avec son motif.
+  const plan = planForBar(ERP.bars[2], ERP);          // LOT-B : février à avril
+  const mars = disposeCells([served("mars", 1, "2025-03")], plan)[0];
+  if (mars.use !== "SHARED") return `mars pour B-1 : ${mars.use}`;
+  return mars.reason ? null : "une cellule partagée part sans motif";
 });
 
 test("sélection — le partagé se divise par les lots vus, puis par les barres", async () => {
@@ -523,7 +547,14 @@ test("moteur — chaque vecteur redonne le profil attendu", async () => {
 test("end to end — identity, pour, signed credential", async () => {
   const me = await fetchMe();
   const did = issuerDid(me);
-  if (!did) return "no issuer DID from /api/me";
+  // SANS OBJET N'EST PAS EN ÉCHEC, et la distinction n'est pas cosmétique.
+  // Ce cas signe au nom de la MINE ; un compte qui n'appartient à aucune
+  // organisation émettrice — l'exploitant de la plateforme, un vérificateur —
+  // n'a pas de DID d'émetteur, et c'est correct. Le peindre en rouge faisait
+  // ressembler une règle d'autorisation qui fonctionne à un produit cassé.
+  if (!did) {
+    return { skip: `${T.selftestNoIssuer} — ${me?.person?.name ?? "?"}` };
+  }
   const pour = await fetchPour();
   if (!pour) return "no pour from /api/pour";
 
@@ -933,14 +964,27 @@ async function wireReset() {
 document.addEventListener("DOMContentLoaded", async () => {
   const out = document.querySelector("[data-selftest]");
   if (!out) return;
-  let failed = 0;
+  // TROIS ISSUES, ET LA TROISIÈME EST NÉCESSAIRE. Un invariant peut ne pas
+  // s'appliquer au contexte du moment — le compte connecté n'est pas celui d'une
+  // organisation émettrice, par exemple. Ce n'est ni un succès, qui laisserait
+  // croire qu'on a contrôlé quelque chose, ni un échec, qui ferait ressembler
+  // une règle d'autorisation qui fonctionne à un produit cassé. Un cas rend
+  // `{skip: raison}` pour le dire.
+  let failed = 0, skipped = 0;
   for (const c of cases) {
     const li = document.createElement("div");
     let err;
     try { err = await c.fn(); } catch (e) { err = String(e); }
-    if (err) failed++;
-    li.innerHTML = `<span class="badge badge--${err ? "warning" : "verified"}">${err ? "fail" : "ok"}</span> ${c.name}` +
-                   (err ? `<div class="muted detail">${err}</div>` : "");
+
+    const skip = err && typeof err === "object" && err.skip;
+    if (skip) skipped++; else if (err) failed++;
+
+    const [kind, label, detail] = skip
+      ? ["pending", T.selftestSkipped, String(skip)]
+      : err ? ["warning", "fail", String(err)]
+            : ["verified", "ok", ""];
+    li.innerHTML = `<span class="badge badge--${kind}">${kind === "pending" ? T.selftestSkipped : label}</span> ${c.name}` +
+                   (detail ? `<div class="muted detail">${detail}</div>` : "");
     out.append(li);
   }
   const env = document.querySelector("[data-environment]");
@@ -956,7 +1000,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const s = document.querySelector("[data-selftest-summary]");
   if (s) {
-    s.textContent = failed ? `${failed} ${T.selftestFailed} / ${cases.length}` : `${cases.length} ${T.selftestPassed}`;
+    const tail = skipped ? ` — ${skipped} ${T.selftestSkippedCount}` : "";
+    s.textContent = (failed
+      ? `${failed} ${T.selftestFailed} / ${cases.length}`
+      : `${cases.length - skipped} ${T.selftestPassed}`) + tail;
     s.className = "badge badge--" + (failed ? "warning" : "verified");
   }
 });
