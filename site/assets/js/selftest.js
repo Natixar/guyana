@@ -20,6 +20,7 @@ import { allCredentials, putCredential, credentialsFor, credentialsByRef, creden
          orphanedCredentials, removeCredentials } from "./wallet.js";
 import { aggregate, allocateUnallocated } from "./engine.js";
 import { runVectors } from "./vectors.js";
+import { renderCertificates } from "./certificate-view.js";
 
 
 const cases = [];
@@ -527,6 +528,54 @@ test("a key belonging to another controller is rejected", async () => {
   doc.verificationMethod[0].controller = "did:web:elsewhere.example";
   const r = await verifyCredential(signed, doc);
   return r.ok ? "a key controlled by another party was accepted" : null;
+});
+
+test("a received certificate renders without executing what it carries", () => {
+  // Le document vient du réseau. Qu'il soit signé prouve son ORIGINE, pas son
+  // innocuité : l'émetteur peut être authentique et le contenu hostile, et une
+  // matrice comporte des champs libres — le motif d'exclusion en est un, saisi à
+  // la main. C'est la faute que CodeQL avait déjà trouvée sur la page barre, et
+  // elle est plus grave ici : la page qui affiche ceci détient la clé de
+  // signature de la mine.
+  const hostile = "<img src=x onerror=alert(1)>";
+  const html = renderCertificates([{
+    receivedAt: "2026-08-02T00:00:00Z",
+    document: {
+      type: ["VerifiableCredential", "CarbonIntensityCredential"],
+      issuer: hostile,
+      credentialSubject: {
+        method: { allocation: hostile },
+        breakdown: [{ step: 7, subPost: 1000, origin: "MEASURED", used: false, reason: hostile }],
+      },
+    },
+  }]);
+
+  if (html.includes("<img")) return "le contenu du document est passé tel quel dans le HTML";
+  if (!html.includes("&lt;img")) return "le contenu hostile a disparu au lieu d'être échappé";
+  return null;
+});
+
+test("a certificate says what it does NOT contain", () => {
+  // Une attestation déposée porte les engagements, jamais les montants. L'écran
+  // doit le DIRE : un tableau muet sur ce point se lit comme un affichage
+  // tronqué, et le porteur croirait à une panne là où il y a une propriété.
+  const html = renderCertificates([{
+    receivedAt: "2026-08-02T00:00:00Z",
+    document: {
+      type: ["VerifiableCredential", "CarbonIntensityCredential"],
+      issuer: "did:web:natixar.pro",
+      credentialSubject: {
+        breakdown: [
+          { step: 7, subPost: 1000, origin: "MEASURED" },
+          { step: 9, subPost: 1005, origin: "MEASURED", used: false, reason: "outside the pilot window" },
+        ],
+      },
+    },
+  }]);
+
+  if (!html.includes("2 cells")) return "le dénombrement des cellules manque";
+  if (!html.includes("outside the pilot window")) return "le motif d'exclusion ne voyage pas jusqu'à l'écran";
+  return null;
 });
 
 test("did:web resolves to the right URL", () => {
