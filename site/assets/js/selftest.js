@@ -257,18 +257,25 @@ test("portefeuille — une attestation sans sujet est refusée", async () => {
 test("portefeuille — l'auto-test ne laisse pas ses attestations derrière lui", async () => {
   // Les cas ci-dessus écrivent réellement. Les retirer ici garde la promesse de
   // la page : on ne laisse rien qu'on n'ait trouvé.
+  //
+  // PAR LA FONCTION DU MODULE, ET NON PAR UNE SUPPRESSION RECOPIÉE ICI. Ce cas
+  // reconstruisait la clé de rangement de son côté ; il avait donc sa propre
+  // idée du schéma, et elle cessait d'être vraie dès qu'un enregistrement venait
+  // d'une version antérieure. Le nettoyage exerce maintenant le chemin que le
+  // panneau de réinitialisation emprunte — s'il échoue, c'est le produit qui est
+  // en cause, pas l'auto-test.
   const before = await allCredentials();
   const mine = before.filter((r) => r.subject === "urn:aurora:dore:selftest");
   if (mine.length === 0) return null;
-  const { STORES, openDb, tx } = await import("./idb.js");
-  const db = await openDb();
-  for (const r of mine) {
-    await tx(db, STORES.CREDENTIALS, "readwrite", (s) => s.delete(`${r.subject}${r.type}`));
-  }
-  db.close();
+  await removeCredentials(mine);
   const after = await allCredentials();
-  return after.some((r) => r.subject === "urn:aurora:dore:selftest")
-    ? "des attestations d'auto-test subsistent" : null;
+  const left = after.filter((r) => r.subject === "urn:aurora:dore:selftest");
+  // Le compte et les clés survivantes, parce qu'un message qui dit seulement
+  // « il en reste » n'apprend rien à qui doit décider quoi corriger.
+  return left.length
+    ? `des attestations d'auto-test subsistent : ${left.length} — clés ${
+        left.map((r) => JSON.stringify(r.key ?? null)).join(", ")}`
+    : null;
 });
 
 // --- Le moteur, côté navigateur (#66) -------------------------------------
