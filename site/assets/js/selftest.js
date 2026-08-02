@@ -243,6 +243,32 @@ test("portefeuille — une réémission remplace au lieu d'accumuler", async () 
     ? null : "le portefeuille détient une version périmée";
 });
 
+test("portefeuille — les divulgations survivent à un rechargement", async () => {
+  // LE DÉFAUT DU 3 AOÛT. Elles ne vivaient que dans une variable de page : un
+  // rechargement les perdait, et la matrice s'affichait en tirets — un calcul
+  // signé dont plus une ligne n'était lisible. Le porteur ne pouvait plus
+  // regarder ce que Natixar avait fait sur SA barre, ce qui est la raison
+  // d'être de cet écran.
+  //
+  // Ce cas relit par une AUTRE connexion que celle qui a écrit : c'est la
+  // seule façon de constater la durabilité plutôt que de la supposer.
+  const disclosures = [{ index: 0, salt: "ab", subPost: 1000, amount: 42, share: 0.5 }];
+  await putCredential(CARBON, "pour-selftest-01", { disclosures, totalSalt: "cd" });
+  const held = (await credentialsByRef("pour-selftest-01")).CarbonIntensityCredential;
+  if (!held?.disclosures) return "les divulgations ne sont pas rangées";
+  if (held.disclosures[0].amount !== 42) return "le montant divulgué a changé en route";
+  if (held.totalSalt !== "cd") return "le sel du total ne survit pas";
+  return null;
+});
+
+test("portefeuille — une attestation sans divulgation n'en invente pas", async () => {
+  // Une attestation d'origine n'en a pas : le champ doit rester absent plutôt
+  // que vide, sinon l'écran croirait détenir une matrice ouverte et vide.
+  await putCredential(ORIGIN, "pour-selftest-02");
+  const held = (await credentialsByRef("pour-selftest-02")).DoreBarOriginCredential;
+  return held && !("disclosures" in held) ? null : "un champ vide a été inventé";
+});
+
 test("portefeuille — la référence locale retrouve une coulée, là où le sujet ne le peut pas", async () => {
   // L'identifiant de sujet est un aléa tiré au moment de signer : après un
   // rechargement, rien ne relierait une coulée à son attestation sans cet index.

@@ -19,7 +19,7 @@
  * fois, depuis le côté de la mine.
  */
 import T from "./labels.js";
-import { credentialsByRef, putCredential } from "./wallet.js";
+import { credentialsByRef, putCredential, credentialType as credentialTypeOf } from "./wallet.js";
 import { renderCertificates } from "./certificate-view.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
 import { formatMass } from "./mass.js";
@@ -214,9 +214,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     // LES LIBELLÉS SONT CONFRONTÉS À LA VERSION QUE L'ATTESTATION DÉCLARE.
     // Un libellé emprunté à une autre version se lirait comme une information
     // alors qu'il serait une supposition.
+    //
+    // ON LES RELIT DU PORTEFEUILLE, et non d'une variable de page : celle-ci ne
+    // survivait pas à un rechargement, et l'écran affichait alors une matrice de
+    // tirets — un calcul signé dont plus une ligne n'était lisible. Le
+    // rapprochement se fait par TYPE, la seule clé que les deux côtés
+    // partagent : le magasin calcule sa propre empreinte, et rien ne garantit
+    // qu'elle coïncide avec la nôtre.
     const declared = foreign[0]?.document?.credentialSubject?.method?.taxonomy;
+    const withLocal = foreign.map((r) => {
+      const held = current[r?.type ?? credentialTypeOf(r?.document)];
+      return held?.disclosures ? { ...r, disclosures: held.disclosures } : r;
+    });
     certificatesBody.innerHTML = renderCertificates(
-      foreign, ctx.carbon?.byDigest ?? {}, applyTo(labels, declared));
+      withLocal, {}, applyTo(labels, declared));
 
     // Le carbone se demande une fois l'origine signée : `derivedFrom` la
     // désigne par empreinte, et sans elle l'intensité flotterait sur un
@@ -314,9 +325,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       // Rangée avant tout affichage : une attestation reçue puis perdue parce
       // que le dépôt a échoué serait le pire des deux.
-      const stored = await putCredential(out.credential, bar.internalId);
-      const byDigest = { ...(ctx.carbon?.byDigest ?? {}),
-                         [stored.digest]: out.disclosures };
+      await putCredential(out.credential, bar.internalId,
+                          { disclosures: out.disclosures, totalSalt: out.totalSalt });
       const deposited = await depositCredential(out.credential);
 
       // La présentation — attestation, divulgations, sel du total — sous la
@@ -333,7 +343,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       carbonLink.hidden = false;
 
       ctx.carbon = {
-        byDigest,
         text: `${T.barCarbonDone} — ${T.barCarbonCounts
           .replace("{served}", String(out.cellsServed))
           .replace("{used}", String(out.counts.USED))

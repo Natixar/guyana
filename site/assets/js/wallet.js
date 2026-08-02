@@ -46,7 +46,7 @@ async function digestOf(doc) {
  * au magasin, qui garde toutes les versions ; un portefeuille qui accumulerait
  * des versions périmées ferait douter l'opérateur de laquelle présenter.
  */
-export async function putCredential(doc, ref = null) {
+export async function putCredential(doc, ref = null, extras = {}) {
   const subject = doc?.credentialSubject?.id;
   if (!subject) {
     const err = new Error("credential has no credentialSubject.id");
@@ -65,6 +65,20 @@ export async function putCredential(doc, ref = null) {
     digest: await digestOf(doc),
     storedAt: new Date().toISOString(),
     document: doc,
+    // LES DIVULGATIONS SE RANGENT AVEC L'ATTESTATION, et c'est une correction
+    // du 3 août 2026. Elles ne vivaient que dans une variable de page : un
+    // rechargement les perdait, et l'écran affichait alors une matrice de
+    // tirets — un calcul signé dont plus une ligne n'était lisible. Le porteur
+    // ne pouvait plus regarder ce que Natixar avait fait sur SA barre, ce qui
+    // est très exactement la raison d'être de cet écran.
+    //
+    // ELLES NE PARTENT TOUJOURS PAS AU MAGASIN. Le dépôt n'envoie que
+    // l'attestation — des engagements scellés. Les montants et leurs sels
+    // restent dans ce navigateur, à côté de la clé, et c'est ce qui laisse au
+    // porteur le droit d'en retirer avant de présenter, sans toucher à un octet
+    // de ce qui a été signé. « Local » veut dire durable, pas éphémère.
+    ...(extras.disclosures ? { disclosures: extras.disclosures } : {}),
+    ...(extras.totalSalt ? { totalSalt: extras.totalSalt } : {}),
   };
   const db = await openDb();
   await tx(db, STORES.CREDENTIALS, "readwrite", (s) => s.put(record, slot(subject, type)));
