@@ -60,6 +60,31 @@ export async function createKeyPair() {
 }
 
 /**
+ * Supprime la clé, et RIEN D'AUTRE.
+ *
+ * RÉVISION DU 2 AOÛT 2026, sur revue de la PR #70. La règle précédente —
+ * « supprimer la clé efface toutes les attestations qu'elle a signées » —
+ * partait d'une bonne intention et se trompait de geste. Supprimer la clé
+ * garantit qu'aucune attestation NOUVELLE ne peut être émise : c'est une
+ * rotation. Ce n'est pas une raison de détruire les documents déjà émis, qui
+ * restent parfaitement vérifiables tant que leur clé publique figure dans le
+ * document DID publié — et le document DID est justement fait pour ne jamais
+ * perdre une clé.
+ *
+ * Effacer les attestations est une action SÉPARÉE et facultative, qui relève de
+ * la surveillance de compromission. Elle a donc sa propre case à cocher, et son
+ * propre critère : est orpheline une attestation dont la clé de signature ne
+ * figure plus dans le DID installé. Rien à voir avec la clé qu'on efface ici.
+ */
+export async function deleteKeyPair() {
+  if (!(await databaseExists())) return false;
+  const db = await openDb();
+  await tx(db, STORES.KEYS, "readwrite", (s) => s.delete(KEY_ID));
+  db.close();
+  return true;
+}
+
+/**
  * Paire jetable, en mémoire, jamais écrite dans IndexedDB.
  *
  * Destinée aux diagnostics. Une page d'auto-vérification qui provisionnerait la

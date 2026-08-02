@@ -48,8 +48,17 @@ async function call(path, body) {
 
 const CELL = {
   id: "c1", subPost: 1000, partType: 1, caracterisation: 1,
-  // Un mètre cube de gazole, 2 680 kgCO2e. Mille m3 seraient absurdes,
-  // et un gabarit invraisemblable rend illisible ce que le cas mesure.
+  // Un mètre cube de gazole, 2 680 kgCO2e.
+  //
+  // LE FACTEUR EST DÉJÀ EN SI, et c'est ce que le chiffre 2680 dit. La feuille 9
+  // du paquet AGM le donne à 2,68 kgCO2e/L parce que les bons de sortie comptent
+  // en litres ; un mètre cube en contient mille, donc le facteur se MULTIPLIE
+  // par mille en franchissant la frontière — 2,68 kgCO2e/L = 2 680 kgCO2e/m3.
+  // La conversion a lieu une seule fois, dans `load_2025.py`, et jamais ici.
+  //
+  // Le contrôle qui le rend indiscutable est dimensionnel : l'émission vaut
+  // `value × factor`, donc m3 × kgCO2e/m3 = kgCO2e. Un facteur laissé en
+  // kgCO2e/L donnerait des kgCO2e mille fois trop petits sous le même nom.
   value: 1, unit: "m3", factor: 2680, origin: "MEASURED",
 };
 
@@ -69,6 +78,16 @@ async function request(over = {}) {
     derivedFrom: { id: "urn:aurora:dore:0123456789abcdef", digestMultibase: "zAbC" },
     extraction: await signedExtraction([CELL]),
     dispositions: [{ id: "c1", use: "USED" }],
+    // LE DÉNOMINATEUR EST CE PAR QUOI ON DIVISE POUR OBTENIR UNE INTENSITÉ :
+    // ici la masse d'or fin du lingot, en kilogrammes. Deux kilogrammes est un
+    // chiffre rond choisi pour que l'arithmétique du test se lise à l'œil, pas
+    // un lingot plausible — une barre d'AGM en porte environ 11,7.
+    //
+    // 2 680 kgCO2e / 2 kg = 1 340 kgCO2e/kg, et c'est `value`. L'unité de
+    // l'intensité n'est jamais déclarée : le signataire la DÉRIVE en
+    // `kgCO2e/${denominatorUnit}`, ce qui est la correction de 90be1a8 — un
+    // chiffre qui porte une unité que personne n'a voulue est le défaut que
+    // `denominatorUnit` existe pour rendre impossible.
     denominator: 2,
     denominatorUnit: "kg",
     value: 1340,

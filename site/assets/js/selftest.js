@@ -7,16 +7,17 @@
 import T from "./labels.js";
 import { canonicalize } from "./canonical.js";
 import { base58btcEncode } from "./multibase.js";
-import { ephemeralKeyPair, loadKeyPair, publicJwk, thumbprint, readable, sign, verify } from "./keys.js";
+import { ephemeralKeyPair, loadKeyPair, deleteKeyPair, publicJwk, thumbprint, readable, sign, verify } from "./keys.js";
 import { buildCredential, signCredential, newSubjectId } from "./credential.js";
 import { fetchPour, operatorClaims } from "./pour.js";
 import { barClaims } from "./bar-claims.js";
 import { fetchMe, issuerDid } from "./me.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
 import { buildDidDocument, verificationMethodId } from "./did.js";
+import { wireDidMerge } from "./did-merge.js";
 import { signBlocker, signView } from "./sign-state.js";
-import { deleteDatabase } from "./idb.js";
-import { allCredentials, putCredential, credentialsFor, credentialsByRef, credentialType } from "./wallet.js";
+import { allCredentials, putCredential, credentialsFor, credentialsByRef, credentialType,
+         orphanedCredentials, removeCredentials } from "./wallet.js";
 import { aggregate, allocateUnallocated } from "./engine.js";
 import { runVectors } from "./vectors.js";
 
@@ -165,6 +166,50 @@ const CARBON = {
   credentialSubject: { id: "urn:aurora:dore:selftest" },
   proof: { proofValue: "zCARBON" },
 };
+
+// --- Ce qui est orphelin, et contre quoi cela se juge (revue PR #70) ------
+// La règle précédente effaçait les attestations avec la clé. Elle se trompait
+// de geste : supprimer la clé est une rotation, et une attestation reste
+// vérifiable tant que sa clé publique figure dans le document DID publié.
+
+const DID_WITH = (ids) => ({
+  id: "did:web:guygold.com",
+  verificationMethod: ids.map((id) => ({ id, type: "JsonWebKey" })),
+});
+
+const SIGNED_BY = (method) => ({
+  type: ["VerifiableCredential", "DoreBarOriginCredential"],
+  credentialSubject: { id: "urn:aurora:dore:orphan-" + method.slice(-4) },
+  proof: { verificationMethod: method, proofValue: "zX" },
+});
+
+test("orphelines — une clé toujours publiée ne rend rien orphelin", async () => {
+  const method = "did:web:guygold.com#AAAA";
+  await putCredential(SIGNED_BY(method), "orphan-test-1");
+  const orphans = await orphanedCredentials(DID_WITH([method]));
+  const mine = orphans.filter((r) => r.ref === "orphan-test-1");
+  await removeCredentials(await allCredentials().then((a) => a.filter((r) => r.ref === "orphan-test-1")));
+  return mine.length === 0 ? null : "une attestation encore publiée est comptée orpheline";
+});
+
+test("orphelines — une clé retirée du document publié le devient", async () => {
+  const method = "did:web:guygold.com#BBBB";
+  await putCredential(SIGNED_BY(method), "orphan-test-2");
+  const orphans = await orphanedCredentials(DID_WITH(["did:web:guygold.com#CCCC"]));
+  const mine = orphans.filter((r) => r.ref === "orphan-test-2");
+  await removeCredentials(await allCredentials().then((a) => a.filter((r) => r.ref === "orphan-test-2")));
+  return mine.length === 1 ? null : "une attestation dont la clé a disparu n'est pas signalée";
+});
+
+test("orphelines — sans document installé, on ne propose RIEN", async () => {
+  const method = "did:web:guygold.com#DDDD";
+  await putCredential(SIGNED_BY(method), "orphan-test-3");
+  // Ne pas savoir n'est pas savoir que rien ne vaut. Proposer d'effacer sur une
+  // ignorance serait le pire des deux.
+  const orphans = await orphanedCredentials(null);
+  await removeCredentials(await allCredentials().then((a) => a.filter((r) => r.ref === "orphan-test-3")));
+  return orphans.length === 0 ? null : `${orphans.length} proposées sans document installé`;
+});
 
 test("portefeuille — le type significatif est extrait, pas le générique", () => {
   if (credentialType(ORIGIN) !== "DoreBarOriginCredential") return "type d'origine mal lu";
@@ -535,6 +580,30 @@ async function environmentReport() {
 
 function expect(got, want) { return got === want ? null : `attendu ${want}, obtenu ${got}`; }
 
+/**
+ * La suppression de clé — et ce qu'elle n'emporte PAS.
+ *
+ * RÉVISION DU 2 AOÛT 2026 (revue de la PR #70). Supprimer la clé est une
+ * ROTATION : elle garantit qu'aucune attestation nouvelle ne sera émise, et
+ * rien de plus. Les attestations déjà signées restent vérifiables tant que leur
+ * clé publique figure dans le document DID publié, et ce document est fait pour
+ * ne jamais perdre une clé. Les détruire au passage était un geste de trop.
+ *
+ * Effacer des attestations devient donc une action distincte, facultative, et
+ * qui repose sur un fait extérieur : le DID INSTALLÉ. Une attestation est
+ * orpheline quand la clé qui l'a signée ne figure plus dans ce document — ce
+ * qui peut arriver sans que ce navigateur ait rien fait, et ne peut pas se
+ * déduire de la clé qu'on s'apprête à supprimer.
+ *
+ * D'où le fait de demander le document, comme la page de création de clé le
+ * fait déjà. Si l'exploitant refuse le nettoyage, les mêmes attestations
+ * resteront candidates la fois suivante : l'état n'est pas dans une décision
+ * passée, il se recalcule contre le document du jour.
+ *
+ * La seconde case existe pour le cas où le document est inaccessible. Elle
+ * autorise la suppression de la clé SANS contrôle — et alors aucune attestation
+ * n'est touchée, puisque rien ne permet de dire laquelle serait orpheline.
+ */
 async function wireReset() {
   const btn = document.querySelector("[data-reset]");
   const status = document.querySelector("[data-reset-status]");
@@ -551,18 +620,62 @@ async function wireReset() {
   const expected = stored ? readable(await thumbprint(stored)) : null;
   if (!stored) { btn.disabled = true; if (status) status.textContent = T.resetNoKey; return; }
 
-  btn.disabled = false;
+  const orphanBox = document.querySelector("[data-reset-orphans]");
+  const orphanCount = document.querySelector("[data-reset-orphan-count]");
+  const forceBox = document.querySelector("[data-reset-force]");
+  const merge = wireDidMerge(document, () => issuerDid(me));
+
+  /**
+   * Un seul écrivain de l'état du panneau, comme partout ailleurs depuis #64.
+   *
+   * Le compte d'orphelines se recalcule à chaque passage plutôt que d'être
+   * retenu : il dépend du document chargé, qui peut changer entre deux clics.
+   */
+  async function refresh() {
+    const installed = merge.previous();
+    const orphans = await orphanedCredentials(installed);
+
+    if (orphanCount) {
+      orphanCount.textContent = installed ? String(orphans.length) : "—";
+    }
+    if (orphanBox) {
+      // Sans document installé, la question n'a pas de réponse : on ne propose
+      // pas d'effacer sur une ignorance.
+      orphanBox.disabled = !installed || orphans.length === 0;
+      if (!installed || orphans.length === 0) orphanBox.checked = false;
+    }
+    // La clé ne se supprime qu'avec un document en main, ou en forçant.
+    btn.disabled = !installed && !forceBox?.checked;
+    if (status && !installed) {
+      status.textContent = forceBox?.checked ? T.resetForced : T.resetNeedsDid;
+    } else if (status && installed) {
+      status.textContent = "";
+    }
+    return orphans;
+  }
+
+  document.querySelector("[data-did-previous-file]")
+    ?.addEventListener("change", () => setTimeout(refresh, 0));
+  document.querySelector("[data-did-previous-text]")
+    ?.addEventListener("input", () => setTimeout(refresh, 0));
+  forceBox?.addEventListener("change", refresh);
+  await refresh();
+
   btn.addEventListener("click", async () => {
     const input = document.querySelector("[data-reset-confirm]");
     if (input?.value.trim() !== expected) {
       if (status) status.textContent = T.resetMismatch;
       return;
     }
-    // Supprime la base entière : la clé ET les attestations qu'elle a signées.
-    // C'est la règle produit, et elle tient par colocalisation plutôt que par
-    // deux effacements dont on pourrait en oublier un.
-    await deleteDatabase().catch(() => {});
-    if (status) status.textContent = T.resetDone;
+
+    const orphans = await refresh();
+    let removed = 0;
+    if (orphanBox?.checked && orphans.length) removed = await removeCredentials(orphans);
+
+    // LA CLÉ SEULEMENT. Le portefeuille survit à la rotation, et c'est le point
+    // de toute cette révision.
+    await deleteKeyPair().catch(() => {});
+    if (status) status.textContent = `${T.resetDone} — ${removed} ${T.resetRemoved}`;
     btn.disabled = true;
     // replace() plutôt que href : le retour arrière ne doit pas ramener sur
     // une page qui prétend encore qu'une clé existe.

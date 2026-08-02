@@ -98,6 +98,49 @@ export async function credentialsByRef(ref) {
   return Object.fromEntries(all.filter((r) => r.ref === ref).map((r) => [r.type, r]));
 }
 
+/**
+ * Les attestations que le DID installé ne peut plus vérifier.
+ *
+ * ORPHELINE SE JUGE CONTRE LE DOCUMENT PUBLIÉ, PAS CONTRE LA CLÉ LOCALE. Une
+ * attestation reste vérifiable tant que la clé qui l'a signée figure dans le
+ * document DID de l'émetteur — c'est toute la raison pour laquelle ce document
+ * est append-only. Elle devient orpheline le jour où cette clé n'y est plus, et
+ * cela peut arriver sans que le navigateur qui la détient ait rien fait.
+ *
+ * Le critère est donc le `verificationMethod` de la preuve : présent dans le
+ * document installé, l'attestation se situe ; absent, personne ne peut plus
+ * dire d'où elle vient.
+ *
+ * Sans document installé on ne rend RIEN plutôt que tout : ne pas savoir n'est
+ * pas la même chose que savoir que rien ne vaut, et proposer d'effacer sur une
+ * ignorance serait le pire des deux.
+ *
+ * @param {object|null} didDocument le `did.json` publié, chargé par l'exploitant
+ * @returns {Promise<Array<object>>}
+ */
+export async function orphanedCredentials(didDocument) {
+  if (!didDocument) return [];
+  const known = new Set((didDocument.verificationMethod ?? []).map((m) => m.id));
+  const all = await allCredentials();
+  return all.filter((r) => {
+    const method = r.document?.proof?.verificationMethod;
+    // Une attestation sans méthode déclarée ne se rattache à aucune clé : elle
+    // est orpheline par construction, et le rester silencieusement serait pire.
+    return !method || !known.has(method);
+  });
+}
+
+/** Retire des attestations, une à une, par leur clé de rangement. */
+export async function removeCredentials(records) {
+  if (!records.length) return 0;
+  const db = await openDb();
+  for (const r of records) {
+    await tx(db, STORES.CREDENTIALS, "readwrite", (s) => s.delete(slot(r.subject, r.type)));
+  }
+  db.close();
+  return records.length;
+}
+
 /** Combien d'attestations, par type. Pour un registre qui compte sans tout charger. */
 export async function summary() {
   const all = await allCredentials();
