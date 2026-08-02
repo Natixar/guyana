@@ -19,6 +19,10 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+import contextlib
+import logging
+import time
+
 from cryptography.hazmat.primitives import serialization
 from fastapi import FastAPI, Header, HTTPException, Request
 from psycopg.types.range import Range
@@ -26,7 +30,72 @@ from psycopg.types.range import Range
 import db
 from signing import sign_payload
 
-app = FastAPI(title="Aurora — magasin", docs_url=None, redoc_url=None)
+#: Un journal à nous, et raccordé à la main.
+#:
+#: uvicorn configure SES loggers et pas les nôtres : sans ce raccordement, la
+#: ligne « schéma appliqué » n'apparaissait nulle part. Une migration qui
+#: s'exécute sans laisser de trace est exactement ce que ce module reproche à
+#: l'ancien fonctionnement — on ne saurait pas la distinguer d'une migration qui
+#: ne s'exécute pas. Constaté sur kubb le 2 août, après l'avoir écrite.
+log = logging.getLogger("store")
+if not log.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s — %(message)s"))
+    log.addHandler(_handler)
+    log.setLevel(logging.INFO)
+
+#: Combien de temps attendre PostgreSQL au démarrage, et pourquoi c'est borné.
+#:
+#: Le magasin et la base démarrent ensemble ; le premier est prêt avant la
+#: seconde à peu près une fois sur deux. Réessayer est donc normal. Réessayer
+#: SANS FIN ne l'est pas : un conteneur qui boucle en silence sur une base
+#: injoignable ressemble à un conteneur qui démarre lentement, et la panne
+#: n'apparaît que le jour où quelqu'un interroge l'API.
+SCHEMA_ATTEMPTS = 30
+SCHEMA_DELAY_S = 2
+
+
+@contextlib.asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Applique le schéma avant de servir la première requête.
+
+    POURQUOI ICI ET NON DANS LE DÉPLOIEMENT. Le schéma appartient à la VERSION DU
+    CODE : `schema.sql` voyage dans l'image, à côté des requêtes qui en
+    dépendent. L'appliquer au démarrage rend impossible qu'ils divergent — une
+    image déployée trouve toujours la base que ses requêtes attendent.
+
+    Un pas de déploiement l'aurait fait aussi, et une fois. Mais il se saute :
+    `deploy.sh` sait n'exécuter qu'une étape, un conteneur se relance à la main,
+    et alors la garantie tombe. Le 2 août 2026, `/api/v1/me` a répondu 500 en
+    production parce que `db.apply_schema` n'était appelé que par le chargeur de
+    données — un script que rien n'oblige à passer après un déploiement.
+
+    C'est possible sans changer de privilèges : `schema.sql` est idempotent par
+    construction — `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS` — et
+    l'utilisateur applicatif possède déjà la base.
+
+    ÉCHOUER FORT PLUTÔT QUE SERVIR À MOITIÉ. Un magasin qui sert avec un schéma
+    périmé rend des 500 sur une partie des routes, ce qui ressemble à un défaut
+    applicatif et se cherche au mauvais endroit. Après SCHEMA_ATTEMPTS, on lève :
+    le conteneur s'arrête, Docker le relance, et la boucle est visible.
+    """
+    last = None
+    for attempt in range(1, SCHEMA_ATTEMPTS + 1):
+        try:
+            with db.connect() as conn:
+                db.apply_schema(conn)
+            log.info("schéma appliqué (tentative %d)", attempt)
+            break
+        except Exception as exc:                      # noqa: BLE001
+            last = exc
+            log.warning("base pas prête (%d/%d) : %s", attempt, SCHEMA_ATTEMPTS, exc)
+            time.sleep(SCHEMA_DELAY_S)
+    else:
+        raise RuntimeError(f"schéma non appliqué après {SCHEMA_ATTEMPTS} tentatives") from last
+    yield
+
+
+app = FastAPI(title="Aurora — magasin", docs_url=None, redoc_url=None, lifespan=lifespan)
 
 #: LES RÔLES, ET CE QU'ILS PEUVENT ATTEINDRE.
 #:
@@ -59,6 +128,20 @@ ROLES = {
     # depuis le domaine de l'émetteur, signature, recalcul. Lui ouvrir le cube
     # lui donnerait le rythme de production d'AGM en prime.
     "demo": set(),
+}
+
+#: À quelle organisation appartient un compte.
+#:
+#: L'IDENTITÉ QUE LE FRONT SIGNE VIENT D'ICI, pas d'une variable d'environnement.
+#: `STORE_ISSUER_DID` désigne l'émetteur de CE service — Natixar, qui signe les
+#: attestations carbone. Ce n'est pas le même DID que celui de la mine, et les
+#: confondre faisait signer les attestations d'origine au nom du calculateur.
+#:
+#: La plateforme héberge plusieurs clients ; une variable par processus ne
+#: saurait en désigner qu'un. L'appartenance est donc une donnée, et le DID vit
+#: dans la taxonomie du client, sur son organisation de tête.
+ORGANISATION_OF = {
+    "agm-randy": 100,
 }
 
 
@@ -99,18 +182,45 @@ def healthz() -> dict:
     return {"ok": True}
 
 
+def _organisation(user: str | None) -> dict | None:
+    """L'organisation du porteur, lue dans sa propre taxonomie."""
+    entity_id = ORGANISATION_OF.get(user or "")
+    if entity_id is None:
+        return None
+    with db.connect() as conn:
+        row = conn.execute(
+            "SELECT id, label AS name, did, legal_name AS \"legalName\", "
+            "       jurisdiction, registered_office AS \"registeredOffice\" "
+            "  FROM entity WHERE id = %s",
+            (entity_id,),
+        ).fetchone()
+    return row
+
+
 @app.get("/api/v1/me")
 def me(x_webauth_user: str | None = Header(default=None)) -> dict:
     """L'identité vient de Traefik, jamais du client.
 
     Répondre `authenticated: false` n'est pas une panne : c'est la page qui dit
     la vérité sur son état. Le bandeau de mode dégradé en découle.
+
+    LE CONTRAT EST CELUI QUE LE FRONT A ÉCRIT EN PREMIER. `me.js` dit depuis le
+    début : « Aujourd'hui /api/me est un fichier statique. Demain c'est un point
+    d'entrée qui interroge FusionAuth. La page ne verra pas la différence. » Ce
+    service avait divergé — il rendait `issuer.did` là où le front lit
+    `organisation.did`, et ce DID était celui de Natixar. Résultat sur kubb :
+    « No organisation identity available — signing is disabled », partout, et
+    aucune signature possible. `issuer` reste, il désigne l'émetteur du chiffre
+    carbone ; `organisation` désigne celui qui signe l'origine, et ce sont deux
+    personnes morales différentes.
     """
     if not x_webauth_user:
-        return {"authenticated": False, "issuer": {"did": ISSUER_DID}}
+        return {"authenticated": False, "organisation": None,
+                "issuer": {"did": ISSUER_DID}}
     return {
         "authenticated": True,
         "person": {"id": x_webauth_user, "name": x_webauth_user},
+        "organisation": _organisation(x_webauth_user),
         # Ce que le porteur peut atteindre. Le menu s'en déduit, mais c'est le
         # service qui tranche : la liste est descriptive, pas normative.
         "grants": sorted(_grants(x_webauth_user)),

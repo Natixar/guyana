@@ -55,6 +55,26 @@ for domain in $APP_DOMAINS; do
   labels+=( --label "traefik.http.routers.${r}.priority=10" )
 done
 
+# La coulée d'exemple est SERVIE PAR LE SITE, et il faut un routeur exact pour
+# la lui rendre. `/api/v1` part au magasin en priorité 1000, ce qui emporte
+# aussi `/api/v1/pour` — que le magasin n'expose pas, et à juste titre : c'est
+# une donnée de démonstration, pas un état du cube. Le résultat en ligne était
+# un 404 là où le front attend une coulée, donc « No pour awaiting
+# confirmation » et un bouton de confirmation grisé.
+#
+# Un chemin EXACT et une priorité au-dessus du magasin, sur le modèle du
+# signataire qui bat déjà le magasin sur /api/v1/sign. On n'affaiblit pas la
+# règle du magasin : on nomme l'exception, et `verify-http.bats` l'affirme.
+for domain in $APP_DOMAINS; do
+  r="${ROUTER_PREFIX}-pour"
+  labels+=( --label "traefik.http.routers.${r}.rule=Host(\`${domain}\`) && Path(\`/api/v1/pour\`)" )
+  labels+=( --label "traefik.http.routers.${r}.entrypoints=websecure" )
+  labels+=( --label "traefik.http.routers.${r}.tls=true" )
+  labels+=( --label "traefik.http.routers.${r}.middlewares=${mw}" )
+  labels+=( --label "traefik.http.routers.${r}.priority=3000" )
+  break                       # le domaine de référence suffit : un seul routeur
+done
+
 # Routeur générique : rend le service indifférent au domaine, ce qui permet de
 # basculer sur un nom dont le certificat est encore valide sans redéployer.
 # Ce n'est PAS un repli TLS : le certificat suit toujours le SNI demandé.

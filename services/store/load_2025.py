@@ -109,6 +109,10 @@ HEAD = {
     "jurisdiction": "Co-operative Republic of Guyana",
     "registered_office": ("3rd Floor R & S Mall Apartment District Track "
                           "JW Mandela Avenue, Durban Backlands, Georgetown, Guyana"),
+    # Le domaine est celui de la mine, et elle le contrôle — décision 4 du
+    # script de tournage, tranchée le 1er août. C'est ce DID que le front
+    # inscrit comme émetteur des attestations d'origine.
+    "did": "did:web:guygold.com",
 }
 
 #: Les règles de calcul qui exigent PLUSIEURS grandeurs.
@@ -320,13 +324,14 @@ def load(conn, cells, org) -> None:
     # étrangère et fait avorter le chargement entier.
     conn.execute(
         """INSERT INTO entity (id, label, industrial, legal_name, jurisdiction,
-                               registered_office)
+                               registered_office, did)
                 VALUES (%(id)s, %(key)s, %(industrial)s, %(legal_name)s,
-                        %(jurisdiction)s, %(registered_office)s)
+                        %(jurisdiction)s, %(registered_office)s, %(did)s)
            ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label,
                 industrial = EXCLUDED.industrial, legal_name = EXCLUDED.legal_name,
                 jurisdiction = EXCLUDED.jurisdiction,
-                registered_office = EXCLUDED.registered_office""",
+                registered_office = EXCLUDED.registered_office,
+                did = EXCLUDED.did""",
         HEAD,
     )
     with conn.cursor() as cur:
@@ -385,14 +390,14 @@ def emit_sql(cells, org) -> None:
               "ON CONFLICT (id) DO UPDATE SET symbol = EXCLUDED.symbol;")
     # La tête d'abord : `parent` la référence.
     print("INSERT INTO entity (id, label, industrial, legal_name, jurisdiction, "
-          "registered_office) VALUES "
+          "registered_office, did) VALUES "
           f"({HEAD['id']}, {sql_literal(HEAD['key'])}, {sql_literal(HEAD['industrial'])}, "
           f"{sql_literal(HEAD['legal_name'])}, {sql_literal(HEAD['jurisdiction'])}, "
-          f"{sql_literal(HEAD['registered_office'])}) "
+          f"{sql_literal(HEAD['registered_office'])}, {sql_literal(HEAD['did'])}) "
           "ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label, "
           "industrial = EXCLUDED.industrial, legal_name = EXCLUDED.legal_name, "
           "jurisdiction = EXCLUDED.jurisdiction, "
-          "registered_office = EXCLUDED.registered_office;")
+          "registered_office = EXCLUDED.registered_office, did = EXCLUDED.did;")
     for d in org.values():
         print(f"INSERT INTO entity (id, label, parent, industrial) VALUES "
               f"({d['id']}, {sql_literal(d['key'])}, {sql_literal(d['parent'])}, "

@@ -323,6 +323,37 @@ def test_a_client_never_learns_who_else_is_on_the_platform(conn, client):
     assert _as(client, "natixar", "/api/v1/counts").json()["byOrganisation"]
 
 
+def test_me_names_the_organisation_that_signs_origins(conn, client):
+    """Le contrat que le front a écrit en premier : `organisation.did`.
+
+    Ce service rendait `issuer.did`, et ce DID était celui de Natixar. Le front
+    lisant `organisation.did`, il ne trouvait rien et désactivait la signature —
+    « No organisation identity available » — sur toutes les pages, en ligne, sans
+    qu'aucun test ne le voie. Les deux champs coexistent maintenant parce qu'ils
+    désignent deux personnes morales : la mine signe l'origine, Natixar signe le
+    chiffre carbone.
+    """
+    conn.execute("INSERT INTO entity (id, label, did, legal_name) "
+                 "VALUES (100, 'AGM Inc.', 'did:web:guygold.com', 'AGM Inc')")
+
+    body = _as(client, "agm-randy", "/api/v1/me").json()
+    assert body["organisation"]["did"] == "did:web:guygold.com"
+    assert body["organisation"]["name"] == "AGM Inc."
+    assert body["organisation"]["legalName"] == "AGM Inc"
+    # L'émetteur du chiffre carbone reste Natixar, et ce n'est PAS le même.
+    assert body["issuer"]["did"] != body["organisation"]["did"]
+
+
+def test_a_user_without_an_organisation_gets_null_not_a_guess(conn, client):
+    """`natixar` exploite la plateforme ; il ne signe aucune origine.
+
+    Rendre là une organisation par défaut lui ferait signer au nom d'un client.
+    """
+    body = _as(client, "natixar", "/api/v1/me").json()
+    assert body["organisation"] is None
+    assert body["authenticated"] is True
+
+
 def test_an_unknown_user_gets_nothing(client):
     """Un nom inconnu n'hérite d'aucun droit — le défaut est le refus."""
     assert _as(client, "inconnu", "/api/v1/credentials/index").status_code == 403
