@@ -75,6 +75,31 @@ for domain in $APP_DOMAINS; do
   break                       # le domaine de référence suffit : un seul routeur
 done
 
+# LA PAGE DE VÉRIFICATION EST PUBLIQUE, et c'est une correction de fond.
+#
+# Elle existe pour démontrer qu'un acheteur, un affineur ou un auditeur peut
+# contrôler une attestation SANS avoir à nous faire confiance. Lui demander un
+# mot de passe sur notre plateforme contredisait cet énoncé : on ne peut pas
+# prouver qu'on est superflu derrière une porte dont on tient la clé.
+#
+# Ce qui devient public : la page, ses feuilles de style et ses modules. Ce sont
+# des fichiers statiques, pas des secrets — et ils sont déjà servis à quiconque
+# détient un compte. Ce qui reste FERMÉ : toutes les pages applicatives, toute
+# l'API, et `/engine/` — donc l'exemplaire embarqué du document DID. Sans lui,
+# la page publique ne peut pas se rabattre sur une copie locale : le
+# vérificateur apporte le document de l'émetteur, ou il n'y a pas de
+# vérification. C'est exactement ce que la démonstration doit montrer.
+for domain in $APP_DOMAINS; do
+  r="${ROUTER_PREFIX}-public"
+  labels+=( --label "traefik.http.routers.${r}.rule=Host(\`${domain}\`) && (PathPrefix(\`/verify\`) || PathPrefix(\`/css/\`) || PathPrefix(\`/js/\`) || Path(\`/favicon.svg\`))" )
+  labels+=( --label "traefik.http.routers.${r}.entrypoints=websecure" )
+  labels+=( --label "traefik.http.routers.${r}.tls=true" )
+  # Les en-têtes de sécurité restent ; seule l'authentification saute.
+  labels+=( --label "traefik.http.routers.${r}.middlewares=${ROUTER_PREFIX}-sec@docker" )
+  labels+=( --label "traefik.http.routers.${r}.priority=2500" )
+  break
+done
+
 # Routeur générique : rend le service indifférent au domaine, ce qui permet de
 # basculer sur un nom dont le certificat est encore valide sans redéployer.
 # Ce n'est PAS un repli TLS : le certificat suit toujours le SNI demandé.

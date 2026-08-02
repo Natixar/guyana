@@ -85,6 +85,7 @@ vPasted       = "pasted"
 vIssuerIs     = "This certificate declares its issuer as"
 vFetchAt      = "Their public key is published at"
 vFetchHow     = "Click the link — it opens in a new tab. Then either save the page (Ctrl+S) and choose the file above, or select everything, copy it, and paste it below. No command line is needed."
+vCannotFetch  = "This page cannot fetch that file for you. A browser is not allowed to read a .well-known from another domain, and this site forbids outgoing connections entirely. That is not a limitation to work around — you fetching it yourself is stronger, because the document then passes through none of our hands."
 vNotDidWeb    = "This issuer does not use a web address, so the key cannot be fetched automatically."
 
 vValid        = "Valid signature"
