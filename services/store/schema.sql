@@ -68,7 +68,12 @@ CREATE TABLE IF NOT EXISTS entity (
     industrial        boolean NOT NULL DEFAULT false,
     legal_name        text,
     jurisdiction      text,
-    registered_office text
+    registered_office text,
+    -- Le DID de l'organisation, d'où le front tire l'émetteur qu'il signe. Il
+    -- vit ici et non dans une variable d'environnement : la plateforme héberge
+    -- plusieurs clients, et une variable par processus ne saurait en désigner
+    -- qu'un. Il appartient au client, donc à sa taxonomie.
+    did               text
 );
 
 
@@ -160,6 +165,7 @@ ALTER TABLE cell   DROP COLUMN IF EXISTS factor_unit;
 ALTER TABLE entity ADD COLUMN IF NOT EXISTS legal_name        text;
 ALTER TABLE entity ADD COLUMN IF NOT EXISTS jurisdiction      text;
 ALTER TABLE entity ADD COLUMN IF NOT EXISTS registered_office text;
+ALTER TABLE entity ADD COLUMN IF NOT EXISTS did               text;
 ALTER TABLE cell   ADD COLUMN IF NOT EXISTS coverage text NOT NULL DEFAULT 'COMPLETE';
 DO $$ BEGIN
     ALTER TABLE cell ADD CONSTRAINT cell_coverage_known

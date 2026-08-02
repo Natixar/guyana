@@ -61,6 +61,20 @@ ROLES = {
     "demo": set(),
 }
 
+#: À quelle organisation appartient un compte.
+#:
+#: L'IDENTITÉ QUE LE FRONT SIGNE VIENT D'ICI, pas d'une variable d'environnement.
+#: `STORE_ISSUER_DID` désigne l'émetteur de CE service — Natixar, qui signe les
+#: attestations carbone. Ce n'est pas le même DID que celui de la mine, et les
+#: confondre faisait signer les attestations d'origine au nom du calculateur.
+#:
+#: La plateforme héberge plusieurs clients ; une variable par processus ne
+#: saurait en désigner qu'un. L'appartenance est donc une donnée, et le DID vit
+#: dans la taxonomie du client, sur son organisation de tête.
+ORGANISATION_OF = {
+    "agm-randy": 100,
+}
+
 
 def _grants(user: str | None) -> set[str]:
     return ROLES.get(user or "", set())
@@ -99,18 +113,45 @@ def healthz() -> dict:
     return {"ok": True}
 
 
+def _organisation(user: str | None) -> dict | None:
+    """L'organisation du porteur, lue dans sa propre taxonomie."""
+    entity_id = ORGANISATION_OF.get(user or "")
+    if entity_id is None:
+        return None
+    with db.connect() as conn:
+        row = conn.execute(
+            "SELECT id, label AS name, did, legal_name AS \"legalName\", "
+            "       jurisdiction, registered_office AS \"registeredOffice\" "
+            "  FROM entity WHERE id = %s",
+            (entity_id,),
+        ).fetchone()
+    return row
+
+
 @app.get("/api/v1/me")
 def me(x_webauth_user: str | None = Header(default=None)) -> dict:
     """L'identité vient de Traefik, jamais du client.
 
     Répondre `authenticated: false` n'est pas une panne : c'est la page qui dit
     la vérité sur son état. Le bandeau de mode dégradé en découle.
+
+    LE CONTRAT EST CELUI QUE LE FRONT A ÉCRIT EN PREMIER. `me.js` dit depuis le
+    début : « Aujourd'hui /api/me est un fichier statique. Demain c'est un point
+    d'entrée qui interroge FusionAuth. La page ne verra pas la différence. » Ce
+    service avait divergé — il rendait `issuer.did` là où le front lit
+    `organisation.did`, et ce DID était celui de Natixar. Résultat sur kubb :
+    « No organisation identity available — signing is disabled », partout, et
+    aucune signature possible. `issuer` reste, il désigne l'émetteur du chiffre
+    carbone ; `organisation` désigne celui qui signe l'origine, et ce sont deux
+    personnes morales différentes.
     """
     if not x_webauth_user:
-        return {"authenticated": False, "issuer": {"did": ISSUER_DID}}
+        return {"authenticated": False, "organisation": None,
+                "issuer": {"did": ISSUER_DID}}
     return {
         "authenticated": True,
         "person": {"id": x_webauth_user, "name": x_webauth_user},
+        "organisation": _organisation(x_webauth_user),
         # Ce que le porteur peut atteindre. Le menu s'en déduit, mais c'est le
         # service qui tranche : la liste est descriptive, pas normative.
         "grants": sorted(_grants(x_webauth_user)),
