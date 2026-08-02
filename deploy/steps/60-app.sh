@@ -38,7 +38,30 @@ labels+=( --label "traefik.http.middlewares.${ROUTER_PREFIX}-auth.basicauth.head
 labels+=( --label "traefik.http.middlewares.${ROUTER_PREFIX}-sec.headers.frameDeny=true" )
 labels+=( --label "traefik.http.middlewares.${ROUTER_PREFIX}-sec.headers.contentTypeNosniff=true" )
 labels+=( --label "traefik.http.middlewares.${ROUTER_PREFIX}-sec.headers.referrerPolicy=strict-origin-when-cross-origin" )
-mw="${ROUTER_PREFIX}-auth@docker,${ROUTER_PREFIX}-sec@docker"
+# LE DOCUMENT QUI POINTE VERS LES EMPREINTES DOIT ÊTRE FRAIS, SANS QUOI LES
+# EMPREINTES NE SERVENT À RIEN.
+#
+# Hugo nomme chaque module par l'empreinte de son contenu, et le serveur
+# statique les met en cache un an — c'est correct, une URL qui change à chaque
+# modification ne peut pas devenir périmée. Mais il met aussi en cache le HTML
+# pendant 24 heures, et le HTML est le SEUL document dont l'URL ne change
+# jamais. Un navigateur qui a chargé la page hier la ressert aujourd'hui, avec
+# les empreintes d'hier, et charge donc les modules d'hier depuis son cache
+# d'un an.
+#
+# Constaté le 2 août : la page d'auto-test a exécuté un moteur de la veille
+# contre des vecteurs du jour, et vingt et un cas sont tombés. Le serveur
+# servait le bon code ; le navigateur ne l'a jamais demandé. C'est exactement
+# le genre de panne qui se produirait devant la caméra.
+#
+# `no-cache` ne veut pas dire « ne garde rien » : il veut dire « revalide avant
+# de servir ». Avec l'ETag, une ressource inchangée coûte un 304 et zéro octet.
+# Appliqué à tout ce que le site sert plutôt qu'au seul HTML : Traefik décide
+# par routeur et non par type de contenu, et un aller-retour conditionnel par
+# module sur un site de vingt fichiers est un prix qu'on paie sans le voir. La
+# raffiner par chemin serait une optimisation, pas une correction.
+labels+=( --label "traefik.http.middlewares.${ROUTER_PREFIX}-fresh.headers.customResponseHeaders.Cache-Control=no-cache" )
+mw="${ROUTER_PREFIX}-auth@docker,${ROUTER_PREFIX}-sec@docker,${ROUTER_PREFIX}-fresh@docker"
 
 i=0
 for domain in $APP_DOMAINS; do
@@ -95,7 +118,7 @@ for domain in $APP_DOMAINS; do
   labels+=( --label "traefik.http.routers.${r}.entrypoints=websecure" )
   labels+=( --label "traefik.http.routers.${r}.tls=true" )
   # Les en-têtes de sécurité restent ; seule l'authentification saute.
-  labels+=( --label "traefik.http.routers.${r}.middlewares=${ROUTER_PREFIX}-sec@docker" )
+  labels+=( --label "traefik.http.routers.${r}.middlewares=${ROUTER_PREFIX}-sec@docker,${ROUTER_PREFIX}-fresh@docker" )
   labels+=( --label "traefik.http.routers.${r}.priority=2500" )
   break
 done
