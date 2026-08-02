@@ -81,6 +81,17 @@ CREATE TABLE IF NOT EXISTS entity (
 CREATE TABLE IF NOT EXISTS cell (
     id               text PRIMARY KEY,
     period           tstzrange NOT NULL,
+    -- L'UNITÉ DE PRODUCTION, ET DONC L'ÉTAPE. Décision du 2 août 2026 : en H1 on
+    -- approxime, faute de données, par deux bijections — un département est une
+    -- unité de production, une unité de production fait une seule opération.
+    -- Une unité flexible ferait tantôt l'une tantôt l'autre ; ce n'est pas le cas
+    -- ici. Cet entier est donc à la fois l'entité, l'unité de production et le
+    -- `step` de l'issue #61, et c'est ce qui débloque cet axe : un ENTIER d'une
+    -- taxonomie masquée voyage dans une attestation sans rien divulguer, là où
+    -- un nom de département dirait l'organigramme du client.
+    --
+    -- Le servir n'ouvre PAS une dimension d'interrogation : on le rend, on ne
+    -- sélectionne pas dessus. La surface de requête reste le temps seul.
     entity_id        integer NOT NULL REFERENCES entity(id),
     sub_post         integer,             -- NULL = non alloué, et c'est un état légitime
     part_type        integer,
@@ -110,6 +121,18 @@ CREATE TABLE IF NOT EXISTS cell (
     -- sert qu'à l'affichage et n'entre dans aucun calcul : elle est donc
     -- facultative, et une cellule qui n'en porte pas se lit en SI.
     display_unit     text,
+
+    -- LE FACTEUR DEPUIS LE SI, ET C'EST CE QUI ÉVITE D'ÉCRIRE UN SYSTÈME
+    -- D'UNITÉS. `display = SI x display_scale` : un mètre cube vaut mille
+    -- litres, donc 1000. Sans ce nombre, savoir qu'une donnée « est en litres »
+    -- obligerait à tenir une table de symboles, leurs préfixes, leurs multiples
+    -- et leur interprétation — et à la tenir juste. Le facteur dit tout ce dont
+    -- l'affichage a besoin, en un double.
+    --
+    -- C'est lui qui rend l'agrégation d'affichage possible : deux données de
+    -- même dimension mais d'unités d'affichage différentes se ramènent à l'une
+    -- ou à l'autre sans que rien n'ait à comprendre les symboles.
+    display_scale    double precision,
 
     -- LE FACTEUR EST UN NOMBRE, PAS UNE REPRÉSENTATION. Il est toujours en
     -- kgCO2e par unité SI d'activité, et cette unité se déduit de `dimension` :
@@ -217,9 +240,15 @@ ALTER TABLE cell ADD  CONSTRAINT cell_coverage_known
 -- n'a pas à être refait. Une base chargée sous l'ancien modèle porte des
 -- quantités par période ; la même grandeur divisée par la durée de sa période
 -- est le débit, et le produit inverse redonne la quantité au bit près.
-ALTER TABLE cell ADD COLUMN IF NOT EXISTS flux         double precision;
-ALTER TABLE cell ADD COLUMN IF NOT EXISTS dimension    text;
-ALTER TABLE cell ADD COLUMN IF NOT EXISTS display_unit text;
+ALTER TABLE cell ADD COLUMN IF NOT EXISTS flux          double precision;
+ALTER TABLE cell ADD COLUMN IF NOT EXISTS dimension     text;
+ALTER TABLE cell ADD COLUMN IF NOT EXISTS display_unit  text;
+ALTER TABLE cell ADD COLUMN IF NOT EXISTS display_scale double precision;
+
+-- Une base migrée porte comme unité d'affichage le symbole SI qu'elle avait en
+-- table d'unités : le facteur y vaut donc un. Le rechargement du cube écrira
+-- l'unité de la source — le litre — et son facteur de mille.
+UPDATE cell SET display_scale = 1 WHERE display_scale IS NULL;
 
 DO $$ BEGIN
     UPDATE cell SET flux = value / EXTRACT(epoch FROM (upper(period) - lower(period)))

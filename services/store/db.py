@@ -76,10 +76,16 @@ def cells_overlapping(conn: psycopg.Connection, periods: list[Range]) -> list[di
         SELECT CASE WHEN count(*) OVER (PARTITION BY c.id) = 1 THEN c.id
                     ELSE c.id || '@' || EXTRACT(epoch FROM lower(c.period * r))::bigint
                END                     AS id,
+               -- L'unité de production, qui EST l'étape sous les bijections H1.
+               -- Un entier d'une taxonomie masquée : le client sait le nommer,
+               -- personne d'autre, et l'axe de trajectoire matière peut donc
+               -- voyager jusque dans l'attestation.
+               c.entity_id             AS step,
                c.sub_post              AS "subPost",
                c.part_type             AS "partType",
                c.caracterisation, c.flux, c.dimension,
                c.display_unit          AS "displayUnit",
+               c.display_scale         AS "displayScale",
                c.factor, c.origin,
                lower(c.period * r)     AS "periodStart",
                upper(c.period * r)     AS "periodEnd"

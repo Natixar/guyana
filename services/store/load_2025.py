@@ -87,25 +87,34 @@ def si_factor(name: str) -> tuple[float, str]:
     return value * scale, si_unit
 
 
-def cell_metrology(name: str) -> tuple[str, str]:
-    """Ce qu'une cellule dit d'elle-même : sa dimension, et son unité d'affichage.
+def cell_metrology(name: str) -> tuple[str, str, float]:
+    """La dimension, l'unité d'affichage, et le facteur qui va du SI vers elle.
 
     L'unité d'affichage est celle de la SOURCE — le litre des bons de sortie
     d'AGM — et elle ne sert qu'à relire la donnée brute sans compter les zéros.
     Aucun calcul ne la lit : la seule unité qui compte est celle du SI, et elle
     se déduit de la dimension.
+
+    LE FACTEUR EST STOCKÉ PLUTÔT QUE DÉDUIT DU SYMBOLE, et c'est ce qui évite
+    d'écrire un système d'unités. Savoir qu'une donnée « est en litres » ne sert
+    à rien sans une table des symboles, de leurs préfixes et de leurs multiples,
+    tenue juste. `display = SI x facteur` dit la même chose en un double.
+
+    C'est le MÊME nombre que celui qui convertit le facteur d'émission, et pour
+    la même raison : mille litres dans un mètre cube. `TO_SI` le porte une fois,
+    et les deux usages le lisent là.
     """
     _, source_unit = SOURCE_FACTORS[name]
-    _, si_unit = si_factor(name)
-    return DIMENSION_OF[si_unit], source_unit
+    scale, si_unit = TO_SI[source_unit]
+    return DIMENSION_OF[si_unit], source_unit, scale
 
 
 DIESEL_COMBUSTION, _ = si_factor("diesel-combustion")
 DIESEL_UPSTREAM, _ = si_factor("diesel-upstream")
 EXPLOSIVE, _ = si_factor("explosive")
 
-DIESEL_DIMENSION, DIESEL_DISPLAY = cell_metrology("diesel-combustion")
-EXPLOSIVE_DIMENSION, EXPLOSIVE_DISPLAY = cell_metrology("explosive")
+DIESEL_DIMENSION, DIESEL_DISPLAY, DIESEL_SCALE = cell_metrology("diesel-combustion")
+EXPLOSIVE_DIMENSION, EXPLOSIVE_DISPLAY, EXPLOSIVE_SCALE = cell_metrology("explosive")
 
 #: Identifiants de la taxonomie servie, agm-h1-v2.
 PART_COMBUSTION, PART_AMONT = 1, 2
@@ -275,6 +284,7 @@ def build_cells(fuel, explosives, assignment, org):
                 "caracterisation": CARAC_OPERATED,
                 "flux": flux,
                 "dimension": DIESEL_DIMENSION, "display_unit": DIESEL_DISPLAY,
+                "display_scale": DIESEL_SCALE,
                 "factor": factor,
                 "origin": "MEASURED",
                 "coverage": row.get("coverage", "COMPLETE"),
@@ -294,6 +304,7 @@ def build_cells(fuel, explosives, assignment, org):
             "caracterisation": CARAC_PROCEDEED,
             "flux": row["kg"] / period_seconds(period),
             "dimension": EXPLOSIVE_DIMENSION, "display_unit": EXPLOSIVE_DISPLAY,
+            "display_scale": EXPLOSIVE_SCALE,
             "factor": EXPLOSIVE,
             "origin": "MEASURED",
             "coverage": row.get("coverage", "COMPLETE"),
@@ -336,16 +347,18 @@ def load(conn, cells, org) -> None:
     with conn.cursor() as cur:
         cur.executemany(
             """INSERT INTO cell (id, period, entity_id, sub_post, part_type, caracterisation,
-                                 flux, dimension, display_unit, factor, origin, coverage)
+                                 flux, dimension, display_unit, display_scale,
+                                 factor, origin, coverage)
                     VALUES (%(id)s, %(period)s, %(entity_id)s, %(sub_post)s, %(part_type)s,
                             %(caracterisation)s, %(flux)s, %(dimension)s, %(display_unit)s,
-                            %(factor)s, %(origin)s, %(coverage)s)
+                            %(display_scale)s, %(factor)s, %(origin)s, %(coverage)s)
                ON CONFLICT (id) DO UPDATE SET
                     period = EXCLUDED.period, entity_id = EXCLUDED.entity_id,
                     sub_post = EXCLUDED.sub_post, part_type = EXCLUDED.part_type,
                     caracterisation = EXCLUDED.caracterisation,
                     flux = EXCLUDED.flux, dimension = EXCLUDED.dimension,
                     display_unit = EXCLUDED.display_unit,
+                    display_scale = EXCLUDED.display_scale,
                     factor = EXCLUDED.factor, origin = EXCLUDED.origin,
                     coverage = EXCLUDED.coverage""",
             cells,
@@ -392,12 +405,13 @@ def emit_sql(cells, org) -> None:
         hi = c["period"].upper.isoformat()
         print(
             "INSERT INTO cell (id, period, entity_id, sub_post, part_type, caracterisation,"
-            " flux, dimension, display_unit, factor, origin, coverage) VALUES ("
+            " flux, dimension, display_unit, display_scale, factor, origin, coverage)"
+            " VALUES ("
             f"{sql_literal(c['id'])}, "
             f"tstzrange({sql_literal(lo)}::timestamptz, {sql_literal(hi)}::timestamptz, '[)'), "
             f"{c['entity_id']}, {sql_literal(c['sub_post'])}, {sql_literal(c['part_type'])}, "
             f"{c['caracterisation']}, {c['flux']!r}, {sql_literal(c['dimension'])}, "
-            f"{sql_literal(c['display_unit'])}, {c['factor']!r}, "
+            f"{sql_literal(c['display_unit'])}, {c['display_scale']!r}, {c['factor']!r}, "
             f"{sql_literal(c['origin'])}, {sql_literal(c['coverage'])}) "
             # Toutes les colonnes, sans exception : un rechargement qui change
             # de dimension doit changer la dimension. En omettre une laisse une
@@ -406,7 +420,7 @@ def emit_sql(cells, org) -> None:
             "entity_id = EXCLUDED.entity_id, sub_post = EXCLUDED.sub_post, "
             "part_type = EXCLUDED.part_type, caracterisation = EXCLUDED.caracterisation, "
             "flux = EXCLUDED.flux, dimension = EXCLUDED.dimension, "
-            "display_unit = EXCLUDED.display_unit, "
+            "display_unit = EXCLUDED.display_unit, display_scale = EXCLUDED.display_scale, "
             "factor = EXCLUDED.factor, origin = EXCLUDED.origin, "
             "coverage = EXCLUDED.coverage;"
         )

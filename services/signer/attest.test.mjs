@@ -45,7 +45,7 @@ const CELL = {
   // débit et la quantité se lisent l'un dans l'autre sans arrondi. Ces cas-ci
   // portent sur la couverture et le refus, pas sur l'arithmétique du temps —
   // celle-là est exercée par les vecteurs partagés du moteur.
-  flux: 1, dimension: "volume", displayUnit: "L",
+  step: 7, flux: 1, dimension: "volume", displayUnit: "L", displayScale: 1000,
   factor: 2680, origin: "MEASURED",
   periodStart: "2025-01-01T00:00:00Z", periodEnd: "2025-01-01T00:00:01Z",
 };

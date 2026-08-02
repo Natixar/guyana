@@ -65,7 +65,7 @@ const CELL = {
   // L'intervalle est d'une seconde pour que le débit et la quantité se lisent
   // l'un dans l'autre : ces cas-ci portent sur la forme de l'attestation, pas
   // sur l'arithmétique du temps.
-  flux: 1, dimension: "volume", displayUnit: "L",
+  step: 7, flux: 1, dimension: "volume", displayUnit: "L", displayScale: 1000,
   factor: 2680, origin: "MEASURED",
   periodStart: "2025-01-01T04:00:00Z", periodEnd: "2025-01-01T04:00:01Z",
 };
@@ -185,6 +185,7 @@ test("une cellule divulguée se décrit seule", async () => {
 
   assert.equal(cell.mode, "aggregate", "le mode d'impact manque");
   assert.equal(cell.subPost, 1000, "la position pivot manque");
+  assert.equal(cell.step, 7, "l'axe de trajectoire matière manque");
   assert.ok("period" in cell, "l'intervalle manque");
   assert.ok("origin" in cell, "l'origine manque");
   // Et jamais une ligne de référentiel : c'est la propriété centrale de #61.

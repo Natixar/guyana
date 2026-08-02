@@ -50,9 +50,10 @@ def conn():
 def _cell(conn, cell_id: str, start: str, end: str, sub_post: int | None = 1000) -> None:
     conn.execute(
         """INSERT INTO cell (id, period, entity_id, sub_post, part_type, caracterisation,
-                             flux, dimension, display_unit, factor, origin)
+                             flux, dimension, display_unit, display_scale,
+                             factor, origin)
            VALUES (%s, tstzrange(%s::timestamptz, %s::timestamptz, '[)'),
-                   1, %s, 1, 1, 1000, 'volume', 'L', 2680, 'MEASURED')""",
+                   1, %s, 1, 1, 1000, 'volume', 'L', 1000, 2680, 'MEASURED')""",
         (cell_id, start, end, sub_post),
     )
 
@@ -159,6 +160,12 @@ def test_a_cell_carries_a_number_not_a_representation(conn):
     assert "factorUnit" not in got
     assert "unit" not in got, "l'unité d'activité est revenue doubler la dimension"
     assert got["dimension"] == "volume" and got["factor"] == 2680
+    # Le facteur d'affichage voyage AVEC son unité : « en litres » ne veut rien
+    # dire sans lui, à moins de tenir une table des symboles et de leurs
+    # multiples — c'est ce système-là qu'on refuse d'écrire.
+    assert got["displayUnit"] == "L" and got["displayScale"] == 1000
+    # L'unité de production, donc l'étape : un entier d'une taxonomie masquée.
+    assert got["step"] == 1
 
 
 def test_no_decimal_crosses_the_boundary(conn):

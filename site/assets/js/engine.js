@@ -124,6 +124,12 @@ const worstOrigin = (a, b) =>
  * une intégration sur un intervalle quelconque n'a de sens que si l'intervalle
  * a survécu à l'agrégation.
  *
+ * L'ÉTAPE Y ENTRE, et elle y entre en PREMIER parce que c'est l'axe de
+ * trajectoire matière de l'issue #61. Sans elle, deux unités de production qui
+ * font la même chose au même moment se fondent en une cellule dont plus rien ne
+ * dit où elle a eu lieu — et c'est justement le long de cet axe qu'un porteur
+ * divulgue la ligne de transport sans la ligne de minage.
+ *
  * LA MÉTROLOGIE DE LA CELLULE N'Y ENTRE PAS, et le vecteur qui l'affirme a
  * raison : ce qui se somme dans un groupe est l'ÉMISSION, pas la donnée
  * d'activité. Ni la dimension ni l'unité d'affichage ne comptent — mille
@@ -132,7 +138,7 @@ const worstOrigin = (a, b) =>
  * produirait deux cellules là où le référentiel n'en voit qu'une.
  */
 const groupKey = (cell, span) =>
-  [cell.subPost, cell.partType, cell.caracterisation,
+  [cell.step ?? "", cell.subPost, cell.partType, cell.caracterisation,
    span.start, span.end,
    cell.mode ?? MODE_DEFAULT].join("/");
 
@@ -308,6 +314,13 @@ export function aggregate(cells, taxonomy) {
     const line = translate(cell, taxonomy);
     lines[line] = (lines[line] ?? 0) + emission;
     pivot.push({
+      // L'ÉTAPE — l'unité de production, qui est l'opération sous les bijections
+      // H1. Un ENTIER d'une taxonomie masquée, et c'est ce qui rend l'axe
+      // publiable : « étape 7 » ne dit rien de l'organigramme du client, alors
+      // que « Sinohydro » le dirait. Une attestation sans cet axe ne permettrait
+      // pas de retirer une ligne de minage en gardant une ligne de transport,
+      // ce qui est l'usage même de la divulgation maîtrisée.
+      step: cell.step ?? null,
       // La catégorie : une position dans la taxonomie pivot, JAMAIS une ligne
       // de référentiel. C'est `lines` qui porte la ligne dérivée, et elle ne se
       // signe pas — un cadre qui change épinglerait tout inventaire passé.

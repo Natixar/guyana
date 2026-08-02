@@ -118,6 +118,7 @@ export function matrixOf(verdict) {
   const cells = [
     ...verdict.pivot.map((cell) => ({ ...cell, used: true })),
     ...verdict.excluded.map(({ cell, reason }) => ({
+      step: cell.step ?? null,
       subPost: cell.subPost ?? null,
       partType: cell.partType ?? null,
       caracterisation: cell.caracterisation,
