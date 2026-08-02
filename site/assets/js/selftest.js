@@ -23,6 +23,7 @@ import { runVectors } from "./vectors.js";
 import { renderCertificates } from "./certificate-view.js";
 import { planForBar, disposeCells, departmentsOnPath, tally } from "./lot-selection.js";
 import { computeForBar } from "./carbon-request.js";
+import { showLoaded } from "./loaded-text.js";
 
 
 const cases = [];
@@ -278,6 +279,44 @@ test("portefeuille — l'auto-test ne laisse pas ses attestations derrière lui"
     ? `des attestations d'auto-test subsistent : ${left.length} — clés ${
         left.map((r) => JSON.stringify(r.key ?? null)).join(", ")}`
     : null;
+});
+
+// --- Le fichier chargé doit être lisible ----------------------------------
+
+test("fichier chargé — le contenu s'affiche, et le tiroir qui le cache s'ouvre", () => {
+  // DEUX GESTES, ET LE SECOND EST AUSSI NÉCESSAIRE QUE LE PREMIER. Écrire le
+  // texte dans une zone repliée dans un <details> fermé corrigerait le symptôme
+  // sans corriger la panne : l'utilisateur ne verrait toujours rien.
+  const host = document.createElement("div");
+  host.innerHTML = "<details><summary>x</summary><textarea></textarea></details>";
+  const box = host.querySelector("textarea");
+  const drawer = host.querySelector("details");
+
+  const raw = '{ "a": 1 }';
+  const back = showLoaded(box, raw);
+
+  if (box.value !== raw) return `zone : ${JSON.stringify(box.value)}`;
+  if (!drawer.hasAttribute("open")) return "le tiroir est resté fermé";
+  // Verbatim : la zone doit montrer le fichier, pas notre idée du fichier.
+  if (back !== raw) return "le contenu rendu à l'appelant a été modifié";
+  return null;
+});
+
+test("fichier chargé — écrire dans la zone ne relance pas le traitement", () => {
+  // C'est la règle du DOM et non une chance : `value` ne déclenche pas `input`.
+  // Si elle cessait d'être vraie, chaque fichier serait traité deux fois — une
+  // fois par l'appelant, une fois par l'écouteur de frappe.
+  const box = document.createElement("textarea");
+  let fired = 0;
+  box.addEventListener("input", () => { fired++; });
+  showLoaded(box, "{}");
+  return fired === 0 ? null : `${fired} événement(s) input déclenché(s)`;
+});
+
+test("fichier chargé — une zone absente n'est pas une panne", () => {
+  // Un écran peut n'offrir que le sélecteur de fichier. Lever ici ferait
+  // échouer un chargement parfaitement valide.
+  return showLoaded(null, "{}") === "{}" ? null : "le contenu n'est pas rendu";
 });
 
 // --- La sélection automatique des données d'une barre ---------------------
