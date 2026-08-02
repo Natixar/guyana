@@ -24,6 +24,7 @@ import { renderCertificates } from "./certificate-view.js";
 import { planForBar, disposeCells, departmentsOnPath, tally } from "./lot-selection.js";
 import { computeForBar } from "./carbon-request.js";
 import { showLoaded } from "./loaded-text.js";
+import { provenanceKind, missingKey } from "./verify-page.js";
 
 
 const cases = [];
@@ -279,6 +280,46 @@ test("portefeuille — l'auto-test ne laisse pas ses attestations derrière lui"
     ? `des attestations d'auto-test subsistent : ${left.length} — clés ${
         left.map((r) => JSON.stringify(r.key ?? null)).join(", ")}`
     : null;
+});
+
+// --- La page de vérification : le DID doit pouvoir verdir ------------------
+
+test("vérification — un document apporté qui a servi devient vert", () => {
+  // LE DÉFAUT DU 3 AOÛT. « Réseau » était le seul état vert, et la politique de
+  // sécurité de la page interdit toute connexion sortante : le document que le
+  // vérificateur apporte lui-même ne pouvait structurellement jamais verdir.
+  if (provenanceKind(true, "supplied") !== "verified") return "un document qui a servi reste bleu";
+  if (provenanceKind(true, "browser") !== "verified") return "la provenance gouverne encore la couleur";
+  return null;
+});
+
+test("vérification — un document qui n'a pas servi est un avertissement", () =>
+  provenanceKind(false, "supplied") === "warning" ? null : "un échec passe inaperçu");
+
+test("vérification — un document pas encore employé n'est ni vert ni rouge", () => {
+  // Sinon du rouge clignoterait sur un dépôt parfaitement valide, en attendant
+  // simplement l'attestation.
+  if (provenanceKind(null, "supplied") !== "info") return "un document en attente est jugé";
+  if (provenanceKind(null, "none") !== "warning") return "l'absence de document doit alerter";
+  return null;
+});
+
+test("vérification — la clé signataire absente du document est NOMMÉE", () => {
+  // Le cas le plus fréquent en pratique : la mine a fait tourner sa clé ou
+  // signé depuis un autre poste. Sans ce rapprochement, le vérificateur lit un
+  // refus qui ne nomme pas le geste à faire.
+  const cred = { proof: { verificationMethod: "did:web:g.com#B" } };
+  const doc = { verificationMethod: [{ id: "did:web:g.com#A" }] };
+  const gap = missingKey(cred, doc);
+  if (!gap) return "l'écart n'est pas détecté";
+  if (gap.signed !== "did:web:g.com#B") return `clé signataire : ${gap.signed}`;
+  if (gap.published.join() !== "did:web:g.com#A") return `publiées : ${gap.published}`;
+  // Et le cas qui va bien ne doit rien signaler.
+  const ok = missingKey(cred, { verificationMethod: [{ id: "did:web:g.com#B" }] });
+  if (ok !== null) return "un document correct est signalé comme fautif";
+  // Pas de document n'est pas un document sans la clé : tant que rien n'a été
+  // déposé, il n'y a pas de faute à annoncer.
+  return missingKey(cred, null) === null ? null : "l'absence de document est prise pour une faute";
 });
 
 // --- Le fichier chargé doit être lisible ----------------------------------

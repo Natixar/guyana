@@ -241,6 +241,12 @@ vDidFromNetwork    = "Key fetched from the issuer's own domain"
 vDidFromBundle     = "Key from a copy shipped with this page — not fetched from the issuer"
 vDidFromBrowser    = "Key rebuilt from this browser's own key — verifier and signer are the same machine"
 vDidFromSupplied   = "Key from the document you supplied"
+vDidVerified       = "This document verified the certificate"
+vDidDidNotVerify   = "This document did not verify the certificate"
+vSignedBy          = "The certificate was signed with key"
+vDocPublishes      = "This document publishes:"
+vDocPublishesNone  = "no key at all"
+vKeyRotated        = "The two do not match. The issuer most likely rotated its key, or signed from another machine: a DID document is append-only, so the published one must carry the old key alongside the new. Ask the issuer for a document that still lists the signing key."
 vDidUnresolved     = "No key found — the issuer has not published one, and none is held here"
 
 # Fusion du document DID — une clé s'ajoute, elle ne remplace pas (#68)
