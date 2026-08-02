@@ -90,7 +90,21 @@ _refs() { # $1 = corps du document
     # ne démontrerait plus rien : le vérificateur apporte le document de
     # l'émetteur, ou il n'y a pas de vérification. Ouvrir `/engine/` en
     # élargissant le routeur ferait disparaître l'argument sans casser un test.
-    [ "$(http_code_anon "https://$DOM/engine/taxonomy.json")" = "401" ]
+    [ "$(http_code_anon "https://$DOM/engine/did/did%3Aweb%3Aguygold.com.json")" = "401" ]
+    [ "$(http_code_anon "https://$DOM/engine/vectors.json")" = "401" ]
+}
+
+@test "la taxonomie est publique, et elle seule sous /engine/" {
+    # L'attestation situe chaque cellule par un entier — sous-poste 1002 — et
+    # nomme la version sous laquelle cet entier a un sens. Sans la table, le
+    # vérificateur lit des numéros : le document cesse d'être autoportant. C'est
+    # le RÉFÉRENTIEL, il ne dit rien de l'exploitation du client.
+    #
+    # Le chemin est EXACT : ce cas et le précédent tiennent ensemble les deux
+    # moitiés de la règle, et un préfixe qui remplacerait le chemin ferait
+    # tomber le précédent.
+    [ "$(http_code_anon "https://$DOM/engine/taxonomy.json")" = "200" ]
+    curl -sS --max-time 15 "https://$DOM/engine/taxonomy.json" | grep -q '"subPosts"'
 }
 
 @test "les pages applicatives restent fermées" {

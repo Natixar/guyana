@@ -154,7 +154,19 @@ for domain in $APP_DOMAINS; do
   # document DID, et la page publique ne doit pas pouvoir s'y rabattre. Le
   # vérificateur apporte le document de l'émetteur, ou il n'y a pas de
   # vérification.
-  labels+=( --label "traefik.http.routers.${r}.rule=Host(\`${domain}\`) && (PathPrefix(\`/verify\`) || PathPrefix(\`/css/\`) || PathPrefix(\`/js/\`) || PathPrefix(\`/fonts/\`) || PathPrefix(\`/img/\`) || Path(\`/favicon.svg\`))" )
+  #
+  # UNE EXCEPTION NOMMÉE : `/engine/taxonomy.json`, par chemin EXACT et non par
+  # préfixe. L'attestation situe chaque cellule par un entier — sous-poste 1002 —
+  # et nomme la version de taxonomie sous laquelle cet entier a un sens. Sans la
+  # table, le vérificateur lit des numéros : le document cesse d'être autoportant
+  # et redevient quelque chose qu'il faut nous demander d'interpréter. La
+  # taxonomie est le RÉFÉRENTIEL, dérivé d'une base publique, et elle ne dit rien
+  # de l'exploitation du client — elle dit ce que « 1002 » signifie.
+  #
+  # Le chemin exact, parce qu'un préfixe emporterait `/engine/did/` avec lui, et
+  # c'est exactement ce qu'on refuse. La page fonctionne sans : les libellés
+  # manquants deviennent des numéros, et rien du recalcul n'en dépend.
+  labels+=( --label "traefik.http.routers.${r}.rule=Host(\`${domain}\`) && (PathPrefix(\`/verify\`) || PathPrefix(\`/css/\`) || PathPrefix(\`/js/\`) || PathPrefix(\`/fonts/\`) || PathPrefix(\`/img/\`) || Path(\`/favicon.svg\`) || Path(\`/engine/taxonomy.json\`))" )
   labels+=( --label "traefik.http.routers.${r}.entrypoints=websecure" )
   labels+=( --label "traefik.http.routers.${r}.tls=true" )
   labels+=( --label "traefik.http.routers.${r}.tls.certresolver=${CERT_RESOLVER}" )
