@@ -26,6 +26,7 @@
  */
 import T from "./labels.js";
 import { documentDigest } from "./did.js";
+import { showLoaded } from "./loaded-text.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -100,13 +101,22 @@ function render() {
   badge.className = `badge badge--${v.kind}`;
 }
 
-/** Branche un couple fichier + zone de texte sur le même lecteur. */
+/**
+ * Branche un couple fichier + zone de texte sur le même lecteur.
+ *
+ * Le fichier choisi s'écrit dans la zone et déplie le tiroir qui la contient.
+ * C'est une page où l'on COMPARE deux documents : afficher un verdict sans
+ * montrer ce sur quoi il porte n'y a aucun sens.
+ *
+ * @see site/assets/js/loaded-text.js
+ */
 function wire(fileSel, textSel, read) {
+  const box = $(textSel);
   $(fileSel)?.addEventListener("change", async (e) => {
     const file = e.target.files?.[0];
-    if (file) await read(await file.text());
+    if (!file) return;
+    await read(showLoaded(box, await file.text()).trim());
   });
-  const box = $(textSel);
   box?.addEventListener("input", () => read(box.value.trim()));
 }
 

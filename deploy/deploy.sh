@@ -202,6 +202,7 @@ run_step() { # $1 = fichier de step ; le script voyage par stdin, rien n'est éc
     rsh "PROXY_NETWORK='$PROXY_NETWORK' APP_CONTAINER='$APP_CONTAINER' \
          APP_IMAGE='$APP_IMAGE' APP_IMAGE_ID='${APP_IMAGE_ID:-}' \
          APP_DOMAINS='$APP_DOMAINS' ROUTER_PREFIX='$ROUTER_PREFIX' \
+         CERT_RESOLVER='${CERT_RESOLVER:-}' \
          BASICAUTH_USERS='$BASICAUTH_USERS' \
          SIGNER_CONTAINER='${SIGNER_CONTAINER:-}' SIGNER_IMAGE='$SIGNER_IMAGE' \
          SIGNER_PORT='${SIGNER_PORT:-}' \

@@ -30,6 +30,7 @@ set -euo pipefail
 : "${STORE_CONTAINER:?}" "${STORE_IMAGE:?}" "${STORE_PORT:?}"
 : "${PROXY_NETWORK:?}" "${DB_NETWORK:?}" "${DB_CONTAINER:?}" "${DB_NAME:?}" "${DB_USER:?}"
 : "${ROUTER_PREFIX:?}" "${APP_DOMAINS:?}"
+: "${CERT_RESOLVER:?doit venir du descripteur d’environnement}"
 : "${DB_PASSWORD:?}" "${SIGNER_KEY:?}" "${STORE_KEY:?}" "${STORE_PUBKEY:?}"
 
 primary=$(printf '%s\n' $APP_DOMAINS | head -1)
@@ -117,6 +118,7 @@ docker run -d --name "$STORE_CONTAINER" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-store.rule=Host(\`${primary}\`) && PathPrefix(\`/api/v1\`)" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-store.entrypoints=websecure" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-store.tls=true" \
+  --label "traefik.http.routers.${ROUTER_PREFIX}-store.tls.certresolver=${CERT_RESOLVER}" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-store.priority=1000" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-store.middlewares=${store_ns}-auth@docker,${store_ns}-sec@docker" \
   --label "traefik.http.services.${ROUTER_PREFIX}-store.loadbalancer.server.port=${STORE_PORT}" \
@@ -145,6 +147,7 @@ docker run -d --name "$SIGNER_CONTAINER" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-signer.rule=Host(\`${primary}\`) && PathPrefix(\`/api/v1/sign\`)" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-signer.entrypoints=websecure" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-signer.tls=true" \
+  --label "traefik.http.routers.${ROUTER_PREFIX}-signer.tls.certresolver=${CERT_RESOLVER}" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-signer.priority=2000" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-signer.middlewares=${signer_ns}-auth@docker,${signer_ns}-sec@docker" \
   --label "traefik.http.services.${ROUTER_PREFIX}-signer.loadbalancer.server.port=${SIGNER_PORT}" \
