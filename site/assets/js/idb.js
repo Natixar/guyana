@@ -66,8 +66,23 @@ export function tx(db, store, mode, fn) {
   return new Promise((resolve, reject) => {
     const t = db.transaction(store, mode);
     const req = fn(t.objectStore(store));
-    req.onsuccess = () => resolve(req.result);
+    let result;
+    req.onsuccess = () => { result = req.result; };
     req.onerror = () => reject(req.error);
+    // ON ATTEND LA VALIDATION, PAS LE SUCCÈS DE LA REQUÊTE, et les deux ne sont
+    // pas le même instant. `onsuccess` dit que l'écriture est acceptée DANS la
+    // transaction ; `oncomplete` dit qu'elle est durable. Résoudre sur le
+    // premier rendait la main avant que quiconque d'autre puisse voir l'effet :
+    // le code appelant fermait la connexion, en rouvrait une, relisait — et
+    // pouvait relire l'état d'avant. C'est ce qui faisait échouer le cas
+    // « l'auto-test ne laisse pas ses attestations derrière lui » : les
+    // suppressions étaient justes et la relecture arrivait trop tôt.
+    //
+    // Une lecture ne souffrait pas du défaut, puisque sa valeur est là dès
+    // `onsuccess`. Attendre `oncomplete` dans les deux cas coûte un tour de
+    // boucle d'événements et supprime la question.
+    t.oncomplete = () => resolve(result);
+    t.onabort = () => reject(t.error);
   });
 }
 
