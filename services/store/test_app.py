@@ -135,6 +135,47 @@ def test_a_cell_straddling_two_windows_is_served_once_per_window(conn):
     assert all(c["id"].startswith("janvier@") for c in got)
 
 
+def _integrated(cells) -> float:
+    """Les émissions des cellules servies, en kgCO2e : débit x facteur x durée."""
+    total = 0.0
+    for c in cells:
+        seconds = (datetime.fromisoformat(c["periodEnd"])
+                   - datetime.fromisoformat(c["periodStart"])).total_seconds()
+        total += c["flux"] * c["factor"] * seconds
+    return total
+
+
+def test_the_window_chosen_does_not_change_an_intensity(conn):
+    """LE CHOIX DES BORNES EST LIBRE, ET C'EST DÉMONTRABLE — décision du 2 août.
+
+    En H1 les opérations sont réputées parfaitement continues et étalées sur le
+    mois. Sur une fenêtre plus courte les émissions diminuent au prorata du
+    temps ; mais la production aussi — trente barres dans le mois en font quinze
+    en quinze jours. Un numérateur deux fois plus petit divisé par un
+    dénominateur deux fois plus petit donne le même nombre.
+
+    Ce test existe parce que la propriété est ce qui autorise à ne contraindre
+    aucune borne. Si elle se cassait — un jour où le découpage cesserait d'être
+    exactement proportionnel — l'API continuerait d'accepter n'importe quelles
+    dates en rendant des intensités qui dépendent du choix, ce qui est le genre
+    de faux qu'on ne remarque pas.
+    """
+    _cell(conn, "janvier", "2026-01-01", "2026-02-01")
+
+    def over(start, end):
+        return _integrated(db.cells_overlapping(conn, [_range(start, end)]))
+
+    whole = over("2026-01-01", "2026-02-01")
+    ten_days = over("2026-01-05", "2026-01-15")
+    assert ten_days == pytest.approx(whole * 10 / 31), "les émissions ne suivent pas la durée"
+
+    # Le dénominateur est lui aussi un débit : trente barres sur le mois.
+    bars_per_second = 30 / (31 * 86400)
+    per_bar = lambda emitted, days: emitted / (bars_per_second * days * 86400)
+    assert per_bar(ten_days, 10) == pytest.approx(per_bar(whole, 31)), \
+        "l'intensité par barre dépend de la fenêtre choisie"
+
+
 def test_an_empty_period_is_refused_by_the_database(conn):
     """Une ligne qui existe sans rien dire fausserait un dénombrement de
     couverture : le signataire exigerait une disposition pour une cellule qui ne

@@ -109,6 +109,28 @@ CREATE TABLE IF NOT EXISTS cell (
     -- deux relevés mensuels rien ne dit comment la consommation s'est répartie,
     -- et un débit constant est la seule répartition qui n'invente pas de
     -- structure.
+    --
+    -- EN H1 CETTE HYPOTHÈSE EST ASSUMÉE ET GÉNÉRALE — décision du 2 août 2026 :
+    -- faute d'information, les opérations sont réputées parfaitement continues
+    -- et étalées sur le mois. Ce n'est pas un pis-aller, c'est ce qui rend LE
+    -- CHOIX DES BORNES LIBRE POUR L'UTILISATEUR.
+    --
+    -- L'argument, parce qu'il n'est pas évident et qu'il gouverne l'API : sur
+    -- une fenêtre plus courte, les émissions diminuent au prorata du temps, mais
+    -- la production aussi — trente barres dans le mois en font quinze en quinze
+    -- jours. On divise donc un numérateur deux fois plus petit par un
+    -- dénominateur deux fois plus petit, et l'intensité par barre NE BOUGE PAS.
+    --
+    -- Conséquence à respecter : ne contraindre aucune borne de requête, ne rien
+    -- aligner sur des mois. La contrainte serait inutile puisque le résultat ne
+    -- dépend pas du choix, et nuisible puisqu'elle ferait croire l'inverse.
+    --
+    -- L'invariance tomberait si les périodes d'émission ALLOUÉE et NON ALLOUÉE
+    -- étaient distinctes — une unité de coulée qui ne tourne pas en continu
+    -- écrit deux enregistrements par mois, l'un avec lot et l'autre sans, et
+    -- alors la date de coupure décide de ce qu'on voit. En H1 tout est aligné
+    -- sur des mois entiers, donc le cas n'existe pas ; le jour où il existera,
+    -- ce sera une révision des données passées et non ce schéma-ci.
     flux             double precision NOT NULL,
 
     -- LA DIMENSION, ET NON L'UNITÉ. Tout est en SI : « volume » se lit m3/s,
