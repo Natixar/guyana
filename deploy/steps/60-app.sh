@@ -10,6 +10,17 @@
 
 set -euo pipefail
 : "${APP_CONTAINER:?}" "${APP_IMAGE:?}" "${PROXY_NETWORK:?}" "${APP_DOMAINS:?}" "${ROUTER_PREFIX:?}"
+# LE RÉSOLVEUR ACME EST EXIGÉ, PAS SUPPOSÉ.
+#
+# `tls=true` sans `tls.certresolver` ne demande aucun certificat : Traefik sert
+# le sien, interne, et le navigateur ouvre une alerte de sécurité sur un service
+# parfaitement sain. La panne est visible tout de suite pour un humain, et
+# invisible pour tout ce qui vérifie un code HTTP.
+#
+# Aucun défaut n'est fourni. Un nom de résolveur inventé ici n'échouerait pas au
+# déploiement mais au renouvellement, quatre-vingt-dix jours plus tard, sur une
+# machine que personne ne regarde ce jour-là.
+: "${CERT_RESOLVER:?doit venir du descripteur d’environnement}"
 : "${BASICAUTH_USERS:?BASICAUTH_USERS must be supplied by the launcher, from secrets/fetch.sh}"
 
 # --- Vérification de l'image ---------------------------------------------
@@ -79,6 +90,7 @@ for domain in $APP_DOMAINS; do
   labels+=( --label "traefik.http.routers.${r}.rule=Host(\`${domain}\`)" )
   labels+=( --label "traefik.http.routers.${r}.entrypoints=websecure" )
   labels+=( --label "traefik.http.routers.${r}.tls=true" )
+  labels+=( --label "traefik.http.routers.${r}.tls.certresolver=${CERT_RESOLVER}" )
   labels+=( --label "traefik.http.routers.${r}.middlewares=${mw}" )
   # Priorité EXPLICITE et basse. Sans elle, Traefik la déduit de la longueur de
   # la règle, et ce routeur — qui ne parle que d'un hôte — battait ceux de
@@ -102,6 +114,7 @@ for domain in $APP_DOMAINS; do
   labels+=( --label "traefik.http.routers.${r}.rule=Host(\`${domain}\`) && Path(\`/api/v1/pour\`)" )
   labels+=( --label "traefik.http.routers.${r}.entrypoints=websecure" )
   labels+=( --label "traefik.http.routers.${r}.tls=true" )
+  labels+=( --label "traefik.http.routers.${r}.tls.certresolver=${CERT_RESOLVER}" )
   labels+=( --label "traefik.http.routers.${r}.middlewares=${mw}" )
   labels+=( --label "traefik.http.routers.${r}.priority=3000" )
   break                       # le domaine de référence suffit : un seul routeur
@@ -126,6 +139,7 @@ for domain in $APP_DOMAINS; do
   labels+=( --label "traefik.http.routers.${r}.rule=Host(\`${domain}\`) && (PathPrefix(\`/verify\`) || PathPrefix(\`/css/\`) || PathPrefix(\`/js/\`) || Path(\`/favicon.svg\`))" )
   labels+=( --label "traefik.http.routers.${r}.entrypoints=websecure" )
   labels+=( --label "traefik.http.routers.${r}.tls=true" )
+  labels+=( --label "traefik.http.routers.${r}.tls.certresolver=${CERT_RESOLVER}" )
   # Les en-têtes de sécurité restent ; seule l'authentification saute.
   labels+=( --label "traefik.http.routers.${r}.middlewares=${ROUTER_PREFIX}-sec@docker,${ROUTER_PREFIX}-fresh@docker" )
   labels+=( --label "traefik.http.routers.${r}.priority=2500" )
@@ -139,6 +153,7 @@ done
 labels+=( --label "traefik.http.routers.${ROUTER_PREFIX}-any.rule=HostRegexp(\`^(?i)${ROUTER_PREFIX}\\..+\$\`)" )
 labels+=( --label "traefik.http.routers.${ROUTER_PREFIX}-any.entrypoints=websecure" )
 labels+=( --label "traefik.http.routers.${ROUTER_PREFIX}-any.tls=true" )
+labels+=( --label "traefik.http.routers.${ROUTER_PREFIX}-any.tls.certresolver=${CERT_RESOLVER}" )
 labels+=( --label "traefik.http.routers.${ROUTER_PREFIX}-any.priority=1" )
 labels+=( --label "traefik.http.routers.${ROUTER_PREFIX}-any.middlewares=${mw}" )
 

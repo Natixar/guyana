@@ -31,6 +31,7 @@
  */
 import T from "./labels.js";
 import { documentDigest } from "./did.js";
+import { showLoaded } from "./loaded-text.js";
 
 const $ = (root, sel) => root.querySelector(sel);
 
@@ -82,12 +83,17 @@ export function wireDidMerge(root, currentDid) {
     }
   }
 
+  const text = $(box, "[data-did-previous-text]");
+
+  // Le fichier choisi s'écrit dans la zone et déplie le tiroir. Sur un écran
+  // qui décide d'une FUSION de clés, pouvoir relire ce qu'on fusionne n'est pas
+  // un confort. Voir loaded-text.js.
   $(box, "[data-did-previous-file]")?.addEventListener("change", async (e) => {
     const file = e.target.files?.[0];
-    if (file) await accept(await file.text());
+    if (!file) return;
+    await accept(showLoaded(text, await file.text()));
   });
 
-  const text = $(box, "[data-did-previous-text]");
   text?.addEventListener("input", async () => {
     const v = text.value.trim();
     if (!v) {

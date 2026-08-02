@@ -5,6 +5,7 @@ import { verifyCredential, didWebUrl } from "./verify.js";
 import { resolveDid } from "./did-source.js";
 import { esc } from "./escape.js";
 import { verifyMatrix, recomputeTotal, commitTotal } from "./commitments.js";
+import { showLoaded } from "./loaded-text.js";
 
 const $ = (s) => document.querySelector(s);
 const state = { credential: null, didDoc: null, didSource: null,
@@ -71,9 +72,15 @@ function wireInput(name, onLoad) {
     refresh();
   };
 
+  // Le fichier déposé s'écrit dans la zone et déplie le tiroir. Le postulat de
+  // cette page est que le vérificateur ne nous fait pas confiance : lui
+  // demander de nous croire sur le contenu de son PROPRE fichier était le seul
+  // endroit de la démonstration où l'on exigeait de la confiance.
+  // Voir loaded-text.js.
   file?.addEventListener("change", async () => {
     const f = file.files?.[0];
-    if (f) accept(await f.text(), f.name);
+    if (!f) return;
+    accept(showLoaded(text, await f.text()), f.name);
   });
   // Un JSON incomplet n'est pas une erreur : c'est quelqu'un en train de taper.
   // On attend une pause, et l'on ne signale un défaut que si le texte semble
