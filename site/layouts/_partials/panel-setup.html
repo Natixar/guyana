@@ -28,7 +28,8 @@
       <p class="muted">{{ partial "t" "didMergeAtomic" }}</p>
     </details>
 
-    <p><button class="btn btn--primary" data-download-did>{{ partial "t" "downloadDid" }}</button></p>
+    <p class="actions"><button class="btn btn--primary" data-download-did>{{ partial "t" "downloadDid" }}</button>
+       <span data-download-did-status class="muted"></span></p>
     <p class="muted">{{ partial "t" "thenPublish" }}
        <a href="{{ (site.GetPage "/installation").RelPermalink }}">{{ (site.GetPage "/installation").Title }}</a>.</p>
   </div>
