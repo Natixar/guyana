@@ -9,7 +9,10 @@ import { showLoaded } from "./loaded-text.js";
 
 const $ = (s) => document.querySelector(s);
 const state = { credential: null, didDoc: null, didSource: null,
-                disclosures: [], totalSalt: null };
+                disclosures: [], totalSalt: null,
+                // Ce que le document a RÉELLEMENT fait, et non d'où il vient.
+                // Les deux étaient confondus : voir `provenance`.
+                didUsed: null };
 
 /**
  * Ce que le porteur remet : une PRÉSENTATION, ou une attestation nue.
@@ -127,16 +130,65 @@ function renderClaims(doc) {
  * vient pas du domaine de l'émetteur, le dire vaut mieux que de le laisser
  * découvrir dans les outils de développement.
  */
+/**
+ * La couleur de la pastille de provenance — décision pure, donc éprouvable.
+ *
+ * `null` veut dire « pas encore employé » : ni vert ni rouge, parce que le
+ * document est là et n'a pas encore eu l'occasion de servir. C'est un état
+ * réel, et le confondre avec l'échec ferait clignoter du rouge sur un dépôt
+ * parfaitement valide en attendant l'attestation.
+ */
+export function provenanceKind(didUsed, didSource) {
+  if (didUsed === true) return "verified";
+  if (didUsed === false) return "warning";
+  return didSource === "none" ? "warning" : "info";
+}
+
+/**
+ * La clé qui a signé figure-t-elle dans le document ? Sinon, les deux listes.
+ *
+ * Rendu séparément du HTML pour être exercé sans DOM : c'est la décision qui
+ * compte, et elle doit rester vraie quelle que soit la mise en forme.
+ *
+ * @returns {{signed: string, published: string[]}|null} `null` si tout va bien
+ */
+export function missingKey(credential, didDoc) {
+  // PAS DE DOCUMENT N'EST PAS UN DOCUMENT SANS LA CLÉ. Tant que le vérificateur
+  // n'a rien déposé, annoncer « ce document ne publie aucune clé » désignerait
+  // une faute là où il n'y a qu'une étape pas encore franchie.
+  if (!didDoc) return null;
+  const signed = credential?.proof?.verificationMethod;
+  const published = (didDoc.verificationMethod ?? []).map((m) => m.id);
+  if (!signed || published.includes(signed)) return null;
+  return { signed, published };
+}
+
 function provenance() {
-  const label = {
-    network: [T.vDidFromNetwork, "verified"],
-    bundled: [T.vDidFromBundle, "warning"],
-    browser: [T.vDidFromBrowser, "warning"],
-    supplied: [T.vDidFromSupplied, "info"],
-    none: [T.vDidUnresolved, "warning"],
+  // LA COULEUR DIT CE QUE LE DOCUMENT A FAIT ; LE TEXTE DIT D'OÙ IL VIENT.
+  //
+  // Correction du 3 août 2026. Les deux étaient portés par la même pastille, et
+  // « réseau » était le seul état vert. Or cette page interdit toute connexion
+  // sortante — `connect-src 'self'` — et le domaine de l'émetteur devrait en
+  // outre l'autoriser. La voie réseau ne peut donc pas aboutir, et le document
+  // que le vérificateur apporte lui-même restait éternellement bleu : le DID NE
+  // POUVAIT STRUCTURELLEMENT PAS VERDIR, quoi qu'on dépose.
+  //
+  // C'était doublement faux. Un document apporté par le vérificateur n'est pas
+  // un pis-aller : c'est la meilleure provenance qui soit, puisqu'il ne passe
+  // par aucune de nos mains. Ce qui mérite d'être jugé, c'est s'il a servi —
+  // s'il contenait la clé et si la signature a tenu.
+  //
+  // La provenance reste écrite, en toutes lettres, parce que c'est l'argument
+  // de la page. Elle cesse seulement de gouverner la couleur.
+  const text = {
+    network: T.vDidFromNetwork,
+    bundled: T.vDidFromBundle,
+    browser: T.vDidFromBrowser,
+    supplied: T.vDidFromSupplied,
+    none: T.vDidUnresolved,
   }[state.didSource];
-  if (!label) return "";
-  const [text, kind] = label;
+  if (!text) return "";
+  const kind = provenanceKind(state.didUsed, state.didSource);
   const badge = `<p><span class="badge badge--${kind}">${esc(text)}</span></p>`;
 
   // Le bandeau. La pastille suffit à qui sait la lire ; le bandeau s'adresse à
@@ -214,14 +266,78 @@ async function renderMatrix(doc) {
           <dl class="facts">${rows.join("")}</dl>${unusable}`;
 }
 
+/**
+ * Pourquoi CE document ne vérifie pas CETTE attestation — dit sur la carte du
+ * document, là où le vérificateur regarde.
+ *
+ * LE MESSAGE QUI MANQUAIT. Une attestation signée par une clé absente du
+ * document donnait un refus dans l'étape 3, à l'autre bout de l'écran, sous une
+ * formulation qui ne nommait pas le geste à faire. Or c'est le cas le PLUS
+ * fréquent en pratique : la mine a fait tourner sa clé, ou signé depuis un
+ * autre poste, et le document apporté ne porte que la clé du jour. Le produit a
+ * déjà la réponse — le document DID est append-only et l'écran de fusion existe
+ * pour cela — encore faut-il que le vérificateur sache que c'est de cela qu'il
+ * s'agit.
+ *
+ * On nomme donc les deux côtés : la clé qui a signé, et celles que le document
+ * publie. Le rapprochement se fait à l'œil, en une seconde.
+ */
+function keyMismatch() {
+  const gap = missingKey(state.credential, state.didDoc);
+  if (!gap) return null;
+  return `<p class="muted">${T.vSignedBy} <code>${esc(gap.signed)}</code></p>` +
+         `<p class="muted">${T.vDocPublishes} ${
+           gap.published.length
+             ? gap.published.map((id) => `<code>${esc(id)}</code>`).join(", ")
+             : `<em>${esc(T.vDocPublishesNone)}</em>`}</p>` +
+         `<p class="muted">${T.vKeyRotated}</p>`;
+}
+
+/**
+ * L'encart qui suit l'attestation : qui l'émet, où sa clé devrait vivre, d'où
+ * celle-ci vient, et — le cas échéant — pourquoi elle ne convient pas.
+ *
+ * Extrait de `refresh` pour pouvoir être rendu APRÈS la vérification. Tant
+ * qu'il était construit avant, la pastille de provenance ne pouvait pas
+ * refléter le résultat.
+ */
+function renderHint(url) {
+  return `<p>${T.vIssuerIs} <code>${esc(state.credential.issuer)}</code></p>` +
+    (url ? `<p>${T.vFetchAt} <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a></p>` +
+           // POURQUOI C'EST À VOUS DE LE FAIRE. Un navigateur ne peut pas lire
+           // le `.well-known` d'un domaine tiers : la politique de sécurité de
+           // ce site interdit toute connexion sortante, et le domaine de
+           // l'émetteur devrait en outre l'autoriser explicitement. Vous, en
+           // revanche, pouvez ouvrir ce lien — et c'est mieux ainsi, puisque le
+           // document ne passe alors par aucune de nos mains.
+           `<p class="muted">${T.vCannotFetch}</p>` +
+           `<p class="muted">${T.vFetchHow}</p>`
+         : `<p class="muted">${T.vNotDidWeb}</p>`) +
+    provenance() + (keyMismatch() ?? "");
+}
+
+/** Le compte rendu du document, sur SA carte — étape 2, pas étape 3. */
+function renderDidStatus() {
+  const status = $("[data-did-status]");
+  if (!status || !state.didDoc) return;
+  if (state.didUsed === true) {
+    status.textContent = T.vDidVerified;
+    status.className = "badge badge--verified";
+  } else if (state.didUsed === false) {
+    status.textContent = T.vDidDidNotVerify;
+    status.className = "badge badge--warning";
+  }
+}
+
 async function refresh() {
   const hint = $("[data-did-hint]");
   const out = $("[data-verdict]");
   const body = $("[data-contents]");
 
   // As soon as the credential is in, say where its issuer's key lives.
+  let url = null;
   if (state.credential?.issuer) {
-    const url = didWebUrl(state.credential.issuer);
+    url = didWebUrl(state.credential.issuer);
 
     // Résolution automatique, réseau d'abord. Sans elle il fallait déposer un
     // fichier à la main, ce qui fonctionne et se filme mal.
@@ -234,25 +350,23 @@ async function refresh() {
     }
 
     hint.hidden = false;
-    hint.innerHTML = `<p>${T.vIssuerIs} <code>${esc(state.credential.issuer)}</code></p>` +
-      (url ? `<p>${T.vFetchAt} <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a></p>` +
-             // POURQUOI C'EST À VOUS DE LE FAIRE. Un navigateur ne peut pas
-             // lire le `.well-known` d'un domaine tiers : la politique de
-             // sécurité de ce site interdit toute connexion sortante, et le
-             // domaine de l'émetteur devrait en outre l'autoriser explicitement.
-             // Vous, en revanche, pouvez ouvrir ce lien — et c'est mieux ainsi,
-             // puisque le document ne passe alors par aucune de nos mains.
-             `<p class="muted">${T.vCannotFetch}</p>` +
-             `<p class="muted">${T.vFetchHow}</p>`
-           : `<p class="muted">${T.vNotDidWeb}</p>`) +
-      provenance();
   } else {
     hint.hidden = true;
   }
 
-  if (!state.credential || !state.didDoc) { out.hidden = true; body.hidden = true; return; }
+  // LA VÉRIFICATION D'ABORD, L'AFFICHAGE ENSUITE, et l'ordre est le correctif.
+  // La provenance se colore selon ce que le document a FAIT ; la rendre avant de
+  // le savoir affichait la couleur du passage précédent — donc jamais la bonne
+  // au premier dépôt, ce qui se lisait comme « le DID ne passe jamais vert ».
+  const r = state.credential && state.didDoc
+    ? await verifyCredential(state.credential, state.didDoc)
+    : null;
+  state.didUsed = r ? r.ok : null;
+  renderDidStatus();
+  if (!hint.hidden) hint.innerHTML = renderHint(url);
 
-  const r = await verifyCredential(state.credential, state.didDoc);
+  if (!r) { out.hidden = true; body.hidden = true; return; }
+
   out.hidden = false;
   out.innerHTML = r.ok
     ? `<span class="badge badge--verified">${T.vValid}</span> <span class="muted">${T.vValidBody}</span>`
