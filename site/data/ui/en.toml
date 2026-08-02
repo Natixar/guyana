@@ -25,6 +25,10 @@ confirmPour       = "Confirm this pour"
 selftestResults   = "Results"
 selftestRunning   = "running…"
 selftestPassed    = "checks passed"
+selftestSkipped    = "n/a"
+selftestSkippedCount = "not applicable to the signed-in account"
+selftestNoIssuer   = "this account belongs to no issuing organisation, so there is no issuer DID to sign with"
+
 selftestFailed    = "failed"
 
 footer            = "Aurora project"
