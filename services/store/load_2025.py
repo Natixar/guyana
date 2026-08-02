@@ -53,6 +53,21 @@ FIXTURE = ROOT / "site" / "static" / "engine" / "erp-fixture.json"
 # C'est donc ici, à la frontière, que les unités d'origine existent encore et
 # que la conversion se décide. Au-delà, il n'y a plus rien à convertir ni rien à
 # vérifier.
+#
+# CHACUN DE CES FACTEURS RELÈVE DE LA LOI « emission factor » : une émission
+# égale une quantité d'activité multipliée par un facteur. C'est la loi la plus
+# simple qu'il y ait, et c'est pour cela qu'elle reste implicite ici — un seul
+# facteur, une seule quantité. Elle cesse de suffire dès qu'une loi demande
+# plusieurs grandeurs : une jambe de transport veut une distance, une masse et
+# un carburant, et alors la loi doit être STOCKÉE à côté de la donnée plutôt que
+# sous-entendue par la forme du tableau. C'est l'issue #71, et c'est aussi ce
+# qui rendra l'explication au vérificateur dérivable de l'intention.
+#
+# Le sens de la conversion est vérifié par `test_units.py`, et pas relu : la
+# question s'est posée deux fois en revue et a reçu deux fois une réponse de
+# mémoire. Un litre est un MILLIÈME de mètre cube, donc la valeur se divise par
+# mille et le facteur se multiplie par mille — c'est le produit qui est
+# physique, pas les deux nombres pris séparément.
 SOURCE_FACTORS = {
     # facteur feuille 9, unité d'origine -> (facteur SI, unité SI)
     "diesel-combustion": (2.68, "L"),
