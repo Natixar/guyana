@@ -30,7 +30,19 @@ from psycopg.types.range import Range
 import db
 from signing import sign_payload
 
+#: Un journal à nous, et raccordé à la main.
+#:
+#: uvicorn configure SES loggers et pas les nôtres : sans ce raccordement, la
+#: ligne « schéma appliqué » n'apparaissait nulle part. Une migration qui
+#: s'exécute sans laisser de trace est exactement ce que ce module reproche à
+#: l'ancien fonctionnement — on ne saurait pas la distinguer d'une migration qui
+#: ne s'exécute pas. Constaté sur kubb le 2 août, après l'avoir écrite.
 log = logging.getLogger("store")
+if not log.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s — %(message)s"))
+    log.addHandler(_handler)
+    log.setLevel(logging.INFO)
 
 #: Combien de temps attendre PostgreSQL au démarrage, et pourquoi c'est borné.
 #:
