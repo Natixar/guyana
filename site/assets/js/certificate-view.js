@@ -50,18 +50,36 @@ const period = (p) =>
  * les exclusions auraient disparu ressemblerait trait pour trait à un tableau
  * complet, ce qui est exactement ce que la décision 1 de l'issue #61 refuse.
  */
-function matrix(doc) {
+function matrix(doc, disclosures = []) {
   const cells = doc?.credentialSubject?.breakdown;
   if (!Array.isArray(cells) || cells.length === 0) return "";
 
+  // LES DIVULGATIONS SONT CE QUI REMPLIT CE TABLEAU, et sans elles il est vide
+  // de tout sauf du dénombrement. Une entrée signée ne porte QU'un engagement,
+  // le fait qu'elle ait compté, et son motif : la catégorie elle-même est dans
+  // l'engagement, parce que « il y a une ligne de minage » est déjà une
+  // information sur l'exploitation. Le porteur, lui, détient les divulgations —
+  // c'est son propre calcul qu'il regarde — et il peut donc voir les colonnes.
+  //
+  // Ce tableau avait été écrit en lisant `c.step` sur l'engagement. Ce champ n'y
+  // est jamais : chaque ligne affichait « — » sans que rien ne signale l'erreur.
+  const byIndex = new Map((disclosures ?? []).map((d) => [d.index, d]));
+  const opened = byIndex.size > 0;
+
   const used = cells.filter((c) => c.used !== false).length;
-  const body = cells.map((c) => {
+  const num = (x) => (typeof x === "number"
+    ? x.toLocaleString("fr-FR", { maximumSignificantDigits: 3 }) : "—");
+
+  const body = cells.map((c, index) => {
     const withheld = c.used === false;
+    const d = byIndex.get(index);
     return `<tr${withheld ? ' class="row--withheld"' : ""}>
-      <td class="num">${esc(String(c.step ?? "—"))}</td>
-      <td class="num">${esc(String(c.subPost ?? "—"))}</td>
-      <td>${period(c.period)}</td>
-      <td>${esc(String(c.origin ?? "—"))}</td>
+      <td class="num">${esc(String(d?.step ?? "—"))}</td>
+      <td class="num">${esc(String(d?.subPost ?? "—"))}</td>
+      <td>${period(d?.period)}</td>
+      <td>${esc(String(d?.origin ?? "—"))}</td>
+      <td class="num">${esc(num(d?.amount))}</td>
+      <td class="num">${d?.share === undefined ? "—" : esc(num(d.share))}</td>
       <td>${withheld ? esc(T.certExcluded) : esc(T.certCounted)}</td>
       <td>${esc(c.reason ?? "")}</td>
     </tr>`;
@@ -73,15 +91,18 @@ function matrix(doc) {
       .replace("{n}", String(cells.length))
       .replace("{used}", String(used))
       .replace("{out}", String(cells.length - used))}</p>
+    <div class="scroll-x">
     <table class="register">
         <thead><tr>
           <th class="num">${T.certStep}</th><th class="num">${T.certSubPost}</th>
           <th>${T.certPeriod}</th><th>${T.certOrigin}</th>
+          <th class="num">${T.certAmount}</th><th class="num">${T.certShare}</th>
           <th>${T.certCounted}</th><th>${T.certReason}</th>
         </tr></thead>
       <tbody>${body}</tbody>
     </table>
-    <p class="muted">${T.certAmountsElsewhere}</p>`;
+    </div>
+    <p class="muted">${opened ? T.certAmountsLocal : T.certAmountsElsewhere}</p>`;
 }
 
 /** La méthode : ce sans quoi le chiffre est invérifiable cinq ans plus tard. */
@@ -90,6 +111,14 @@ function method(doc) {
   if (!m || typeof m !== "object") return "";
   const known = [
     [T.certAllocation, m.allocation],
+    [T.certLotRule, m.lotRule],
+    // LES DEUX DIVISEURS SE LISENT, sans quoi la règle n'est qu'un nom. Le
+    // porteur doit pouvoir constater que le partagé a été divisé par le nombre
+    // de lots actifs sur la fenêtre — c'est la partie du calcul qui, sans cet
+    // affichage, exigerait de nous croire sur parole.
+    [T.certDivisors, m.divisors
+      ? `${m.divisors.lotsInWindow} × ${m.divisors.barsInLot}`
+      : undefined],
     [T.certTaxonomy, m.taxonomy],
     [T.certFactors, m.factorSet ?? m.factors],
     [T.certEventModel, m.eventModel],
@@ -106,7 +135,7 @@ function method(doc) {
  *                         `{digest, type, receivedAt, document}`
  * @returns {string} du HTML, entièrement échappé
  */
-export function renderCertificate(record) {
+export function renderCertificate(record, disclosures = []) {
   const doc = record?.document ?? record;
   const intensity = doc?.credentialSubject?.carbonIntensity;
 
@@ -120,7 +149,12 @@ export function renderCertificate(record) {
   }
   // Le lien vers l'attestation d'origine, par empreinte. Sans lui, n'importe qui
   // pourrait émettre un chiffre carbone pour le même sujet.
-  const from = doc?.credentialSubject?.derivedFrom;
+  //
+  // AU PREMIER NIVEAU, ET NON DANS LE SUJET : c'est là que
+  // `buildCarbonCredential` l'écrit, et le chercher au mauvais endroit revenait
+  // à ne jamais l'afficher — sans erreur, ce qui est la pire façon de perdre une
+  // ligne. Les deux emplacements sont lus, le document faisant foi.
+  const from = doc?.derivedFrom ?? doc?.credentialSubject?.derivedFrom;
   if (from?.digestMultibase) {
     facts.push(row(T.certDerivedFrom, `<code>${esc(String(from.digestMultibase))}</code>`));
   }
@@ -130,17 +164,25 @@ export function renderCertificate(record) {
       <h3>${esc(meaningfulType(doc))}</h3>
       <dl class="facts">${facts.join("")}</dl>
       ${method(doc)}
-      ${matrix(doc)}
+      ${matrix(doc, disclosures)}
     </article>`;
 }
 
-/** Toutes les attestations d'une barre, la plus parlante d'abord. */
-export function renderCertificates(records) {
+/**
+ * Toutes les attestations d'une barre, la plus parlante d'abord.
+ *
+ * @param {Array<object>} records
+ * @param {Record<string, Array>} [disclosuresByDigest] les divulgations que ce
+ *        navigateur détient, indexées par l'empreinte de l'attestation. Elles ne
+ *        viennent jamais du serveur : elles ne quittent pas le porteur.
+ */
+export function renderCertificates(records, disclosuresByDigest = {}) {
   if (!Array.isArray(records) || records.length === 0) return "";
   // Celle qui porte une matrice passe devant : c'est celle que la mine n'a pas
   // faite, et donc celle qu'elle a une raison de regarder.
   const ordered = [...records].sort(
     (a, b) => Number(Boolean(b?.document?.credentialSubject?.breakdown))
             - Number(Boolean(a?.document?.credentialSubject?.breakdown)));
-  return ordered.map(renderCertificate).join("");
+  return ordered.map((r) =>
+    renderCertificate(r, disclosuresByDigest[r?.digest] ?? r?.disclosures ?? [])).join("");
 }

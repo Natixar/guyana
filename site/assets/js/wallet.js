@@ -79,17 +79,32 @@ export async function credentialsFor(subject) {
 }
 
 /**
- * Tout ce que le portefeuille détient.
+ * Tout ce que le portefeuille détient, CHAQUE ENREGISTREMENT AVEC SA CLÉ RÉELLE.
  *
  * N'ouvre pas la base si elle n'existe pas : une page qui consulte le
  * portefeuille ne doit pas le créer au passage.
+ *
+ * LA CLÉ EST LUE, JAMAIS RECALCULÉE, et c'est une correction du 2 août 2026.
+ * Supprimer par `slot(r.subject, r.type)` suppose que l'enregistrement a été
+ * rangé par la version actuelle du schéma. Un navigateur qui a visité le site
+ * avant #68 détient des enregistrements rangés SOUS LE SUJET SEUL : la clé
+ * reconstruite ne désigne alors rien, la suppression réussit sans rien
+ * supprimer, et l'auto-test signale à juste titre que des attestations
+ * subsistent. Vider le cache HTTP n'y change rien — IndexedDB n'est pas un
+ * cache, et c'est bien pour cela que le symptôme a survécu au correctif
+ * précédent.
+ *
+ * `getAll()` et `getAllKeys()` parcourent le magasin dans le même ordre de clés
+ * (§ IDBObjectStore de la spécification) : l'appariement par rang est garanti,
+ * pas supposé.
  */
 export async function allCredentials() {
   if (!(await databaseExists())) return [];
   const db = await openDb();
   const records = await tx(db, STORES.CREDENTIALS, "readonly", (s) => s.getAll());
+  const keys = await tx(db, STORES.CREDENTIALS, "readonly", (s) => s.getAllKeys());
   db.close();
-  return records ?? [];
+  return (records ?? []).map((r, i) => ({ ...r, key: keys?.[i] }));
 }
 
 /** Les attestations rangées sous une référence locale — un numéro de coulée. */
@@ -130,12 +145,21 @@ export async function orphanedCredentials(didDocument) {
   });
 }
 
-/** Retire des attestations, une à une, par leur clé de rangement. */
+/**
+ * Retire des attestations, une à une.
+ *
+ * Par la clé LUE quand on l'a — c'est le cas de tout ce qui sort
+ * d'`allCredentials` — et par la clé reconstruite seulement à défaut. L'ordre
+ * des deux est le sujet : la clé lue désigne l'enregistrement quel que soit le
+ * schéma sous lequel il a été rangé, la clé reconstruite ne désigne que ce que
+ * la version courante aurait écrit.
+ */
 export async function removeCredentials(records) {
   if (!records.length) return 0;
   const db = await openDb();
   for (const r of records) {
-    await tx(db, STORES.CREDENTIALS, "readwrite", (s) => s.delete(slot(r.subject, r.type)));
+    const key = r.key ?? slot(r.subject, r.type);
+    await tx(db, STORES.CREDENTIALS, "readwrite", (s) => s.delete(key));
   }
   db.close();
   return records.length;

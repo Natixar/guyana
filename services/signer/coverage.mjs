@@ -26,13 +26,27 @@ function fault(code, detail) {
 
 const USED = "USED";
 const EXCLUDED = "EXCLUDED";
+const SHARED = "SHARED";
 
 /**
  * Répartit les cellules servies selon leur disposition, ou refuse.
  *
+ * TROIS DISPOSITIONS ET NON DEUX, depuis le 2 août 2026. Le binaire
+ * retenue / écartée ne savait pas dire ce qu'une cellule sans lot est : un
+ * département hors du chemin de la matière consomme réellement, et pour aucun
+ * lot en particulier. L'écarter la ferait disparaître du contenu carbone ; la
+ * retenir la ferait porter en entier par un lot qui n'en est pas seul
+ * responsable. `SHARED` nomme le troisième cas, et la part qui lui revient se
+ * calcule — elle ne se choisit pas.
+ *
+ * Une cellule partagée exige elle aussi sa raison. Le motif n'y est pas une
+ * excuse mais une donnée : il dit POURQUOI aucun lot ne la revendique, et c'est
+ * ce qu'un vérificateur doit pouvoir apprécier.
+ *
  * @param {{cells: Array<{id: string}>}} extraction ce que le magasin a servi
- * @param {Array<{id: string, use: "USED"|"EXCLUDED", reason?: string}>} dispositions
- * @returns {{used: Array<object>, excluded: Array<{cell: object, reason: string}>}}
+ * @param {Array<{id: string, use: "USED"|"SHARED"|"EXCLUDED", reason?: string}>} dispositions
+ * @returns {{used: Array<object>, shared: Array<{cell: object, reason: string}>,
+ *            excluded: Array<{cell: object, reason: string}>}}
  * @throws {Error} `DISPOSITION_MISSING`, `DISPOSITION_UNKNOWN_CELL`,
  *   `DISPOSITION_DUPLICATE`, `DISPOSITION_INVALID`, `EXCLUSION_UNEXPLAINED`
  */
@@ -50,7 +64,17 @@ export function partition(extraction, dispositions) {
 
   const seen = new Set();
   const used = [];
+  const shared = [];
   const excluded = [];
+
+  /** Une raison non vide, ou le refus. Même exigence pour écartée et partagée. */
+  const reasonOf = (d) => {
+    const reason = typeof d.reason === "string" ? d.reason.trim() : "";
+    // Une disposition sans raison est le trou par lequel la complétude s'en va :
+    // elle rend indistinguables « écartée à dessein » et « oubliée ».
+    if (!reason) throw fault("EXCLUSION_UNEXPLAINED", String(d.id));
+    return reason;
+  };
 
   for (const d of dispositions) {
     const cell = byId.get(d?.id);
@@ -63,12 +87,10 @@ export function partition(extraction, dispositions) {
 
     if (d.use === USED) {
       used.push(cell);
+    } else if (d.use === SHARED) {
+      shared.push({ cell, reason: reasonOf(d) });
     } else if (d.use === EXCLUDED) {
-      // Une exclusion sans raison est le trou par lequel la complétude s'en va :
-      // elle rend indistinguables « écartée à dessein » et « oubliée ».
-      const reason = typeof d.reason === "string" ? d.reason.trim() : "";
-      if (!reason) throw fault("EXCLUSION_UNEXPLAINED", String(d.id));
-      excluded.push({ cell, reason });
+      excluded.push({ cell, reason: reasonOf(d) });
     } else {
       throw fault("DISPOSITION_INVALID", `${d.use} sur ${d.id}`);
     }
@@ -79,5 +101,5 @@ export function partition(extraction, dispositions) {
     throw fault("DISPOSITION_MISSING", `${missing.length} cellule(s) : ${missing.slice(0, 5).join(", ")}`);
   }
 
-  return { used, excluded };
+  return { used, shared, excluded };
 }

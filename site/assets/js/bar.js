@@ -31,6 +31,7 @@ import { verificationMethodId } from "./did.js";
 import { esc } from "./escape.js";
 import { signView } from "./sign-state.js";
 import { depositCredential } from "./deposit.js";
+import { requestCarbonCredential, originRef } from "./carbon-request.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -123,6 +124,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     <p class="muted" data-bar-sign-status></p>
     <p class="muted" data-bar-deposit hidden></p>
 
+    <h3 class="subhead">${T.certIntensity}</h3>
+    <p class="muted">${T.barCarbonWhy}</p>
+    <p class="actions">
+      <button class="btn" data-bar-carbon>${T.barCarbon}</button>
+      <a class="btn btn--ghost" data-bar-carbon-download hidden download>${T.barCarbonDownload}</a>
+    </p>
+    <p class="muted" data-bar-carbon-status></p>
+
     <section data-bar-certificates hidden>
       <h3 class="subhead">${T.certHeld}</h3>
       <p class="muted">${T.certHeldWhy}</p>
@@ -150,7 +159,11 @@ document.addEventListener("DOMContentLoaded", async () => {
    * donc dans le contexte plutôt que d'être écrit à côté — règle de `app.js`
    * après #64 : un état nouveau entre dans `ctx`, il ne s'écrit pas ailleurs.
    */
-  const ctx = { deposit: null };
+  const ctx = { deposit: null, carbon: null };
+
+  const carbonBtn = $("[data-bar-carbon]");
+  const carbonStatus = $("[data-bar-carbon-status]");
+  const carbonLink = $("[data-bar-carbon-download]");
 
   /**
    * Ce que le magasin détient pour CETTE barre. L'index complet n'a pas sa place ici.
@@ -188,7 +201,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     // que quelqu'un d'AUTRE a signé.
     const foreign = held.filter((r) => r?.document?.issuer && r.document.issuer !== did);
     certificates.hidden = foreign.length === 0;
-    certificatesBody.innerHTML = renderCertificates(foreign);
+    // LES DIVULGATIONS NE VIENNENT JAMAIS DU MAGASIN, et c'est pour cela
+    // qu'elles sont passées ici depuis le contexte plutôt que lues avec le
+    // document. Le magasin détient l'attestation — des engagements scellés — ;
+    // les montants qui les ouvrent sont nés dans la réponse du signataire et
+    // n'ont pas bougé de ce navigateur. Sans elles, la matrice affiche son
+    // dénombrement et rien d'autre, ce qui est la propriété, pas une panne.
+    certificatesBody.innerHTML = renderCertificates(foreign, ctx.carbon?.byDigest ?? {});
+
+    // Le carbone se demande une fois l'origine signée : `derivedFrom` la
+    // désigne par empreinte, et sans elle l'intensité flotterait sur un
+    // identifiant que personne n'a revendiqué.
+    const hasCarbon = foreign.some(
+      (r) => r?.document?.credentialSubject?.carbonIntensity);
+    carbonBtn.disabled = !mine || hasCarbon;
+    if (!ctx.carbon?.text) {
+      carbonStatus.textContent = mine
+        ? (hasCarbon ? T.barCarbonDone : "")
+        : T.barCarbonNeedOrigin;
+    }
 
     badge.textContent = mine ? T.barStatusHere : (elsewhere ? T.barStatusElsewhere : T.barStatusNone);
     badge.className = `badge badge--${mine ? "verified" : (elsewhere ? "warning" : "pending")}`;
@@ -239,6 +270,78 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     await render();
+  });
+
+  /**
+   * Faire signer par Natixar le contenu carbone de CETTE barre.
+   *
+   * LE GESTE QUI MANQUAIT. Tout le reste existait — le magasin sert et signe ce
+   * qu'il sert, le signataire recalcule avant de signer, la page publique
+   * recalcule sans nous appeler — mais rien ne les reliait, et le vérificateur
+   * n'avait donc jamais de carbone à vérifier.
+   *
+   * AUCUNE SAISIE. La sélection des données se dérive de la barre : les deux
+   * mois de son lot, les départements que le procédé place sur le chemin de la
+   * matière, et le partage des frais généraux entre les lots actifs sur la
+   * fenêtre. L'opérateur clique ; il ne choisit pas, et deux opérateurs
+   * obtiennent le même chiffre.
+   *
+   * LES DIVULGATIONS RESTENT ICI. Elles partent dans le contexte de la page, pas
+   * au magasin : c'est ce qui laisse au porteur le droit d'en retirer avant de
+   * présenter, sans toucher à un octet de ce qui a été signé.
+   */
+  carbonBtn?.addEventListener("click", async () => {
+    carbonBtn.disabled = true;
+    ctx.carbon = { text: T.barCarbonRunning };
+    carbonStatus.textContent = ctx.carbon.text;
+    try {
+      const origin = (await credentialsByRef(bar.internalId))
+        .DoreBarOriginCredential?.document;
+      if (!origin) throw new Error(T.barCarbonNeedOrigin);
+
+      const out = await requestCarbonCredential({
+        bar, fixture, origin: await originRef(origin),
+      });
+
+      // Rangée avant tout affichage : une attestation reçue puis perdue parce
+      // que le dépôt a échoué serait le pire des deux.
+      const stored = await putCredential(out.credential, bar.internalId);
+      const byDigest = { ...(ctx.carbon?.byDigest ?? {}),
+                         [stored.digest]: out.disclosures };
+      const deposited = await depositCredential(out.credential);
+
+      // La présentation — attestation, divulgations, sel du total — sous la
+      // forme même que la page de vérification sait déposer. Un seul fichier,
+      // parce que c'est le seul geste qu'on puisse demander à un vérificateur
+      // de faire juste.
+      const presentation = new Blob([JSON.stringify({
+        credential: out.credential,
+        disclosures: out.disclosures,
+        totalSalt: out.totalSalt,
+      }, null, 2)], { type: "application/json" });
+      carbonLink.href = URL.createObjectURL(presentation);
+      carbonLink.download = `${bar.internalId}-carbon.json`;
+      carbonLink.hidden = false;
+
+      ctx.carbon = {
+        byDigest,
+        text: `${T.barCarbonDone} — ${T.barCarbonCounts
+          .replace("{served}", String(out.cellsServed))
+          .replace("{used}", String(out.counts.USED))
+          .replace("{shared}", String(out.counts.SHARED))
+          .replace("{excluded}", String(out.counts.EXCLUDED))}`
+          + (deposited.ok ? ` — ${T.barDeposited}` : ` — ${T.barDepositFailed}`)
+          + ` — ${T.barCarbonSaved}`,
+      };
+    } catch (err) {
+      // Le code du refus, pas seulement son texte : le signataire répond par des
+      // codes stables pour qu'on corrige sans lire une phrase.
+      ctx.carbon = { text: `${T.barCarbonFailed} — ${err.code ?? ""} ${err.message ?? err}` };
+      carbonBtn.disabled = false;
+    }
+    carbonStatus.textContent = ctx.carbon.text;
+    await render();
+    carbonStatus.textContent = ctx.carbon.text;
   });
 
   fetchBtn?.addEventListener("click", async () => {

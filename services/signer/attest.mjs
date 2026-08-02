@@ -14,7 +14,7 @@
  */
 import { canonicalBytes } from "../../site/assets/js/canonical.js";
 import { multibase58Decode } from "../../site/assets/js/multibase.js";
-import { aggregate, emissionOf } from "../../site/assets/js/engine.js";
+import { aggregate, allocateToBar, emissionOf } from "../../site/assets/js/engine.js";
 import { assertAdmissible } from "./admissible.mjs";
 import { partition } from "./coverage.mjs";
 
@@ -64,7 +64,7 @@ export async function decide(request, { storeKey, taxonomy, tolerance = 1e-9 }) 
   const extraction = await verifyExtraction(request.extraction, storeKey);
 
   // 3 — le client rend-il compte de tout ce qui lui a été servi ?
-  const { used, excluded } = partition(extraction, request.dispositions);
+  const { used, shared, excluded } = partition(extraction, request.dispositions);
 
   // 4 — le recalcul redonne-t-il le chiffre présenté ?
   //
@@ -79,19 +79,50 @@ export async function decide(request, { storeKey, taxonomy, tolerance = 1e-9 }) 
   // moitié le lot compterait pour un mois entier. Le moteur sait déjà le faire ;
   // ce qui manque est la décision d'admissibilité sur ce que le porteur a le
   // droit de déclarer comme fenêtre. Elle relève de #6.
+  //
+  // DEUX AGRÉGATS ET NON UN, depuis le 2 août 2026. Ce qui est attribué au lot
+  // de la barre et ce qui n'est attribué à aucun lot ne subissent pas la même
+  // division : les mêler avant de diviser reviendrait à diluer le lot dans son
+  // voisin. Le signataire ne juge toujours pas POURQUOI une cellule est dans
+  // l'un ou l'autre — c'est un contrôle de couverture, pas de sémantique — mais
+  // il refait l'arithmétique que ce classement entraîne.
   const profile = aggregate(used, taxonomy);
-  const total = Object.values(profile.lines).reduce((a, b) => a + b, 0);
+  const sharedProfile = aggregate(shared.map((s) => s.cell), taxonomy);
+  const sum = (lines) => Object.values(lines).reduce((a, b) => a + b, 0);
+
+  // Les diviseurs sont DÉCLARÉS par le client et RECALCULÉS ici : sans eux, la
+  // valeur présentée serait invérifiable ; absents, la règle dégénère en
+  // « un lot, une barre », qui est exactement l'ancien comportement.
+  const alloc = allocateToBar({
+    allocated: sum(profile.lines),
+    shared: sum(sharedProfile.lines),
+    lotsInWindow: request.allocationInputs?.lotsInWindow ?? 1,
+    barsInLot: request.allocationInputs?.barsInLot ?? 1,
+  });
+
   const denominator = request.denominator;
   if (!(typeof denominator === "number") || denominator <= 0) {
     throw fault("DENOMINATOR_INVALID", String(denominator));
   }
-  const recomputed = total / denominator;
+  const recomputed = alloc.perBar / denominator;
 
   if (Math.abs(recomputed - request.value) > tolerance) {
     throw fault("VALUE_MISMATCH", `présenté ${request.value}, recalculé ${recomputed}`);
   }
 
-  return { ...profile, excluded, value: recomputed, total };
+  return {
+    ...profile,
+    shared,
+    excluded,
+    alloc,
+    value: recomputed,
+    total: alloc.perBar,
+    // Le seau non-alloué subit les mêmes parts que ce dont il provient : le
+    // déclarer en entier à côté d'un total déjà divisé donnerait deux chiffres
+    // sans commune mesure dans le même document.
+    unallocated: profile.unallocated * alloc.shareUsed
+               + sharedProfile.unallocated * alloc.shareShared,
+  };
 }
 
 /**
@@ -115,34 +146,60 @@ export async function decide(request, { storeKey, taxonomy, tolerance = 1e-9 }) 
  * @returns {{cells: Array<object>, disposition: (cell: object) => object}}
  */
 export function matrixOf(verdict) {
+  const share = verdict.alloc ?? { shareUsed: 1, shareShared: 1 };
+
+  /** Une cellule servie, remise à plat pour la matrice. */
+  const flat = (cell) => ({
+    step: cell.step ?? null,
+    subPost: cell.subPost ?? null,
+    partType: cell.partType ?? null,
+    caracterisation: cell.caracterisation,
+    // La période d'une cellule écartée voyage comme celle d'une cellule
+    // retenue. Le motif seul ne suffit pas : « écartée, hors périmètre » sans
+    // date ne se recoupe avec rien, alors que la matrice existe précisément
+    // pour être recoupée.
+    period: { start: cell.periodStart, end: cell.periodEnd },
+    // Le montant d'une cellule écartée se calcule par LA MÊME formule que
+    // celui d'une cellule retenue — débit x facteur x durée — et donc par la
+    // même fonction. Deux formules, même d'accord aujourd'hui, divergeraient
+    // un jour sans que rien ne le signale, et l'écart apparaîtrait dans un
+    // document signé.
+    amount: emissionOf(cell),
+    origin: cell.origin ?? "NOT_MEASURED",
+  });
+
+  // LE MONTANT N'EST PAS MIS À L'ÉCHELLE, LA PART EST DÉCLARÉE À CÔTÉ.
+  //
+  // C'est la décision qui rend la matrice recoupable. Un montant déjà divisé
+  // par le nombre de barres ne se compare à rien : ni au cube, ni au classeur
+  // d'AGM, ni à la même cellule vue depuis une autre barre. En portant le
+  // montant ENTIER de la cellule et, à côté, la fraction que cette barre en
+  // supporte, la matrice dit deux choses vérifiables séparément — ce que la
+  // mine a consommé, et la règle par laquelle on lui en impute une part.
+  //
+  // Le contenu carbone de la barre est alors une somme que n'importe qui refait
+  // à la main : Σ montant × part. Une cellule écartée y entre avec une part
+  // nulle, ce qui est plus fort que de l'omettre — elle est dénombrable, datée,
+  // et son motif est lisible.
   const cells = [
-    ...verdict.pivot.map((cell) => ({ ...cell, used: true })),
+    ...verdict.pivot.map((cell) => ({ ...cell, share: share.shareUsed })),
+    ...(verdict.shared ?? []).map(({ cell, reason }) => ({
+      ...flat(cell), share: share.shareShared, reason,
+    })),
     ...verdict.excluded.map(({ cell, reason }) => ({
-      step: cell.step ?? null,
-      subPost: cell.subPost ?? null,
-      partType: cell.partType ?? null,
-      caracterisation: cell.caracterisation,
-      // La période d'une cellule écartée voyage comme celle d'une cellule
-      // retenue. Le motif seul ne suffit pas : « écartée, hors périmètre » sans
-      // date ne se recoupe avec rien, alors que la matrice existe précisément
-      // pour être recoupée.
-      period: { start: cell.periodStart, end: cell.periodEnd },
-      // Le montant d'une cellule écartée se calcule par LA MÊME formule que
-      // celui d'une cellule retenue — débit x facteur x durée — et donc par la
-      // même fonction. Deux formules, même d'accord aujourd'hui, divergeraient
-      // un jour sans que rien ne le signale, et l'écart apparaîtrait dans un
-      // document signé.
-      amount: emissionOf(cell),
-      origin: cell.origin ?? "NOT_MEASURED",
-      used: false,
-      reason,
+      ...flat(cell), share: 0, reason,
     })),
   ];
 
-  // `used` et `reason` gouvernent l'entrée signée ; ils ne font pas partie du
-  // contenu engagé, sinon ils y seraient cachés alors qu'ils doivent être lus.
+  // `reason` gouverne la lecture de l'entrée signée ; il ne fait pas partie du
+  // contenu engagé, sinon il y serait caché alors qu'il doit être lu. `share`,
+  // lui, EST engagé : c'est un terme du calcul, et un terme du calcul qu'on
+  // pourrait changer après signature ne serait pas un calcul signé.
   return {
-    cells: cells.map(({ used: _u, reason: _r, ...content }) => content),
-    disposition: (_cell, index) => ({ used: cells[index].used, reason: cells[index].reason }),
+    cells: cells.map(({ reason: _r, ...content }) => content),
+    disposition: (_cell, index) => ({
+      used: cells[index].share > 0,
+      reason: cells[index].reason,
+    }),
   };
 }
