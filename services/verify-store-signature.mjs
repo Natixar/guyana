@@ -54,7 +54,7 @@ if (!ok) {
 // Un contrôle qui ne peut pas échouer est décoratif : on vérifie aussi qu'une
 // charge altérée est bien rejetée.
 const tampered = structuredClone(payload);
-tampered.cells[0].value = 999999;
+tampered.cells[0].flux = 999999;
 const stillOk = await crypto.subtle.verify(
   { name: "ECDSA", hash: "SHA-256" }, key,
   multibase58Decode(proof.proofValue), canonicalBytes(tampered));

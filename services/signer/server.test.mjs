@@ -58,9 +58,16 @@ const CELL = {
   // La conversion a lieu une seule fois, dans `load_2025.py`, et jamais ici.
   //
   // Le contrôle qui le rend indiscutable est dimensionnel : l'émission vaut
-  // `value × factor`, donc m3 × kgCO2e/m3 = kgCO2e. Un facteur laissé en
-  // kgCO2e/L donnerait des kgCO2e mille fois trop petits sous le même nom.
-  value: 1, unit: "m3", factor: 2680, origin: "MEASURED",
+  // `flux × facteur × durée`, donc (m3/s) × (kgCO2e/m3) × s = kgCO2e. Un facteur
+  // laissé en kgCO2e/L donnerait des kgCO2e mille fois trop petits sous le même
+  // nom.
+  //
+  // L'intervalle est d'une seconde pour que le débit et la quantité se lisent
+  // l'un dans l'autre : ces cas-ci portent sur la forme de l'attestation, pas
+  // sur l'arithmétique du temps.
+  flux: 1, dimension: "volume", displayUnit: "L",
+  factor: 2680, origin: "MEASURED",
+  periodStart: "2025-01-01T04:00:00Z", periodEnd: "2025-01-01T04:00:01Z",
 };
 
 async function signedExtraction(cells) {
@@ -172,17 +179,24 @@ test("une cellule écartée reste dans la matrice, dénombrable et motivée", as
 
 test("une cellule divulguée se décrit seule", async () => {
   // Le porteur peut ne remettre que celle-ci. Un vérificateur qui reçoit un
-  // montant sans son unité, sans sa période et sans son mode n'a rien reçu.
+  // montant sans sa période et sans son mode n'a rien reçu.
   const r = await call("/api/v1/sign", await request());
   const cell = r.body.disclosures[0];
 
-  assert.equal(cell.unit, "kgCO2e", "le montant ne dit pas son unité");
   assert.equal(cell.mode, "aggregate", "le mode d'impact manque");
   assert.equal(cell.subPost, 1000, "la position pivot manque");
   assert.ok("period" in cell, "l'intervalle manque");
   assert.ok("origin" in cell, "l'origine manque");
   // Et jamais une ligne de référentiel : c'est la propriété centrale de #61.
   assert.ok(!("line" in cell) && !("ghgp" in cell));
+
+  // NI L'UNITÉ DU RÉSULTAT. Elle appartient au calcul, pas à la donnée : ce
+  // sont des kgCO2e parce qu'on a appliqué un facteur d'émission, et le même
+  // débit sous un facteur de consommation d'eau donnerait des mètres cubes.
+  // Figée dans la cellule, elle deviendrait fausse sans que rien ne bouge ;
+  // l'attestation, elle, dit de quel calcul elle rend compte.
+  assert.ok(!("unit" in cell), "l'unité du résultat est collée à la donnée");
+  assert.equal(r.body.credential.credentialSubject.carbonIntensity.unit, "kgCO2e/kg");
 });
 
 test("l'intervalle survit à l'agrégation", async () => {
@@ -190,9 +204,9 @@ test("l'intervalle survit à l'agrégation", async () => {
   // fondaient en une seule dont personne ne pouvait plus dire le mois — alors
   // que la période est un axe de la matrice.
   const janvier = { ...CELL, id: "j", periodStart: "2025-01-01T04:00:00Z",
-                    periodEnd: "2025-02-01T04:00:00Z" };
+                    periodEnd: "2025-01-01T04:00:01Z" };
   const fevrier = { ...CELL, id: "f", periodStart: "2025-02-01T04:00:00Z",
-                    periodEnd: "2025-03-01T04:00:00Z" };
+                    periodEnd: "2025-02-01T04:00:01Z" };
   const r = await call("/api/v1/sign", await request({
     extraction: await signedExtraction([janvier, fevrier]),
     dispositions: [{ id: "j", use: "USED" }, { id: "f", use: "USED" }],

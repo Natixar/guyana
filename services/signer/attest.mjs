@@ -14,7 +14,7 @@
  */
 import { canonicalBytes } from "../../site/assets/js/canonical.js";
 import { multibase58Decode } from "../../site/assets/js/multibase.js";
-import { aggregate } from "../../site/assets/js/engine.js";
+import { aggregate, emissionOf } from "../../site/assets/js/engine.js";
 import { assertAdmissible } from "./admissible.mjs";
 import { partition } from "./coverage.mjs";
 
@@ -67,6 +67,18 @@ export async function decide(request, { storeKey, taxonomy, tolerance = 1e-9 }) 
   const { used, excluded } = partition(extraction, request.dispositions);
 
   // 4 — le recalcul redonne-t-il le chiffre présenté ?
+  //
+  // SANS FENÊTRE, DÉLIBÉRÉMENT. Chaque cellule est intégrée sur sa propre
+  // période, c'est-à-dire en entier. C'est juste tant que l'extraction est
+  // servie pour des périodes que les cellules épousent — le cas d'aujourd'hui,
+  // où le cube est mensuel et l'attestation porte sur des mois.
+  //
+  // Le jour où une attestation portera sur l'empreinte temporelle d'un lot —
+  // un multi-intervalle de quelques jours — la fenêtre devra voyager dans la
+  // requête et entrer ici, faute de quoi une cellule mensuelle recouvrant à
+  // moitié le lot compterait pour un mois entier. Le moteur sait déjà le faire ;
+  // ce qui manque est la décision d'admissibilité sur ce que le porteur a le
+  // droit de déclarer comme fenêtre. Elle relève de #6.
   const profile = aggregate(used, taxonomy);
   const total = Object.values(profile.lines).reduce((a, b) => a + b, 0);
   const denominator = request.denominator;
@@ -109,7 +121,17 @@ export function matrixOf(verdict) {
       subPost: cell.subPost ?? null,
       partType: cell.partType ?? null,
       caracterisation: cell.caracterisation,
-      amount: cell.value * cell.factor,
+      // La période d'une cellule écartée voyage comme celle d'une cellule
+      // retenue. Le motif seul ne suffit pas : « écartée, hors périmètre » sans
+      // date ne se recoupe avec rien, alors que la matrice existe précisément
+      // pour être recoupée.
+      period: { start: cell.periodStart, end: cell.periodEnd },
+      // Le montant d'une cellule écartée se calcule par LA MÊME formule que
+      // celui d'une cellule retenue — débit x facteur x durée — et donc par la
+      // même fonction. Deux formules, même d'accord aujourd'hui, divergeraient
+      // un jour sans que rien ne le signale, et l'écart apparaîtrait dans un
+      // document signé.
+      amount: emissionOf(cell),
       origin: cell.origin ?? "NOT_MEASURED",
       used: false,
       reason,

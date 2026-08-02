@@ -1,12 +1,13 @@
 {
   "_": "Vecteurs partagés du moteur de calcul. Exécutés dans le navigateur par la page d'auto-test ET dans Node par la suite du signataire. Si les deux hôtes s'accordent ici, ils s'accordent en pratique. Voir services/README.md et l'issue #66.",
-  "version": "1",
+  "version": "2",
   "taxonomy": "agm-h1-v2",
   "conditions": {
     "export": "GHGP",
     "control": "Operational",
     "level": "Standard"
   },
+  "_flux": "Une cellule porte un DÉBIT — la métrique divisée par la durée de son intervalle — et l'émission vaut débit x facteur x durée. Les cas ci-dessous prennent donc un intervalle de mille secondes (00:00:00 -> 00:16:40) : un débit de 1 y désigne mille unités, et les attentes se lisent comme avant le passage au débit. Mille secondes et non un mois, parce que le produit doit être exact en binaire — un facteur ramené à la durée d'un mois ne se relit pas.",
   "cases": [
     {
       "name": "combustion fixe — le gazole des groupes va en 1.1",
@@ -16,10 +17,13 @@
           "subPost": 1000,
           "partType": 1,
           "caracterisation": 1,
-          "value": 1000,
-          "unit": "L",
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 2.68,
-          "origin": "MEASURED"
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
         }
       ],
       "expect": {
@@ -38,19 +42,25 @@
           "subPost": 1000,
           "partType": 1,
           "caracterisation": 1,
-          "value": 1000,
-          "unit": "L",
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 2.68,
-          "origin": "MEASURED"
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
         },
         {
           "subPost": 1000,
           "partType": 2,
           "caracterisation": 1,
-          "value": 1000,
-          "unit": "L",
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 0.61,
-          "origin": "MEASURED"
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
         }
       ],
       "expect": {
@@ -70,10 +80,13 @@
           "subPost": 1002,
           "partType": 1,
           "caracterisation": 1,
-          "value": 1000,
-          "unit": "L",
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 2.68,
-          "origin": "MEASURED"
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
         }
       ],
       "expect": {
@@ -92,10 +105,13 @@
           "subPost": 1005,
           "partType": null,
           "caracterisation": 2,
-          "value": 1000,
-          "unit": "kg",
+          "flux": 1,
+          "dimension": "mass",
+          "displayUnit": "kg",
           "factor": 0.17,
-          "origin": "MEASURED"
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
         }
       ],
       "expect": {
@@ -114,19 +130,25 @@
           "subPost": 1000,
           "partType": 1,
           "caracterisation": 1,
-          "value": 1000,
-          "unit": "L",
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 2.68,
-          "origin": "MEASURED"
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
         },
         {
           "subPost": 1000,
           "partType": 1,
           "caracterisation": 1,
-          "value": 1000,
-          "unit": "L",
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 2.68,
-          "origin": "ESTIMATED"
+          "origin": "ESTIMATED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
         }
       ],
       "expect": {
@@ -145,21 +167,25 @@
           "subPost": 1000,
           "partType": 1,
           "caracterisation": 1,
-          "value": 1000,
-          "unit": "L",
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 2.68,
-          "origin": "MEASURED"
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
         },
         {
           "subPost": null,
           "partType": null,
           "caracterisation": 1,
-          "value": 500,
-          "unit": "L",
+          "flux": 0.5,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 2.68,
           "origin": "MEASURED",
           "periodStart": "2025-01-01T00:00:00Z",
-          "periodEnd": "2025-02-01T00:00:00Z"
+          "periodEnd": "2025-01-01T00:16:40Z"
         }
       ],
       "expect": {
@@ -178,10 +204,13 @@
           "subPost": 1002,
           "partType": 5,
           "caracterisation": 1,
-          "value": 1000,
-          "unit": "L",
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 1.0,
-          "origin": "MEASURED"
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
         }
       ],
       "expect": {
@@ -196,14 +225,36 @@
           "subPost": 1000,
           "partType": 1,
           "caracterisation": null,
-          "value": 1000,
-          "unit": "L",
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
+          "factor": 2.68,
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
+        }
+      ],
+      "expect": {
+        "error": "CARACTERISATION_REQUIRED"
+      }
+    },
+    {
+      "name": "période absente — un débit sans intervalle ne désigne aucune quantité",
+      "why": "Lui prêter une durée par défaut produirait un nombre plausible et faux, que la signature figerait. Le refus est la seule réponse honnête.",
+      "cells": [
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": 1,
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 2.68,
           "origin": "MEASURED"
         }
       ],
       "expect": {
-        "error": "CARACTERISATION_REQUIRED"
+        "error": "PERIOD_REQUIRED"
       }
     },
     {
@@ -214,19 +265,25 @@
           "subPost": 1000,
           "partType": 1,
           "caracterisation": 1,
-          "value": 600,
-          "unit": "L",
+          "flux": 0.6,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 2.68,
-          "origin": "MEASURED"
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
         },
         {
           "subPost": 1000,
           "partType": 1,
           "caracterisation": 1,
-          "value": 400,
-          "unit": "L",
+          "flux": 0.4,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 2.68,
-          "origin": "MEASURED"
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
         }
       ],
       "expect": {
@@ -239,26 +296,32 @@
       }
     },
     {
-      "name": "agrégation — des unités d'activité différentes somment quand même leurs émissions",
-      "why": "Ce qui se somme dans un groupe est l'émission, pas la donnée d'activité : additionner des litres et des kilogrammes n'aurait aucun sens.",
+      "name": "agrégation — des unités d'affichage différentes somment quand même leurs émissions",
+      "why": "Ce qui se somme dans un groupe est l'émission, pas la donnée d'activité. L'unité d'affichage est une commodité de rendu et n'entre dans aucun calcul : deux cellules affichées en kilogrammes et en tonnes portent le même débit SI et ne font qu'un groupe.",
       "cells": [
         {
           "subPost": 1005,
           "partType": null,
           "caracterisation": 2,
-          "value": 1000,
-          "unit": "kg",
+          "flux": 1,
+          "dimension": "mass",
+          "displayUnit": "kg",
           "factor": 0.17,
-          "origin": "MEASURED"
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
         },
         {
           "subPost": 1005,
           "partType": null,
           "caracterisation": 2,
-          "value": 1000,
-          "unit": "t",
+          "flux": 1,
+          "dimension": "mass",
+          "displayUnit": "t",
           "factor": 0.17,
-          "origin": "MEASURED"
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
         }
       ],
       "expect": {
@@ -271,6 +334,166 @@
       }
     },
     {
+      "name": "débit — deux fois l'intervalle, deux fois l'émission",
+      "why": "C'est la propriété qui définit le stockage en débit. Le même nombre sur un intervalle deux fois plus long doit rendre deux fois plus : sans elle, la période ne serait qu'une étiquette.",
+      "cells": [
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": 1,
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
+          "factor": 2.68,
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:33:20Z"
+        }
+      ],
+      "expect": {
+        "lines": {
+          "1.1": 5360.0
+        },
+        "origin": "MEASURED",
+        "unallocated": 0,
+        "groups": 1
+      }
+    },
+    {
+      "name": "fenêtre — un recouvrement partiel ne prend que sa part",
+      "why": "C'est la raison d'être du débit. Une cellule mensuelle servie pour une fenêtre de trois jours doit compter trois jours ; la sommer entière serait un sur-comptage silencieux, et c'est le défaut que le stockage en quantité rendait inévitable.",
+      "windows": [
+        {
+          "start": "2025-01-01T00:00:00Z",
+          "end": "2025-01-01T00:06:40Z"
+        }
+      ],
+      "cells": [
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": 1,
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
+          "factor": 2.68,
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
+        }
+      ],
+      "expect": {
+        "lines": {
+          "1.1": 1072.0
+        },
+        "origin": "MEASURED",
+        "unallocated": 0,
+        "groups": 1
+      }
+    },
+    {
+      "name": "fenêtre — deux morceaux disjoints donnent deux cellules datées",
+      "why": "L'empreinte d'un lot est un multi-intervalle, un par opération. Une enveloppe couvrant les deux prétendrait avoir intégré ce qui les sépare ; une moyenne des deux ne se situerait plus dans le temps.",
+      "windows": [
+        {
+          "start": "2025-01-01T00:00:00Z",
+          "end": "2025-01-01T00:03:20Z"
+        },
+        {
+          "start": "2025-01-01T00:13:20Z",
+          "end": "2025-01-01T00:16:40Z"
+        }
+      ],
+      "cells": [
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": 1,
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
+          "factor": 2.68,
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
+        }
+      ],
+      "expect": {
+        "lines": {
+          "1.1": 1072.0
+        },
+        "origin": "MEASURED",
+        "unallocated": 0,
+        "groups": 2
+      }
+    },
+    {
+      "name": "fenêtre — deux morceaux qui se recouvrent ne comptent le recouvrement qu'une fois",
+      "why": "Deux opérations d'un même lot peuvent se chevaucher. Intégrer sur chacune séparément gonflerait l'empreinte précisément là où l'activité est la plus dense, ce qui est le pire endroit pour se tromper.",
+      "windows": [
+        {
+          "start": "2025-01-01T00:00:00Z",
+          "end": "2025-01-01T00:10:00Z"
+        },
+        {
+          "start": "2025-01-01T00:06:40Z",
+          "end": "2025-01-01T00:16:40Z"
+        }
+      ],
+      "cells": [
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": 1,
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
+          "factor": 2.68,
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
+        }
+      ],
+      "expect": {
+        "lines": {
+          "1.1": 2680.0
+        },
+        "origin": "MEASURED",
+        "unallocated": 0,
+        "groups": 1
+      }
+    },
+    {
+      "name": "fenêtre — une cellule hors fenêtre ne compte pas, et son origine compte quand même",
+      "why": "Le magasin sert par recouvrement et peut servir large. Une cellule qui ne recouvre rien pèse zéro — mais elle a été jugée pertinente, et l'oublier ferait remonter la qualité de l'agrégat par un effet de bord.",
+      "windows": [
+        {
+          "start": "2025-02-01T00:00:00Z",
+          "end": "2025-02-01T00:16:40Z"
+        }
+      ],
+      "cells": [
+        {
+          "subPost": 1000,
+          "partType": 1,
+          "caracterisation": 1,
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
+          "factor": 2.68,
+          "origin": "ESTIMATED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z"
+        }
+      ],
+      "expect": {
+        "lines": {},
+        "origin": "ESTIMATED",
+        "unallocated": 0,
+        "groups": 0
+      }
+    },
+    {
       "name": "allocation — le non-alloué du mois se divise entre les barres de ce mois",
       "why": "Règle §14.2 « spécifique validée », décidée le 1er août 2026. C'est ce qui fait qu'une barre porte sa part des frais généraux.",
       "cells": [
@@ -278,12 +501,13 @@
           "subPost": null,
           "partType": null,
           "caracterisation": 1,
-          "value": 1000,
-          "unit": "L",
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 2.68,
           "origin": "MEASURED",
           "periodStart": "2025-01-01T00:00:00Z",
-          "periodEnd": "2025-02-01T00:00:00Z"
+          "periodEnd": "2025-01-01T00:16:40Z"
         }
       ],
       "expect": {
@@ -309,23 +533,25 @@
           "subPost": null,
           "partType": null,
           "caracterisation": 1,
-          "value": 1000,
-          "unit": "L",
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 2.68,
           "origin": "MEASURED",
           "periodStart": "2025-01-01T00:00:00Z",
-          "periodEnd": "2025-02-01T00:00:00Z"
+          "periodEnd": "2025-01-01T00:16:40Z"
         },
         {
           "subPost": null,
           "partType": null,
           "caracterisation": 1,
-          "value": 1000,
-          "unit": "L",
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 2.68,
           "origin": "MEASURED",
           "periodStart": "2025-02-01T00:00:00Z",
-          "periodEnd": "2025-03-01T00:00:00Z"
+          "periodEnd": "2025-02-01T00:16:40Z"
         }
       ],
       "expect": {
@@ -353,12 +579,13 @@
           "subPost": null,
           "partType": null,
           "caracterisation": 1,
-          "value": 1000,
-          "unit": "L",
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
           "factor": 2.68,
           "origin": "MEASURED",
           "periodStart": "2025-01-01T00:00:00Z",
-          "periodEnd": "2025-02-01T00:00:00Z"
+          "periodEnd": "2025-01-01T00:16:40Z"
         }
       ],
       "expect": {
@@ -378,5 +605,5 @@
     }
   ],
   "resultUnit": "kgCO2e",
-  "_resultUnit": "Tout est en SI. Un facteur vaut des kgCO2e par unité d'activité, et cette unité est celle de la cellule : le moteur ne convertit rien et n'a rien à vérifier. La conversion a lieu à l'ingestion — voir services/store/load_2025.py."
+  "_resultUnit": "L'unité est celle du CALCUL, pas celle de la donnée : une cellule porte un débit, et c'est le facteur qui en fait des kgCO2e. Elle vit donc sur le profil et sur aucune cellule — le jour où le même débit servira à calculer une consommation d'eau, une cellule qui aurait emporté « kgCO2e » dans sa forme serait devenue fausse sans que rien ne bouge. La conversion des unités d'origine a lieu à l'ingestion — voir services/store/load_2025.py."
 }

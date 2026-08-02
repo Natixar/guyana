@@ -19,9 +19,15 @@
  * un tableau vide.
  *
  * DEUX AXES DANS UN SEUL TABLEAU, ET IL FAUT LE MONTRER. Les quatre origines se
- * partagent 100 % d'une ligne ; INCOMPLETE et MISSING sont un autre axe — une
- * cellule mesurée peut combler un trou de calendrier. Additionner les sept
- * colonnes n'a aucun sens, donc l'en-tête les sépare.
+ * partagent 100 % d'une ligne ; MISSING est un autre axe — une cellule mesurée
+ * peut combler un trou de calendrier. Additionner les cinq colonnes n'a aucun
+ * sens, donc l'en-tête les sépare.
+ *
+ * IL N'Y A PLUS DE COLONNE INCOMPLETE. Dire qu'une émission attend une grandeur
+ * absente suppose de connaître l'intention de calcul, qui n'est pas stockée en
+ * H1 : elle y est implicite — une métrique, un facteur d'émission. La colonne
+ * affichait donc une règle codée en dur pour le gazole d'AGM, présentée comme un
+ * indice de qualité mesuré. C'est H2 qui la rendra déductible.
  *
  * Le refus vient du service, pas de cet écran : un compte sans le droit reçoit
  * un 403 même en tapant l'adresse. La page se contente de le dire lisiblement.
@@ -50,7 +56,7 @@ const alarming = (n, total) => total > 0 && n / total >= 0.1;
 function organisationRow(r) {
   const cells = [
     ["measured", false], ["derived", false], ["estimated", false],
-    ["notMeasured", true], ["incomplete", true], ["missing", true],
+    ["notMeasured", true], ["missing", true],
   ].map(([key, watch]) => {
     const value = r[key] ?? 0;
     const flag = watch && alarming(value, r.cells);
@@ -73,13 +79,13 @@ function breakdown(byOrganisation) {
         <tr>
           <th rowspan="2">${T.qualityOrganisation}</th>
           <th colspan="4" class="num">${T.qualityAxisOrigin}</th>
-          <th colspan="2" class="num">${T.qualityAxisCoverage}</th>
+          <th class="num">${T.qualityAxisCoverage}</th>
           <th rowspan="2" class="num">${T.qualityCells}</th>
         </tr>
         <tr>
           <th class="num">MEASURED</th><th class="num">DERIVED</th>
           <th class="num">ESTIMATED</th><th class="num">NOT MEASURED</th>
-          <th class="num">INCOMPLETE</th><th class="num">MISSING</th>
+          <th class="num">MISSING</th>
         </tr>
       </thead>
       <tbody>${byOrganisation.map(organisationRow).join("")}</tbody>

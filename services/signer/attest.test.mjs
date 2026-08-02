@@ -40,9 +40,14 @@ async function extractionOf(cells, signWith = storePair.privateKey) {
 
 const CELL = {
   id: "c1", subPost: 1000, partType: 1, caracterisation: 1,
-  // Un mètre cube de gazole, 2 680 kgCO2e. Mille m3 seraient absurdes,
-  // et un gabarit invraisemblable rend illisible ce que le cas mesure.
-  value: 1, unit: "m3", factor: 2680, origin: "MEASURED",
+  // Un mètre cube de gazole, 2 680 kgCO2e. La cellule porte un DÉBIT, et
+  // l'intervalle est ce qui en fait une quantité : une seconde, pour que le
+  // débit et la quantité se lisent l'un dans l'autre sans arrondi. Ces cas-ci
+  // portent sur la couverture et le refus, pas sur l'arithmétique du temps —
+  // celle-là est exercée par les vecteurs partagés du moteur.
+  flux: 1, dimension: "volume", displayUnit: "L",
+  factor: 2680, origin: "MEASURED",
+  periodStart: "2025-01-01T00:00:00Z", periodEnd: "2025-01-01T00:00:01Z",
 };
 
 async function requestFor(cells, over = {}) {
@@ -101,7 +106,7 @@ test("refuse une extraction signée par quelqu'un d'autre que le magasin", async
 
 test("refuse une extraction dont une cellule a été modifiée après signature", async () => {
   const r = await requestFor([CELL]);
-  r.extraction.cells[0].value = 999999;
+  r.extraction.cells[0].flux = 999999;
   await refuses(r, "EXTRACTION_SIGNATURE_INVALID");
 });
 

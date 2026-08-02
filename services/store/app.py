@@ -312,7 +312,6 @@ def counts(x_webauth_user: str | None = Header(default=None)) -> dict:
                        count(*) FILTER (WHERE c.origin = 'DERIVED')         AS derived,
                        count(*) FILTER (WHERE c.origin = 'ESTIMATED')       AS estimated,
                        count(*) FILTER (WHERE c.origin = 'NOT_MEASURED')    AS "notMeasured",
-                       count(*) FILTER (WHERE c.coverage = 'INCOMPLETE')    AS incomplete,
                        count(*) FILTER (WHERE c.coverage = 'MISSING')       AS missing
                   FROM cell c
                   JOIN root_of r  ON r.id = c.entity_id

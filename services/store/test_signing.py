@@ -65,8 +65,8 @@ def test_writes_a_sample_for_the_javascript_host():
     payload = {
         "cells": [{
             "id": "c1", "subPost": 1000, "partType": 1, "caracterisation": 1,
-            "value": 1000, "unit": "L", "factor": 2.68,
-            "factorUnit": "kgCO2e/L", "origin": "MEASURED",
+            "flux": 1000, "dimension": "volume", "displayUnit": "L",
+            "factor": 2.68, "origin": "MEASURED",
         }],
         "servedAt": "2026-08-01T00:00:00Z",
         # Non-ASCII et décimaux : les deux endroits où les sérialisations

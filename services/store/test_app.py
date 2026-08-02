@@ -42,8 +42,7 @@ pytestmark = pytest.mark.skipif(
 def conn():
     with db.connect() as c:
         db.apply_schema(c)
-        c.execute("TRUNCATE cell, credential; DELETE FROM entity; DELETE FROM unit;")
-        c.execute("INSERT INTO unit (id, symbol) VALUES (1, 'm3') ON CONFLICT DO NOTHING")
+        c.execute("TRUNCATE cell, credential; DELETE FROM entity;")
         c.execute("INSERT INTO entity (id, label) VALUES (1, 'lot-1') ON CONFLICT DO NOTHING")
         yield c
 
@@ -51,9 +50,9 @@ def conn():
 def _cell(conn, cell_id: str, start: str, end: str, sub_post: int | None = 1000) -> None:
     conn.execute(
         """INSERT INTO cell (id, period, entity_id, sub_post, part_type, caracterisation,
-                             value, unit_id, factor, origin)
+                             flux, dimension, display_unit, factor, origin)
            VALUES (%s, tstzrange(%s::timestamptz, %s::timestamptz, '[)'),
-                   1, %s, 1, 1, 1000, 1, 2680, 'MEASURED')""",
+                   1, %s, 1, 1, 1000, 'volume', 'L', 2680, 'MEASURED')""",
         (cell_id, start, end, sub_post),
     )
 
@@ -115,13 +114,14 @@ def test_an_unallocated_cell_is_served_like_any_other(conn):
 
 
 def test_a_cell_carries_a_number_not_a_representation(conn):
-    """Le facteur est un nombre en kgCO2e par unité d'activité, et cette unité
-    est déjà celle de la cellule. La porter une seconde fois créerait deux
-    sources de vérité pour une information unique."""
+    """Le facteur est un nombre en kgCO2e par unité SI d'activité, et cette unité
+    se déduit de la dimension. La porter une seconde fois créerait deux sources
+    de vérité pour une information unique."""
     _cell(conn, "janvier", "2026-01-01", "2026-02-01")
     got = db.cells_overlapping(conn, [_range("2026-01-01", "2026-02-01")])[0]
     assert "factorUnit" not in got
-    assert got["unit"] == "m3" and got["factor"] == 2680
+    assert "unit" not in got, "l'unité d'activité est revenue doubler la dimension"
+    assert got["dimension"] == "volume" and got["factor"] == 2680
 
 
 def test_no_decimal_crosses_the_boundary(conn):
@@ -130,7 +130,7 @@ def test_no_decimal_crosses_the_boundary(conn):
     vérifie plus."""
     _cell(conn, "janvier", "2026-01-01", "2026-02-01")
     got = db.cells_overlapping(conn, [_range("2026-01-01", "2026-02-01")])
-    for key in ("value", "factor"):
+    for key in ("flux", "factor"):
         assert isinstance(got[0][key], float), f"{key} n'est pas un flottant"
 
 
@@ -267,9 +267,9 @@ def _tenants(conn):
 def _quality_cell(conn, cell_id, entity, origin="MEASURED", coverage="COMPLETE"):
     conn.execute(
         """INSERT INTO cell (id, period, entity_id, sub_post, part_type, caracterisation,
-                             value, unit_id, factor, origin, coverage)
+                             flux, dimension, display_unit, factor, origin, coverage)
            VALUES (%s, tstzrange('2025-01-01'::timestamptz, '2025-02-01'::timestamptz, '[)'),
-                   %s, 1000, 1, 1, 10, 1, 2680, %s, %s)""",
+                   %s, 1000, 1, 1, 10, 'volume', 'L', 2680, %s, %s)""",
         (cell_id, entity, origin, coverage),
     )
 
@@ -299,13 +299,17 @@ def test_coverage_is_a_second_axis_not_a_fifth_origin(conn, client):
     """
     _tenants(conn)
     _quality_cell(conn, "q1", 10, origin="MEASURED", coverage="MISSING")
-    _quality_cell(conn, "q2", 10, origin="MEASURED", coverage="INCOMPLETE")
+    _quality_cell(conn, "q2", 10, origin="MEASURED", coverage="COMPLETE")
 
     row = _as(client, "natixar", "/api/v1/counts").json()["byOrganisation"][0]
     assert row["cells"] == 2
     assert row["measured"] == 2, "la couverture a mangé l'origine"
     assert row["missing"] == 1
-    assert row["incomplete"] == 1
+    # Et rien de plus : H1 ne prétend pas dire si une règle de calcul attendait
+    # une grandeur absente. Le savoir demande l'intention de calcul, qui n'est
+    # pas stockée ; une colonne de plus ici serait une règle codée en dur
+    # présentée comme un indice mesuré.
+    assert "incomplete" not in row
 
 
 def test_a_client_never_learns_who_else_is_on_the_platform(conn, client):

@@ -45,17 +45,24 @@ def cells_overlapping(conn: psycopg.Connection, periods: list[Range]) -> list[di
 
     `&& ANY(...)` reste indexable par le GiST, là où une disjonction construite
     à la main ne le serait pas nécessairement.
+
+    LES CELLULES SORTENT ENTIÈRES, avec leur période et leur débit, et non
+    tronquées à la fenêtre demandée. L'intégration appartient au moteur, qui
+    tourne des DEUX côtés — dans le navigateur qui explore et dans le signataire
+    qui recalcule. La faire ici mettrait l'arithmétique du temps dans le seul
+    endroit que le signataire ne rejoue pas, et un débit servi est justement ce
+    qui permet au navigateur de rejouer mille fenêtres sans revenir demander.
     """
     if not periods:
         return []
     rows = conn.execute(
         """
         SELECT c.id, c.sub_post AS "subPost", c.part_type AS "partType",
-               c.caracterisation, c.value, u.symbol AS unit,
+               c.caracterisation, c.flux, c.dimension,
+               c.display_unit AS "displayUnit",
                c.factor, c.origin,
                lower(c.period) AS "periodStart", upper(c.period) AS "periodEnd"
           FROM cell c
-          JOIN unit u ON u.id = c.unit_id
          WHERE c.period && ANY(%s)
          ORDER BY c.id
         """,
