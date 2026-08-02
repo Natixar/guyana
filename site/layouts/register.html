@@ -1,0 +1,13 @@
+{{ define "main" }}
+  <h1>{{ .Title }}</h1>
+  <p class="muted">{{ partial "t" "registerIntro" }}</p>
+
+  {{/* La mention de simulation est sur l'écran, pas dans un fichier : l'opérateur
+       ne doit pas avoir à ouvrir le jeu de données pour savoir ce qui est feint. */}}
+  <aside class="callout callout--roadmap" role="note">
+    <p>{{ partial "t" "registerSimulated" }}</p>
+  </aside>
+
+  <p><strong data-register-count>—</strong> {{ partial "t" "registerCertified" }}</p>
+  <div data-register><p class="muted">{{ partial "t" "registerLoading" }}</p></div>
+{{ end }}

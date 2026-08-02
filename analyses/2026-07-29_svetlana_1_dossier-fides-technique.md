@@ -17,7 +17,7 @@ Deux versions du dossier sont donc préparées ci-dessous :
 - **Version A — nommée.** Meilleur dossier, nécessite l'accord écrit d'AGM.
 - **Version B — anonymisée.** « A gold mining operation in South America ». Publiable sans accord, moins convaincante mais parfaitement recevable : plusieurs fiches du catalogue FIDES ne nomment pas leur client final.
 
-Si l'accord n'est pas obtenu **avant le 15 août**, on publie la version B. Ne pas attendre le 19.
+Si l'accord n'est pas obtenu **avant le 8 août**, on publie la version B. Ne pas attendre le 19 : les autres candidats rassemblent déjà des voix.
 
 ---
 
@@ -39,7 +39,7 @@ Le jury Innovation évalue : originalité de l'approche, application inédite de
 
 **3. Deux émetteurs, deux bases de confiance, dans une même chaîne.** La mine atteste ce qu'elle observe — le lingot existe, il pèse tant, il titre tant, il a été coulé tel jour. Nous attestons ce que nous calculons — l'intensité carbone, avec sa méthode. **Nous ne signons pas le poids d'un lingot que nous n'avons jamais vu, et la mine ne signe pas un calcul qu'elle n'a pas fait.** Le vérificateur contrôle les deux signatures séparément. C'est honnête, et c'est rare.
 
-**4. La minimisation des données est ici une exigence commerciale, pas réglementaire.** Dans la plupart des cas d'usage du catalogue, on protège des données personnelles parce que la loi l'impose. Ici, les prix, les contreparties et les volumes doivent rester invisibles parce que **les révéler détruirait la position commerciale du vendeur**. La divulgation sélective n'est pas une case de conformité, c'est la condition sans laquelle la mine ne participe pas du tout.
+**4. La minimisation des données est ici une exigence commerciale, pas réglementaire.** Dans la plupart des cas d'usage du catalogue, on protège des données personnelles parce que la loi l'impose. Ici, les prix, les contreparties et les volumes doivent rester invisibles parce que **les révéler détruirait la position commerciale du vendeur**. La divulgation maîtrisée n'est pas une case de conformité, c'est la condition sans laquelle la mine ne participe pas du tout.
 
 **5. Vérifiable sans l'opérateur de la plateforme.** Une chaîne d'approvisionnement de métaux met en présence des acteurs qui sont concurrents entre eux. Un système où il faut appeler l'intermédiaire pour vérifier une affirmation est un système où l'intermédiaire sait tout. Notre attestation se vérifie contre la clé publique de son émetteur : nous pouvons refuser l'accès, nous ne pouvons pas mentir.
 
@@ -146,7 +146,24 @@ Rangés dans l'ordre où ils apparaissent dans le dossier. Chacun tient en trois
 
 **Identifiant décentralisé** *(DID)* — un identifiant qui permet de retrouver la clé publique d'un émetteur. Nous employons la variante `did:web`, la plus simple : l'identifiant `did:web:guygold.com` signifie « la clé publique est publiée à une adresse convenue sur le site guygold.com ». Aucune blockchain n'est nécessaire. AGM nous a déjà fourni le sien, ainsi que son identifiant légal international (LEI).
 
-**Divulgation sélective** *(selective disclosure)* — la capacité de prouver une partie d'une attestation sans révéler le reste. Un acheteur obtient l'intensité carbone et la date de coulée sans voir les volumes ni les contreparties. Techniquement, chaque information est engagée séparément dans l'attestation, et on ne révèle que celles que l'on choisit.
+**Divulgation maîtrisée** — notre terme, et il est délibéré. La capacité de prouver une partie d'une attestation sans révéler le reste, **plus** le fait que la plateforme elle-même ne lise pas les chiffres en clair. Un acheteur obtient l'intensité carbone et la date de coulée sans voir les volumes ni les contreparties. Techniquement, chaque information est engagée séparément dans l'attestation, et on ne révèle que celles que l'on choisit.
+
+*Pourquoi pas « divulgation sélective ».* L'expression désigne, dans les normes du domaine, des constructions précises — SD-JWT, signatures BBS+ — que nous n'implémentons pas. Employer le terme exposerait à une question à laquelle nous ne pourrions pas répondre par oui. **Le tableau ci-dessous est la réponse à préparer** : il dit ce que nous offrons et ce que la voie normalisée offre en plus. Il n'est pas destiné au formulaire ; il est là pour que vous ne soyez jamais prise de court.
+
+| | Notre divulgation maîtrisée | Divulgation sélective normalisée |
+|---|---|---|
+| Révéler une partie, garder le reste | **oui**, ligne par ligne | oui |
+| Une seule signature couvre tout | **oui** | oui |
+| Le vérificateur contrôle sans nous appeler | **oui** | oui |
+| Le vérificateur **refait le calcul** | **oui** — c'est notre apport | non prévu |
+| Les exclusions voyagent avec leur motif | **oui** — notre apport | non prévu |
+| La plateforme ne lit pas les chiffres | **oui, à partir de H2** | hors sujet — la norme ne traite que la présentation |
+| Conforme SD-JWT / BBS+ | non | oui |
+| Fonctionne dans un portefeuille EUDI / EBSI | non | oui |
+| Deux présentations non corrélables entre elles | **non** — un vérificateur qui en reçoit deux sait que c'est le même lot | oui, avec BBS+ |
+| Prouver « moins de X » sans donner X | non | oui, en preuve à divulgation nulle |
+
+**Les trois « non » se disent sans gêne, dans cet ordre :** ils décrivent une compatibilité avec un écosystème de portefeuilles qui n'existe pas encore en production, et notre identifiant de sujet est déjà conçu pour l'y accueillir sans réémettre quoi que ce soit. La non-corrélation, elle, est le seul écart de propriété réelle — et elle ne mord que si un même acheteur reçoit plusieurs présentations du même lot, ce qui n'est pas le cas d'usage.
 
 **Intensité carbone, du berceau à la sortie d'usine** *(cradle-to-gate)* — la quantité de CO₂ équivalent émise pour produire une unité, depuis l'extraction jusqu'à la sortie du site, transport aval exclu. Notre unité est le **tCO2e par once d'or**. « Du berceau à la sortie d'usine » est une convention normalisée : elle dit exactement où le périmètre commence et où il s'arrête.
 
@@ -169,6 +186,45 @@ Un dossier qui surpromet se démonte en une question. Voici les cinq limites, av
 | « C'est compatible EUDI / EBSI » | Nous employons les mêmes normes W3C sur lesquelles ces écosystèmes reposent, ce qui rend l'interopérabilité future possible. Nous n'avons pas fait l'intégration, et nous ne le prétendons pas. |
 | « Le système garantit que la donnée est vraie » | Il garantit **l'intégrité et l'attribution** : la donnée vient bien de l'émetteur déclaré et n'a pas été modifiée. Que la mesure d'origine soit juste relève de l'audit, pas de la cryptographie. C'est une distinction que le jury connaît — l'énoncer vous crédibilise. |
 | « Nous couvrons toute l'empreinte » | Périmètres 1 et 2, sur un périmètre pilote choisi, année 2025. |
+| « C'est de la divulgation sélective » | **Divulgation maîtrisée.** Les propriétés utiles sont les mêmes ; la construction n'est pas celle des normes SD-JWT ou BBS+. Le tableau du §4 dit exactement en quoi, et il vaut mieux le sortir que le laisser deviner. |
+| « Vos données sont chiffrées chez nous » | **Ce sera vrai à partir de H2.** Aujourd'hui le magasin conserve les données du pilote en clair, derrière une authentification. Le schéma le prévoit, la décision de conception est prise ; ce n'est pas encore construit. La page publique porte la mention de date — ne la retirez pas d'une capture d'écran. |
+
+---
+
+## 5 bis. Les hypothèses de production — à dire avant qu'on les demande
+
+La démonstration porte sur **378 lingots de doré, année 2025**. Quatre hypothèses
+les font exister, et elles sont toutes assumées. Si le jury les découvre en
+posant une question, elles ressemblent à un raccourci ; énoncées d'avance, elles
+ressemblent à ce qu'elles sont — un modèle explicite, versionné, et remplaçable
+par les vraies données le jour où elles arrivent.
+
+| Hypothèse | Pourquoi |
+|---|---|
+| Le cycle de production dure **un mois** | Le minerai extrait un mois est traité et coulé le suivant. C'est court pour une mine, et c'est le seul point où nous simplifions la réalité physique. |
+| Les lingots sont coulés **en début de mois** | Le volume est faible — une trentaine de lingots par mois — donc la coulée est intermittente et non continue. |
+| Les opérations d'un lot sont les consommations des départements de production du **mois précédent** | C'est le cycle d'un mois, appliqué. Un lingot coulé le 1er mars porte le gazole de février. |
+| La fenêtre est **février à décembre**, pas l'année pleine | Des lingots coulés début janvier puiseraient dans décembre 2024, que nous n'avons pas. La fenêtre couvre **93,2 % des onces de l'année**. |
+
+**Ce qui est fabriqué, et ce qui ne l'est pas.** Le registre de coulée d'AGM — le
+jeu de données G-01 — est encore partiel : les onces mensuelles existent, mais la
+date de coulée, l'identifiant de lingot, le poids et le titre n'ont pas été
+fournis. Ces quatre champs sont donc simulés, et l'attestation le déclare dans un
+champ prévu pour cela (`eventModel: "simulated-v1"`). Tout le reste — les litres
+de gazole, les départements, les explosifs, les onces par mois — vient du paquet
+réel d'AGM.
+
+**La phrase à dire si on vous interroge :** *« La chaîne de preuve est réelle et
+tourne ; le registre de coulée est simulé parce que la mine ne nous l'a pas encore
+transmis, et l'attestation le déclare elle-même. »* C'est plus fort qu'un silence,
+et c'est vérifiable — le champ est dans le fichier signé.
+
+**Le périmètre organisationnel.** Pour le pilote, la mine est traitée comme un
+ensemble, et les entreprises sous-traitantes comme des directions regroupant des
+départements. Distinguer ce qu'AGM exploite de ce qu'elle ne fait que financer —
+les engins lourds de Sinohydro, par exemple — demanderait un audit du pouvoir de
+décision. **Cela ne change pas le chiffre par lingot** : cela change la ligne du
+référentiel où l'émission se range, pas le total qu'un lingot porte.
 
 ---
 
@@ -198,7 +254,7 @@ Ce qu'on lui accorde : l'origine, la date, l'intensité carbone, la méthode. Pa
 | **1er–5 août** | Accord écrit d'AGM sur la version A, ou décision de partir en version B | Svetlana |
 | **avant le 5 août** | Texte de la fiche validé par Jean-Marc | Svetlana + Jean-Marc |
 | **~12 août** | Nous vous livrons la page de vérification et le lien à insérer | Claude |
-| **15 août** | Point de bascule : sans accord AGM, on publie la version B | Svetlana |
+| **8 août** | Point de bascule : sans accord AGM, on publie la version B | Svetlana |
 | **20 août** | **Publication dans l'Ecosystem Explorer — date limite** | Svetlana |
 | 21 août | Finalistes annoncés | — |
 | 22 août → | Vote communautaire — mobilisation des réseaux | Svetlana |

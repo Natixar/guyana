@@ -8,12 +8,15 @@ première peut être vraie pendant que la seconde est fausse.
 
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 
 import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.range import Range
+
+from jcs import canonical_bytes
 
 HERE = Path(__file__).resolve().parent
 
@@ -49,7 +52,7 @@ def cells_overlapping(conn: psycopg.Connection, periods: list[Range]) -> list[di
         """
         SELECT c.id, c.sub_post AS "subPost", c.part_type AS "partType",
                c.caracterisation, c.value, u.symbol AS unit,
-               c.factor, c.factor_unit AS "factorUnit", c.origin,
+               c.factor, c.origin,
                lower(c.period) AS "periodStart", upper(c.period) AS "periodEnd"
           FROM cell c
           JOIN unit u ON u.id = c.unit_id
@@ -76,30 +79,93 @@ def _json_ready(row: dict) -> dict:
     return out
 
 
-def insert_credential(conn: psycopg.Connection, doc: dict, received_by: str | None) -> str:
+def credential_type(doc: dict) -> str:
+    """Le type significatif, « VerifiableCredential » étant porté par toutes.
+
+    Sans lui, l'origine et l'intensité carbone d'une même barre seraient
+    indistinguables — et elles partagent le même sujet.
+    """
+    types = doc.get("type") or []
+    if isinstance(types, str):
+        types = [types]
+    meaningful = [t for t in types if t != "VerifiableCredential"]
+    return meaningful[0] if meaningful else "VerifiableCredential"
+
+
+def insert_credential(conn: psycopg.Connection, doc: dict, received_by: str | None) -> dict:
+    """Range une attestation. L'identité est l'empreinte du document.
+
+    Renvoyer deux fois le même fichier ne crée rien ; une réémission pour le
+    même sujet est une ligne de plus, et le registre prendra la plus récente.
+    """
     subject = (doc.get("credentialSubject") or {}).get("id")
     if not subject:
         raise ValueError("attestation sans credentialSubject.id")
+
+    digest = hashlib.sha256(canonical_bytes(doc)).hexdigest()
+    kind = credential_type(doc)
+
     conn.execute(
         """
-        INSERT INTO credential (id, received_by, document)
-             VALUES (%s, %s, %s)
-        ON CONFLICT (id) DO NOTHING
+        INSERT INTO credential (digest, subject, type, received_by, document)
+             VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (digest) DO NOTHING
         """,
-        (subject, received_by, psycopg.types.json.Jsonb(doc)),
+        (digest, subject, kind, received_by, psycopg.types.json.Jsonb(doc)),
     )
-    return subject
+    return {"subject": subject, "type": kind, "digest": digest}
 
 
 def list_credentials(conn: psycopg.Connection, limit: int = 100) -> list[dict]:
+    """La plus récente par (sujet, type), documents compris."""
     rows = conn.execute(
         """
-        SELECT id, received_at AS "receivedAt", received_by AS "receivedBy", document
+        SELECT DISTINCT ON (subject, type)
+               digest, subject, type,
+               received_at AS "receivedAt", received_by AS "receivedBy", document
           FROM credential
-         ORDER BY received_at DESC
+         ORDER BY subject, type, received_at DESC
          LIMIT %s
         """,
         (limit,),
+    ).fetchall()
+    for r in rows:
+        r["receivedAt"] = r["receivedAt"].isoformat().replace("+00:00", "Z")
+    return rows
+
+
+def credential_index(conn: psycopg.Connection) -> list[dict]:
+    """Le registre : qui existe, sans les documents.
+
+    Trois cent soixante-dix-huit attestations complètes pour peupler un tableau
+    seraient plusieurs mégaoctets là où quelques kilo-octets suffisent. Le
+    document ne part que si on le demande, une barre à la fois.
+    """
+    rows = conn.execute(
+        """
+        SELECT DISTINCT ON (subject, type)
+               subject, type, digest, received_at AS "receivedAt"
+          FROM credential
+         ORDER BY subject, type, received_at DESC
+        """
+    ).fetchall()
+    for r in rows:
+        r["receivedAt"] = r["receivedAt"].isoformat().replace("+00:00", "Z")
+    return rows
+
+
+def credential_by_subject(conn: psycopg.Connection, subject: str) -> list[dict]:
+    """Les attestations d'une barre, la plus récente de chaque type."""
+    rows = conn.execute(
+        """
+        SELECT DISTINCT ON (type)
+               digest, subject, type,
+               received_at AS "receivedAt", received_by AS "receivedBy", document
+          FROM credential
+         WHERE subject = %s
+         ORDER BY type, received_at DESC
+        """,
+        (subject,),
     ).fetchall()
     for r in rows:
         r["receivedAt"] = r["receivedAt"].isoformat().replace("+00:00", "Z")

@@ -48,6 +48,11 @@ for domain in $APP_DOMAINS; do
   labels+=( --label "traefik.http.routers.${r}.entrypoints=websecure" )
   labels+=( --label "traefik.http.routers.${r}.tls=true" )
   labels+=( --label "traefik.http.routers.${r}.middlewares=${mw}" )
+  # Priorité EXPLICITE et basse. Sans elle, Traefik la déduit de la longueur de
+  # la règle, et ce routeur — qui ne parle que d'un hôte — battait ceux de
+  # l'API, qui parlent d'un hôte ET d'un préfixe. Le site répondant 200 pour
+  # tout chemin inconnu, la panne ressemblait à un succès.
+  labels+=( --label "traefik.http.routers.${r}.priority=10" )
 done
 
 # Routeur générique : rend le service indifférent au domaine, ce qui permet de

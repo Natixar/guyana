@@ -2,9 +2,11 @@
 
 import T from "./labels.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
+import { resolveDid } from "./did-source.js";
+import { esc } from "./escape.js";
 
 const $ = (s) => document.querySelector(s);
-const state = { credential: null, didDoc: null };
+const state = { credential: null, didDoc: null, didSource: null };
 
 /** Accolades équilibrées, en ignorant celles qui sont dans une chaîne. */
 function looksComplete(raw) {
@@ -24,7 +26,8 @@ function looksComplete(raw) {
   return !inStr && depth === 0;
 }
 
-const esc = (s) => String(s).replace(/[<&]/g, (c) => ({ "<": "&lt;", "&": "&amp;" })[c]);
+// L'échappement vit dans son propre module : trois versions partielles
+// valaient moins qu'une complète. Celle-ci couvre aussi les attributs.
 
 /** Accepts either a chosen file or pasted text — pasting is the easier path. */
 function wireInput(name, onLoad) {
@@ -76,11 +79,43 @@ function renderClaims(doc) {
     if (k === "id") continue;
     const value = v && typeof v === "object" ? v.value : v;
     const origin = v && typeof v === "object" ? v.origin : null;
-    rows.push(`<div><dt>${esc(k)}</dt><dd>${esc(value ?? "—")}` +
+    // L'unité voyage à côté de la valeur plutôt que collée dedans : signer
+    // « 12,7 kg » figerait une mise en forme et une langue. C'est donc au rendu
+    // de les réunir, et c'est ici. Une revendication sans unité n'en a pas.
+    const unit = v && typeof v === "object" && v.unit ? ` ${v.unit}` : "";
+    rows.push(`<div><dt>${esc(k)}</dt><dd>${esc(value ?? "—")}${esc(unit)}` +
       (origin && origin !== "MEASURED" ? ` <span class="origin-tag">${esc(origin.toLowerCase())}</span>` : "") +
       `</dd></div>`);
   }
   return rows.join("");
+}
+
+/**
+ * D'où vient la clé qui sert à vérifier — annoncé, jamais tu.
+ *
+ * C'est la seule phrase que cette page existe pour démontrer : si la clé ne
+ * vient pas du domaine de l'émetteur, le dire vaut mieux que de le laisser
+ * découvrir dans les outils de développement.
+ */
+function provenance() {
+  const label = {
+    network: [T.vDidFromNetwork, "verified"],
+    bundled: [T.vDidFromBundle, "warning"],
+    browser: [T.vDidFromBrowser, "warning"],
+    supplied: [T.vDidFromSupplied, "info"],
+    none: [T.vDidUnresolved, "warning"],
+  }[state.didSource];
+  if (!label) return "";
+  const [text, kind] = label;
+  const badge = `<p><span class="badge badge--${kind}">${esc(text)}</span></p>`;
+
+  // Le bandeau. La pastille suffit à qui sait la lire ; le bandeau s'adresse à
+  // qui regarde l'écran sans connaître le montage. Tant qu'AGM n'a pas déposé
+  // son document — l'installation n'est que partielle — le « téléchargement »
+  // affiché plus haut n'a pas eu lieu, et le taire ferait de cette page une
+  // démonstration truquée.
+  if (state.didSource === "network" || state.didSource === "supplied") return badge;
+  return badge + `<p class="banner banner--warning">${esc(T.vDidSimulated)}</p>`;
 }
 
 async function refresh() {
@@ -91,11 +126,22 @@ async function refresh() {
   // As soon as the credential is in, say where its issuer's key lives.
   if (state.credential?.issuer) {
     const url = didWebUrl(state.credential.issuer);
+
+    // Résolution automatique, réseau d'abord. Sans elle il fallait déposer un
+    // fichier à la main, ce qui fonctionne et se filme mal.
+    if (!state.didDoc) {
+      try {
+        const got = await resolveDid(state.credential.issuer);
+        state.didDoc = got.document;
+        state.didSource = got.source;
+      } catch { state.didSource = "none"; }
+    }
+
     hint.hidden = false;
     hint.innerHTML = `<p>${T.vIssuerIs} <code>${esc(state.credential.issuer)}</code></p>` +
-      (url ? `<p>${T.vFetchAt} <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a></p>
-              <p class="muted">${T.vFetchHow}</p>`
-           : `<p class="muted">${T.vNotDidWeb}</p>`);
+      (url ? `<p>${T.vFetchAt} <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a></p>`
+           : `<p class="muted">${T.vNotDidWeb}</p>`) +
+      provenance();
   } else {
     hint.hidden = true;
   }
@@ -127,5 +173,7 @@ async function refresh() {
 
 document.addEventListener("DOMContentLoaded", () => {
   wireInput("vc", (j) => { state.credential = j; });
-  wireInput("did", (j) => { state.didDoc = j; });
+  // Un document déposé à la main l'emporte : le vérificateur qui apporte le
+  // sien sait ce qu'il fait, et la provenance devient « fourni ».
+  wireInput("did", (j) => { state.didDoc = j; state.didSource = "supplied"; });
 });

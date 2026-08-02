@@ -1,0 +1,10 @@
+{{ define "main" }}
+  {{/* La mention de simulation est sur l'écran qui SIGNE, pas seulement sur le
+       registre : c'est ici que l'opérateur engage sa clé, et c'est donc ici
+       qu'il doit lire ce que valent les chiffres qu'il atteste. */}}
+  <aside class="callout callout--roadmap" role="note">
+    <p>{{ partial "t" "barSignSimulated" }}</p>
+  </aside>
+
+  <div class="card" data-bar></div>
+{{ end }}

@@ -1,0 +1,30 @@
+Natixar Gold Trace — Aurora
+Proof of concept, horizon H1 (FIDES)
+
+OWNER OF THIS CODE
+
+    Natixar
+    a legal entity organised and existing under the laws of France
+    registered office: 31 str. Raphael, 13008 Marseille, France
+
+Copyright (c) 2026 Natixar. All rights reserved.
+
+Every file in this repository is the property of Natixar unless it carries a
+notice of its own saying otherwise. Third-party components keep their own
+licences; `bash-deploy-libs` is a submodule and is governed by the terms of its
+own repository, not by this notice.
+
+
+WHAT IS NOT HERE, AND ON PURPOSE
+
+The client's physical data pack lives under `poc-data/`. It belongs to AGM Inc,
+it is confidential under clause 9 of the agreement, and it is excluded from
+version control. Nothing in this repository may copy its contents into a tracked
+file.
+
+The identity of AGM Inc is not recorded here. It is a client's data, and it
+belongs in the client's own taxonomy: it is loaded into the store as the head
+organisation of its entity tree, by `services/store/load_2025.py`. That
+taxonomy is the one the dimension encryption will cover once decision D1 of
+issue #6 is settled, which is why the identity is placed there rather than in a
+file that would never be encrypted.

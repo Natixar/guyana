@@ -10,10 +10,20 @@
 #   - le signataire est sur `proxy` SEULEMENT ;
 #   - le signataire reçoit la clé publique du magasin, jamais la privée.
 #
-# Le routage se fait par préfixe de chemin, et l'ordre des priorités compte :
-# `/api/v1/sign` doit gagner contre `/api/v1`, sans quoi les requêtes de
-# signature atterriraient dans le magasin — qui n'a pas de clé et répondrait 404,
-# ce qui est un symptôme bien loin de sa cause.
+# LE ROUTAGE PAR PRIORITÉ, ET POURQUOI ELLES SONT SI GRANDES.
+#
+# Traefik, faute de priorité explicite, la CALCULE sur la longueur de la règle.
+# Le routeur du site porte `Host(\`guyana.natixar.pro\`)`, soit une trentaine de
+# caractères, donc une priorité d'une trentaine : des valeurs de 10 et 20 se
+# faisaient battre par un routeur qui ne les mentionnait même pas. Le magasin
+# n'a jamais été joignable depuis le navigateur, et personne ne l'a vu parce que
+# le site répond 200 avec sa page d'accueil pour tout chemin inconnu — une
+# erreur de routage prenait l'apparence d'un succès.
+#
+# Les priorités sont donc explicites et TRÈS au-dessus de toute longueur de
+# règle plausible. `/api/v1/sign` doit en outre gagner contre `/api/v1`, sans
+# quoi les requêtes de signature atterriraient dans le magasin — qui n'a pas de
+# clé et répondrait 404, un symptôme loin de sa cause.
 set -euo pipefail
 
 : "${SIGNER_CONTAINER:?}" "${SIGNER_IMAGE:?}" "${SIGNER_PORT:?}"
@@ -23,7 +33,42 @@ set -euo pipefail
 : "${DB_PASSWORD:?}" "${SIGNER_KEY:?}" "${STORE_KEY:?}" "${STORE_PUBKEY:?}"
 
 primary=$(printf '%s\n' $APP_DOMAINS | head -1)
-mw="${ROUTER_PREFIX}-auth@docker,${ROUTER_PREFIX}-sec@docker"
+
+# CHAQUE CONTENEUR DÉCLARE SES PROPRES MIDDLEWARES.
+#
+# Les routeurs de l'API référençaient ceux du site. Or le lanceur recrée le site
+# APRÈS les services : pendant ce laps, Traefik voyait des routeurs pointant vers
+# un middleware absent et les mettait en erreur — « middleware
+# "guyana-sec@docker" does not exist ». L'API répondait 404 à chaque
+# redéploiement, jusqu'à ce que le site revienne.
+#
+# Un middleware par conteneur coûte quelques étiquettes et supprime une
+# dépendance d'ordre entre étapes. Les noms sont distincts pour que Traefik ne
+# voie jamais deux définitions du même.
+declare_mw() { # $1 = préfixe de nom
+  printf -- '--label
+traefik.http.middlewares.%s-auth.basicauth.users=%s
+' "$1" "$BASICAUTH_USERS"
+  printf -- '--label
+traefik.http.middlewares.%s-auth.basicauth.headerfield=X-Webauth-User
+' "$1"
+  printf -- '--label
+traefik.http.middlewares.%s-sec.headers.frameDeny=true
+' "$1"
+  printf -- '--label
+traefik.http.middlewares.%s-sec.headers.contentTypeNosniff=true
+' "$1"
+  printf -- '--label
+traefik.http.middlewares.%s-sec.headers.referrerPolicy=strict-origin-when-cross-origin
+' "$1"
+}
+
+: "${BASICAUTH_USERS:?BASICAUTH_USERS doit venir du lanceur, via secrets/fetch.sh}"
+
+store_ns="${ROUTER_PREFIX}-store"
+signer_ns="${ROUTER_PREFIX}-signer"
+mapfile -t store_mw < <(declare_mw "$store_ns")
+mapfile -t signer_mw < <(declare_mw "$signer_ns")
 
 # Les secrets arrivent par stdin et ne touchent jamais le disque de la cible.
 # Un fichier déposé sur l'hôte survivrait au conteneur et à notre attention.
@@ -42,6 +87,18 @@ secret_put() { # $1 = image, $2 = utilisateur, $3 = volume, $4 = nom de fichier
     sh -c "umask 077; cat > /s/$4 && chown \$(id -u $2):\$(id -g $2) /s/$4 && chmod 400 /s/$4"
 }
 
+# La chaîne de connexion en forme MOT-CLÉ, jamais en URI.
+#
+# Un mot de passe engendré au hasard contient tôt ou tard « / » ou « + ». Dans
+# `postgresql://user:pass@hote/base`, un « / » termine la partie utilisateur et
+# décale tout ce qui suit : la connexion échoue sur « Servname not supported »,
+# un message qui ne parle ni de mot de passe ni d'échappement. C'est arrivé.
+#
+# La forme mot-clé n'a pas de grammaire d'URI à respecter — seulement des
+# guillemets simples, qu'on échappe ici.
+escaped_password=$(printf '%s' "$DB_PASSWORD" | sed "s/\\\\/\\\\\\\\/g; s/'/\\\\'/g")
+store_dsn="host=${DB_CONTAINER} user=${DB_USER} dbname=${DB_NAME} password='${escaped_password}'"
+
 # --- le magasin : la base, aucune clé d'attestation ------------------------
 docker rm -f "$STORE_CONTAINER" >/dev/null 2>&1 || true
 printf '%s' "$STORE_KEY" | secret_put "$STORE_IMAGE" store "${STORE_CONTAINER}-secrets" store_key.pem
@@ -51,16 +108,17 @@ docker run -d --name "$STORE_CONTAINER" \
   --restart unless-stopped \
   --read-only --tmpfs /tmp \
   --security-opt no-new-privileges:true \
-  -e STORE_DSN="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_CONTAINER}/${DB_NAME}" \
+  -e STORE_DSN="$store_dsn" \
   -e STORE_KEY_PATH=/run/secrets/store_key.pem \
   -e STORE_PORT="$STORE_PORT" \
   -v "${STORE_CONTAINER}-secrets:/run/secrets:ro" \
+  "${store_mw[@]}" \
   --label traefik.enable=true \
   --label "traefik.http.routers.${ROUTER_PREFIX}-store.rule=Host(\`${primary}\`) && PathPrefix(\`/api/v1\`)" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-store.entrypoints=websecure" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-store.tls=true" \
-  --label "traefik.http.routers.${ROUTER_PREFIX}-store.priority=10" \
-  --label "traefik.http.routers.${ROUTER_PREFIX}-store.middlewares=${mw}" \
+  --label "traefik.http.routers.${ROUTER_PREFIX}-store.priority=1000" \
+  --label "traefik.http.routers.${ROUTER_PREFIX}-store.middlewares=${store_ns}-auth@docker,${store_ns}-sec@docker" \
   --label "traefik.http.services.${ROUTER_PREFIX}-store.loadbalancer.server.port=${STORE_PORT}" \
   "$STORE_IMAGE" >/dev/null
 
@@ -82,12 +140,13 @@ docker run -d --name "$SIGNER_CONTAINER" \
   -e STORE_PUBKEY_PATH=/run/secrets/store_pubkey \
   -e SIGNER_PORT="$SIGNER_PORT" \
   -v "${SIGNER_CONTAINER}-secrets:/run/secrets:ro" \
+  "${signer_mw[@]}" \
   --label traefik.enable=true \
   --label "traefik.http.routers.${ROUTER_PREFIX}-signer.rule=Host(\`${primary}\`) && PathPrefix(\`/api/v1/sign\`)" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-signer.entrypoints=websecure" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-signer.tls=true" \
-  --label "traefik.http.routers.${ROUTER_PREFIX}-signer.priority=20" \
-  --label "traefik.http.routers.${ROUTER_PREFIX}-signer.middlewares=${mw}" \
+  --label "traefik.http.routers.${ROUTER_PREFIX}-signer.priority=2000" \
+  --label "traefik.http.routers.${ROUTER_PREFIX}-signer.middlewares=${signer_ns}-auth@docker,${signer_ns}-sec@docker" \
   --label "traefik.http.services.${ROUTER_PREFIX}-signer.loadbalancer.server.port=${SIGNER_PORT}" \
   "$SIGNER_IMAGE" >/dev/null
 
@@ -125,4 +184,4 @@ for c in "$STORE_CONTAINER" "$SIGNER_CONTAINER"; do
 done
 
 echo "magasin sur ${PROXY_NETWORK}+${DB_NETWORK}, signataire sur ${PROXY_NETWORK} seul"
-echo "routage : /api/v1/sign -> signataire (priorité 20), /api/v1 -> magasin (10)"
+echo "routage : /api/v1/sign -> signataire (2000), /api/v1 -> magasin (1000), reste -> site"
