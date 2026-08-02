@@ -66,7 +66,24 @@ p  { margin: 0 0 1rem; }
   border: 1px solid color-mix(in srgb, var(--status-pending) 45%, transparent);
   color: var(--foreground);
 }
+.banner--warning {
+  background: color-mix(in srgb, var(--status-warning) 12%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--status-warning) 45%, transparent);
+  color: var(--foreground);
+}
 .banner[hidden] { display: none; }
+
+/* Empreintes : lues à voix haute et comparées caractère par caractère, donc
+   chasse fixe et coupure autorisée n'importe où. */
+.mono { font-family: var(--font-mono, ui-monospace, monospace); word-break: break-all; }
+
+/* Fusion du document DID : replié par défaut — la plupart des exploitants
+   n'ont pas encore de document publié. */
+.merge { margin: 1rem 0; padding: .875rem 1.125rem;
+  border: 1px solid var(--border); border-radius: var(--radius); }
+.merge > summary { cursor: pointer; font-weight: 600; }
+.merge textarea { width: 100%; font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: .8125rem; }
 
 /* Contenu ------------------------------------------------------------- */
 main { flex: 1; padding: 2.5rem 0 3rem; }
@@ -100,6 +117,70 @@ main { flex: 1; padding: 2.5rem 0 3rem; }
 .badge--warning  { color: var(--status-warning);  background: color-mix(in srgb, var(--status-warning) 12%, transparent); }
 .badge--info     { color: var(--status-info);     background: color-mix(in srgb, var(--status-info) 12%, transparent); }
 
+/* Encadrés ------------------------------------------------------------- */
+/* Un encadré de feuille de route dit qu'une garantie n'est PAS encore là. Sur
+   une page de vente, cette phrase est la seule que le lecteur pressé ne doit
+   pas pouvoir sauter — d'où la barre latérale, la couleur d'état et le fond
+   teinté, plutôt qu'une note de bas de page. */
+.callout {
+  margin: 1.25rem 0;
+  padding: .875rem 1.125rem;
+  border-left: 4px solid var(--status-info);
+  border-radius: 0 6px 6px 0;
+  background: color-mix(in srgb, var(--status-info) 8%, transparent);
+}
+.callout p { margin: 0; }
+.callout--roadmap {
+  border-left-color: var(--status-pending);
+  background: color-mix(in srgb, var(--status-pending) 10%, transparent);
+}
+
+/* Navigation ------------------------------------------------------------ */
+.site-nav { display: flex; gap: 1rem; margin-left: 1.5rem; flex-wrap: wrap; }
+/* Sur un téléphone le menu passe à la ligne : la marge de gauche, utile
+   quand il suit le nom de marque, ne l'est plus quand il est seul. */
+@media (max-width: 34rem) {
+  .site-nav { margin-left: 0; width: 100%; gap: .875rem; }
+  .site-user { margin-left: 0; width: 100%; }
+}
+.site-nav a { color: inherit; opacity: .75; text-decoration: none; font-size: .9375rem; }
+.site-nav a:hover { opacity: 1; text-decoration: underline; }
+/* La page courante se signale au lecteur ET au lecteur d'écran. */
+.site-nav a[aria-current="page"] { opacity: 1; font-weight: 600; text-decoration: underline; }
+.site-user { margin-left: auto; font-size: .875rem; opacity: .7; }
+.site-header .wrap { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+
+/* Registre --------------------------------------------------------------- */
+/* Onze lots repliés : la maille du calcul est le lot, et 378 lignes ouvertes
+   d'emblée feraient une page qu'on parcourt au lieu d'une page qu'on lit. */
+.lot { margin: .5rem 0; border: 1px solid var(--border); border-radius: 8px; }
+.lot > summary {
+  display: flex; flex-wrap: wrap; gap: .75rem; align-items: baseline;
+  padding: .75rem 1rem; cursor: pointer;
+}
+.lot > summary::-webkit-details-marker { color: var(--muted-foreground); }
+.lot[open] > summary { border-bottom: 1px solid var(--border); }
+
+table.register { width: 100%; border-collapse: collapse; font-size: .9375rem; }
+table.register th, table.register td {
+  padding: .5rem 1rem; text-align: left; border-bottom: 1px solid var(--border);
+}
+table.register th { font-weight: 600; color: var(--muted-foreground); }
+table.register tr:last-child td { border-bottom: 0; }
+table.register .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* Une part qui mérite un coup de fil. La couleur n'est PAS le seul porteur —
+   le chiffre reste lisible et le tableau se lit sans elle : un exploitant
+   daltonien doit voir la même chose, et une capture en noir et blanc aussi. */
+table.register .num--warning { color: var(--status-warning); font-weight: 600; }
+/* Un tableau ne doit jamais faire déborder la page horizontalement. */
+.lot[open] { overflow-x: auto; }
+/* Sept colonnes de pourcentages : sur un portable, elles défilent dans leur
+   propre boîte plutôt que d'élargir la page. */
+table.register { width: 100%; }
+.card > table.register { display: block; overflow-x: auto; }
+
+.btn--small { padding: .25rem .625rem; font-size: .875rem; }
+
 /* Actions -------------------------------------------------------------- */
 .btn {
   font: inherit; font-family: var(--font-heading); font-weight: var(--fw-medium);
@@ -117,8 +198,16 @@ main { flex: 1; padding: 2.5rem 0 3rem; }
            text-transform: uppercase; letter-spacing: .04em; color: var(--muted-foreground);
            margin: 1.5rem 0 .25rem; }
 .subhead:first-of-type { margin-top: .5rem; }
-.actions { margin-top: 1.5rem; }
-.actions .muted { margin-left: .75rem; }
+/* Une ligne d'action tient sur une ligne quand elle peut, et se replie quand
+   elle ne peut pas. `margin-left` sur un texte en flux le laissait couler SOUS
+   le bouton dès que la largeur manquait — sur un téléphone, le texte passait
+   derrière. Flex + wrap replie proprement ; `align-items: center` garde le
+   texte à hauteur du bouton tant qu'ils cohabitent. */
+.actions {
+  margin-top: 1.5rem;
+  display: flex; flex-wrap: wrap; align-items: center; gap: .75rem;
+}
+.actions .muted { margin-left: 0; flex: 1 1 16rem; }
 input[type="text"] {
   font: inherit; font-family: var(--font-mono); margin-top: .35rem;
   padding: .6rem .75rem; width: min(24rem, 100%);

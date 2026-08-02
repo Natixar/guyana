@@ -16,6 +16,30 @@
   <div class="card">
     <h2>{{ partial "t" "resetTitle" }}</h2>
     <p class="muted">{{ partial "t" "resetBody" }}</p>
+    {{/* Le DID installé, demandé ICI comme il l'est à la création de clé. Ce
+         n'est pas une formalité : « orpheline » se juge contre le document
+         publié, pas contre la clé locale, et sans le document la question n'a
+         pas de réponse. */}}
+    <details class="merge" data-did-merge open>
+      <summary>{{ partial "t" "resetDidTitle" }}</summary>
+      <p class="muted">{{ partial "t" "resetDidWhy" }}</p>
+      <p><input type="file" accept=".json,application/json" data-did-previous-file></p>
+      <details><summary>{{ partial "t" "didMergePaste" }}</summary>
+        <textarea rows="5" data-did-previous-text spellcheck="false"></textarea></details>
+      <p><span data-did-previous-status class="badge badge--warning">{{ partial "t" "didMergeNone" }}</span></p>
+      <dl class="facts" data-did-previous-facts hidden>
+        <div><dt>{{ partial "t" "didPreviousDigest" }}</dt><dd data-did-previous-digest class="mono">—</dd></div>
+        <div><dt>{{ partial "t" "didKeysKept" }}</dt><dd data-did-keys-kept>—</dd></div>
+      </dl>
+    </details>
+
+    <p><label><input type="checkbox" data-reset-orphans disabled>
+       {{ partial "t" "resetAlsoClear" }} <strong data-reset-orphan-count>—</strong>
+       {{ partial "t" "resetOrphaned" }}</label></p>
+
+    <p><label><input type="checkbox" data-reset-force>
+       {{ partial "t" "resetForce" }}</label></p>
+
     <p><label>{{ partial "t" "resetLabel" }}<br>
        <input type="text" data-reset-confirm autocomplete="off" spellcheck="false"></label></p>
     <p class="actions">

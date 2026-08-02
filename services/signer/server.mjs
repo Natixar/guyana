@@ -51,7 +51,8 @@ export async function createApp({ signingKey, storeKey, taxonomy }) {
         issuerDid: ISSUER_DID,
         subjectId: request.subjectId,
         derivedFrom: request.derivedFrom,
-        intensity: { value: verdict.value, unit: request.unit ?? "tCO2e/oz" },
+        // L'unité est dérivée, jamais déclarée : kgCO2e par unité de dénominateur.
+        intensity: { value: verdict.value, unit: `kgCO2e/${request.denominatorUnit}` },
         pivot: verdict.pivot,
         unallocated: verdict.unallocated,
         excluded: verdict.excluded,

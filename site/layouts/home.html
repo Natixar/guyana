@@ -5,5 +5,12 @@
   {{ partial "banner-demo.html" . }}
   {{ partial "panel-environment.html" . }}
   {{ partial "panel-setup.html" . }}
-  {{ partial "panel-bar.html" . }}
+
+  {{/* La coulée ne se choisit plus sur l'accueil : elle se choisit dans le
+       registre, qui sait laquelle est déjà certifiée. Un panneau figé sur un
+       exemple unique laissait croire qu'il n'y avait qu'une barre. */}}
+  <p class="actions">
+    <a class="btn btn--primary" href="/register/">{{ partial "t" "navProduction" }}</a>
+    <span class="muted">{{ partial "t" "registerIntro" }}</span>
+  </p>
 {{ end }}

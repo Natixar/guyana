@@ -40,7 +40,9 @@ async function extractionOf(cells, signWith = storePair.privateKey) {
 
 const CELL = {
   id: "c1", subPost: 1000, partType: 1, caracterisation: 1,
-  value: 1000, unit: "L", factor: 2.68, factorUnit: "kgCO2e/L", origin: "MEASURED",
+  // Un mètre cube de gazole, 2 680 kgCO2e. Mille m3 seraient absurdes,
+  // et un gabarit invraisemblable rend illisible ce que le cas mesure.
+  value: 1, unit: "m3", factor: 2680, origin: "MEASURED",
 };
 
 async function requestFor(cells, over = {}) {
@@ -53,7 +55,8 @@ async function requestFor(cells, over = {}) {
     extraction: await extractionOf(cells),
     dispositions: cells.map((c) => ({ id: c.id, use: "USED" })),
     denominator: 1,
-    value: cells.length * 2.68,
+    denominatorUnit: "kg",
+    value: cells.length * 2680,
     ...over,
   };
 }
@@ -67,10 +70,10 @@ async function refuses(request, code) {
 
 test("signe un cas nominal, et rend le profil recalculé", async () => {
   const out = await decide(await requestFor([CELL]), opts());
-  assert.equal(out.unit, "tCO2e");
-  assert.equal(out.lines["1.1"], 2.68);
+  assert.equal(out.unit, "kgCO2e");
+  assert.equal(out.lines["1.1"], 2680);
   assert.equal(out.origin, "MEASURED");
-  assert.equal(out.value, 2.68);
+  assert.equal(out.value, 2680);
 });
 
 test("refuse une revendication hors de l'ensemble admissible", async () => {
@@ -106,7 +109,7 @@ test("refuse une cellule servie dont le client ne rend pas compte", async () => 
   const two = [CELL, { ...CELL, id: "c2" }];
   const r = await requestFor(two);
   r.dispositions = [{ id: "c1", use: "USED" }];   // c2 passée sous silence
-  r.value = 2.68;
+  r.value = 2680;
   await refuses(r, "DISPOSITION_MISSING");
 });
 
@@ -121,9 +124,9 @@ test("accepte une exclusion motivée, et la fait voyager", async () => {
   const r = await requestFor(two);
   r.dispositions = [{ id: "c1", use: "USED" },
                     { id: "c2", use: "EXCLUDED", reason: "hors fenêtre pilote" }];
-  r.value = 2.68;
+  r.value = 2680;
   const out = await decide(r, opts());
-  assert.equal(out.value, 2.68);
+  assert.equal(out.value, 2680);
   assert.equal(out.excluded.length, 1);
   assert.equal(out.excluded[0].reason, "hors fenêtre pilote");
 });
@@ -135,11 +138,30 @@ test("refuse une disposition qui parle d'une cellule jamais servie", async () =>
 });
 
 test("refuse un chiffre que le recalcul ne redonne pas", async () => {
-  await refuses(await requestFor([CELL], { value: 0.94 }), "VALUE_MISMATCH");
+  await refuses(await requestFor([CELL], { value: 940 }), "VALUE_MISMATCH");
 });
 
-test("refuse une valeur hors des bornes de vraisemblance", async () => {
-  await refuses(await requestFor([CELL], { value: 1e9 }), "VALUE_IMPLAUSIBLE");
+test("refuse une requête qui ne dit pas l'unité de son dénominateur", async () => {
+  // Sans elle, la borne de vraisemblance supposait une unité : un chiffre
+  // divisé par des barres au lieu d'onces est ~355 fois plus grand, et le
+  // garde censé attraper une unité que personne n'a voulue en devinait une.
+  const r = await requestFor([CELL]);
+  delete r.denominatorUnit;
+  await refuses(r, "FIELD_MISSING");
+});
+
+test("refuse une unité de dénominateur hors du SI", async () => {
+  // L'once troy porte un facteur trente et un que quelqu'un finira par
+  // appliquer une fois de trop ou pas du tout.
+  await refuses(await requestFor([CELL], { denominatorUnit: "oz" }), "DENOMINATOR_UNIT_NOT_SI");
+  await refuses(await requestFor([CELL], { denominatorUnit: "t" }), "DENOMINATOR_UNIT_NOT_SI");
+});
+
+test("un chiffre faux est rejeté par le RECALCUL, pas par un seuil", async () => {
+  // Il n'y a plus de seuil : borner en tCO2e par once d'or mettait la
+  // connaissance d'un client dans un service générique, et ne protégeait que
+  // d'un problème d'unité que le SI résout à la racine.
+  await refuses(await requestFor([CELL], { value: 1e9 }), "VALUE_MISMATCH");
 });
 
 test("refuse un dénominateur nul plutôt que de diviser par zéro", async () => {

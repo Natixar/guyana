@@ -114,7 +114,12 @@ jobs:
         env:
           STORE_DSN: postgresql://postgres:test@localhost:5432/aurora
         run: |
-          python3 -m pip install --quiet pytest cryptography 'psycopg[binary]'
+          # Les dépendances du service viennent de son requirements.txt, épinglé :
+          # les réénumérer ici en produit une seconde liste, qui diverge. C'est
+          # arrivé — fastapi y manquait, le module de test l'importe, et la
+          # collecte échouait avant le premier cas. Rien ne l'avait vu parce que
+          # ce job ne s'était jamais exécuté sur la branche.
+          python3 -m pip install --quiet -r requirements.txt pytest httpx
           python3 -m pytest -q
 
       # Les deux moitiés d'un seul contrôle. Python signe, JavaScript vérifie —
@@ -179,6 +184,16 @@ jobs:
           curl -sf http://127.0.0.1:8080/ | grep -q 'Natixar Gold Trace'
           curl -sf http://127.0.0.1:8080/api/v1/me | grep -q 'did:web'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/inconnu)" = 200
+
+      # LES TESTS DU SIGNATEUR TOURNENT DANS SON IMAGE, pas seulement depuis le
+      # dépôt. Depuis le dépôt tous les fichiers existent ; dans l'image, seuls
+      # ceux que le Dockerfile a copiés. Un module qui gagne une dépendance non
+      # copiée passe alors la CI et redémarre en boucle en production sur
+      # ERR_MODULE_NOT_FOUND — c'est arrivé le 1er août 2026.
+      - name: le signataire tourne dans son image
+        run: |
+          docker build -q -f services/signer/Dockerfile -t aurora-signer:ci .
+          docker run --rm aurora-signer:ci node --test '/app/*.test.mjs'
 
       - name: démonter
         if: always()

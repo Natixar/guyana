@@ -1,0 +1,37 @@
+{{/* Le contrôle d'empreinte, posé dans le guide d'installation.
+
+     Un shortcode et non du HTML brut : goldmark filtre le HTML des fichiers de
+     contenu, et activer `unsafe` ouvrirait l'injection sur toute page future
+     pour le confort d'un formulaire.
+
+     Deux dépôts et non un : ce que le contrôle compare, ce sont DEUX documents
+     — celui qui est en ligne et celui qu'on s'apprête à publier. Demander une
+     empreinte saisie à la main inviterait à la recopier de travers, ce qui est
+     précisément l'erreur que le contrôle existe pour attraper. */}}
+<section class="card" data-did-check>
+  <h3>{{ partial "t" "didCheckTitle" }}</h3>
+  <p class="muted">{{ partial "t" "didCheckWhy" }}</p>
+
+  <h4 class="subhead">{{ partial "t" "didCheckOnline" }}</h4>
+  <p><input type="file" accept="application/json,.json" data-check-online-file></p>
+  <details>
+    <summary>{{ partial "t" "didMergePaste" }}</summary>
+    <textarea rows="4" spellcheck="false" data-check-online-text></textarea>
+  </details>
+  <dl class="facts">
+    <div><dt>{{ partial "t" "didCheckDigest" }}</dt><dd><code data-check-online-digest>—</code></dd></div>
+    <div><dt>{{ partial "t" "didCheckKeys" }}</dt><dd data-check-online-keys>—</dd></div>
+  </dl>
+
+  <h4 class="subhead">{{ partial "t" "didCheckNext" }}</h4>
+  <p><input type="file" accept="application/json,.json" data-check-next-file></p>
+  <details>
+    <summary>{{ partial "t" "didMergePaste" }}</summary>
+    <textarea rows="4" spellcheck="false" data-check-next-text></textarea>
+  </details>
+  <dl class="facts">
+    <div><dt>{{ partial "t" "didCheckBuiltOn" }}</dt><dd><code data-check-next-previous>—</code></dd></div>
+  </dl>
+
+  <p><span class="badge badge--pending" data-check-verdict>{{ partial "t" "didCheckWaiting" }}</span></p>
+</section>

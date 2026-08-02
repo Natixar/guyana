@@ -10,3 +10,10 @@ audit-*
 # départements, registre d'équipements. Elles ne quittent pas ce poste. La
 # taxonomie pivot, elle, est publiée — c'est site/static/engine/taxonomy.json.
 poc-data/
+
+# Les analyses portent toutes l'en-tête « Document local, non versionné », et
+# aucune n'a jamais été suivie. La règle n'était qu'une habitude : le répertoire
+# n'était pas ignoré, seulement jamais ajouté, si bien qu'un `git add -A` les
+# aurait toutes emportées. Depuis que le script de tournage contient les mots de
+# passe de la démonstration, l'habitude ne suffit plus.
+analyses/

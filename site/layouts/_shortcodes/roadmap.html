@@ -1,0 +1,13 @@
+{{/* Encadré de feuille de route : une garantie qui n'est PAS encore là.
+
+     Un shortcode et non du HTML brut dans la page : goldmark filtre le HTML
+     des fichiers de contenu, et l'activer globalement (`unsafe = true`)
+     ouvrirait l'injection sur toute page future pour le confort d'un div.
+
+     Sur une page de vente, la phrase qui dit qu'une garantie n'est pas encore
+     là est la seule que le lecteur pressé ne doit pas pouvoir sauter. D'où le
+     rôle `note` et le libellé explicite : elle est annoncée aux lecteurs
+     d'écran comme aux autres. */}}
+<aside class="callout callout--roadmap" role="note" aria-label="{{ .Get "when" | default "Roadmap" }}">
+  <p><strong>{{ .Get "when" | default "Not yet available" }}</strong> {{ .Inner | .Page.RenderString }}</p>
+</aside>

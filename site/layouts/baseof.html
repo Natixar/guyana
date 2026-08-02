@@ -6,10 +6,17 @@
     <div class="wrap">
       <span class="brand">{{ partial "logo.html" (dict "variant" "white") }}</span>
       <span class="brand-name">{{ site.Params.platformName }}</span>
+      <nav class="site-nav" data-nav aria-label="{{ partial "t" "navLabel" }}"></nav>
+      <span class="site-user muted" data-nav-user></span>
     </div>
   </header>
 
   <main><div class="wrap">{{ block "main" . }}{{ end }}</div></main>
+
+  {{/* Le menu est commun à toutes les pages : il se construit ici, une fois,
+       à partir de /api/v1/me. Chaque page garde son propre point d'entrée. */}}
+  {{ $nav := resources.Get "js/nav.js" | js.Build (dict "format" "esm" "minify" true "target" "es2020" "params" (index site.Data.ui site.Language.Lang)) | fingerprint "sha384" }}
+  <script type="module" src="{{ $nav.RelPermalink }}" integrity="{{ $nav.Data.Integrity }}" defer></script>
 
 
   <footer class="site-footer">

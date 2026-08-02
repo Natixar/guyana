@@ -48,7 +48,18 @@ async function call(path, body) {
 
 const CELL = {
   id: "c1", subPost: 1000, partType: 1, caracterisation: 1,
-  value: 1000, unit: "L", factor: 2.68, factorUnit: "kgCO2e/L", origin: "MEASURED",
+  // Un mètre cube de gazole, 2 680 kgCO2e.
+  //
+  // LE FACTEUR EST DÉJÀ EN SI, et c'est ce que le chiffre 2680 dit. La feuille 9
+  // du paquet AGM le donne à 2,68 kgCO2e/L parce que les bons de sortie comptent
+  // en litres ; un mètre cube en contient mille, donc le facteur se MULTIPLIE
+  // par mille en franchissant la frontière — 2,68 kgCO2e/L = 2 680 kgCO2e/m3.
+  // La conversion a lieu une seule fois, dans `load_2025.py`, et jamais ici.
+  //
+  // Le contrôle qui le rend indiscutable est dimensionnel : l'émission vaut
+  // `value × factor`, donc m3 × kgCO2e/m3 = kgCO2e. Un facteur laissé en
+  // kgCO2e/L donnerait des kgCO2e mille fois trop petits sous le même nom.
+  value: 1, unit: "m3", factor: 2680, origin: "MEASURED",
 };
 
 async function signedExtraction(cells) {
@@ -67,8 +78,19 @@ async function request(over = {}) {
     derivedFrom: { id: "urn:aurora:dore:0123456789abcdef", digestMultibase: "zAbC" },
     extraction: await signedExtraction([CELL]),
     dispositions: [{ id: "c1", use: "USED" }],
+    // LE DÉNOMINATEUR EST CE PAR QUOI ON DIVISE POUR OBTENIR UNE INTENSITÉ :
+    // ici la masse d'or fin du lingot, en kilogrammes. Deux kilogrammes est un
+    // chiffre rond choisi pour que l'arithmétique du test se lise à l'œil, pas
+    // un lingot plausible — une barre d'AGM en porte environ 11,7.
+    //
+    // 2 680 kgCO2e / 2 kg = 1 340 kgCO2e/kg, et c'est `value`. L'unité de
+    // l'intensité n'est jamais déclarée : le signataire la DÉRIVE en
+    // `kgCO2e/${denominatorUnit}`, ce qui est la correction de 90be1a8 — un
+    // chiffre qui porte une unité que personne n'a voulue est le défaut que
+    // `denominatorUnit` existe pour rendre impossible.
     denominator: 2,
-    value: 1.34,
+    denominatorUnit: "kg",
+    value: 1340,
     ...over,
   };
 }
@@ -84,7 +106,8 @@ test("un cas nominal rend une attestation signée", async () => {
   assert.equal(r.status, 201);
   assert.equal(r.body.proof?.cryptosuite, "ecdsa-jcs-2019");
   assert.ok(r.body.proof.proofValue.startsWith("z"));
-  assert.equal(r.body.credentialSubject.carbonIntensity.value, 1.34);
+  assert.equal(r.body.credentialSubject.carbonIntensity.value, 1340);
+  assert.equal(r.body.credentialSubject.carbonIntensity.unit, "kgCO2e/kg");
   assert.equal(r.body.type[1], "CarbonIntensityCredential");
 });
 
@@ -127,19 +150,17 @@ test("les exclusions voyagent jusqu'au vérificateur", async () => {
 });
 
 test("un refus est une réponse, pas un incident : 422 et un code stable", async () => {
-  // 5 est vraisemblable et faux — le recalcul donne 1,34. Une valeur absurde
-  // serait rejetée par le contrôle 1 et ne dirait rien du contrôle 4 : l'ordre
-  // des contrôles est lui-même une propriété, et un test qui l'ignore mesure
-  // autre chose que ce qu'il annonce.
-  const r = await call("/api/v1/sign", await request({ value: 5 }));
+  const r = await call("/api/v1/sign", await request({ value: 5000 }));
   assert.equal(r.status, 422);
   assert.equal(r.body.error, "VALUE_MISMATCH");
 });
 
-test("l'ordre des contrôles tient : l'invraisemblable est rejeté avant le recalcul", async () => {
-  const r = await call("/api/v1/sign", await request({ value: 1e9 }));
+test("l'ordre des contrôles tient : l'admissibilité passe avant le recalcul", async () => {
+  // Unité hors SI ET chiffre faux : c'est l'admissibilité qui répond, parce
+  // qu'elle est le premier contrôle et le moins cher.
+  const r = await call("/api/v1/sign", await request({ denominatorUnit: "oz", value: 9e9 }));
   assert.equal(r.status, 422);
-  assert.equal(r.body.error, "VALUE_IMPLAUSIBLE");
+  assert.equal(r.body.error, "DENOMINATOR_UNIT_NOT_SI");
 });
 
 test("une extraction non signée est refusée avec son code", async () => {
