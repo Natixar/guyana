@@ -172,6 +172,10 @@ table.register .num { text-align: right; font-variant-numeric: tabular-nums; }
    le chiffre reste lisible et le tableau se lit sans elle : un exploitant
    daltonien doit voir la même chose, et une capture en noir et blanc aussi. */
 table.register .num--warning { color: var(--status-warning); font-weight: 600; }
+/* Une cellule écartée reste dans l'attestation, dénombrable et motivée. Elle
+   doit se distinguer sans disparaître : l'estomper la ferait lire comme une
+   ligne secondaire alors qu'elle est le sujet de la colonne « Reason ». */
+table.register tr.row--withheld td { color: var(--muted-foreground); font-style: italic; }
 /* Un tableau ne doit jamais faire déborder la page horizontalement. */
 .lot[open] { overflow-x: auto; }
 /* Sept colonnes de pourcentages : sur un portable, elles défilent dans leur
