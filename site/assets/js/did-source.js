@@ -22,9 +22,23 @@
  * pis-aller : un vérificateur hors ligne, ou en réseau fermé, reçoit le
  * document DID avec l'attestation au lieu de le résoudre.
  *
- * TROIS VOIES, DANS CET ORDRE, ET LE RÉSEAU TOUJOURS EN PREMIER. Le jour où AGM
- * publie, il n'y a rien à changer : le repli cesse de servir et la mention
- * disparaît d'elle-même.
+ * TROIS VOIES, DANS CET ORDRE, ET LE RÉSEAU TOUJOURS EN PREMIER.
+ *
+ * MAIS LA PREMIÈRE NE PEUT PAS ABOUTIR AUJOURD'HUI, et il faut le dire ici
+ * plutôt que le laisser croire. La politique de sécurité du site est
+ * `connect-src 'self'` : aucune requête ne sort vers un autre domaine, et le
+ * domaine de l'émetteur devrait de toute façon autoriser explicitement la
+ * lecture depuis le nôtre. Un navigateur ne lira donc pas le `.well-known` d'un
+ * tiers, quel que soit l'état de publication d'AGM. La tentative est conservée
+ * parce qu'elle ne coûte rien et redeviendra vraie le jour où la CSP sera
+ * ouverte — mais la voie réelle, aujourd'hui, est celle où le VÉRIFICATEUR
+ * ouvre le lien lui-même et dépose le document. C'est d'ailleurs la meilleure :
+ * le document ne passe alors par aucune de nos mains.
+ *
+ * Sur la page publique de vérification, `/engine/` n'est pas servi : l'exemplaire
+ * embarqué n'y est donc pas joignable, et il ne reste que le dépôt manuel. C'est
+ * voulu — se rabattre en silence sur une copie locale ferait de cette page une
+ * démonstration truquée.
  */
 import { didWebUrl } from "./verify.js";
 import { loadKeyPair } from "./keys.js";

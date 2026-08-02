@@ -139,7 +139,15 @@ async function refresh() {
 
     hint.hidden = false;
     hint.innerHTML = `<p>${T.vIssuerIs} <code>${esc(state.credential.issuer)}</code></p>` +
-      (url ? `<p>${T.vFetchAt} <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a></p>`
+      (url ? `<p>${T.vFetchAt} <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a></p>` +
+             // POURQUOI C'EST À VOUS DE LE FAIRE. Un navigateur ne peut pas
+             // lire le `.well-known` d'un domaine tiers : la politique de
+             // sécurité de ce site interdit toute connexion sortante, et le
+             // domaine de l'émetteur devrait en outre l'autoriser explicitement.
+             // Vous, en revanche, pouvez ouvrir ce lien — et c'est mieux ainsi,
+             // puisque le document ne passe alors par aucune de nos mains.
+             `<p class="muted">${T.vCannotFetch}</p>` +
+             `<p class="muted">${T.vFetchHow}</p>`
            : `<p class="muted">${T.vNotDidWeb}</p>`) +
       provenance();
   } else {
