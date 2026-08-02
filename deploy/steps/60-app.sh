@@ -60,6 +60,15 @@ labels+=( --label "traefik.http.middlewares.${ROUTER_PREFIX}-sec.headers.referre
 # par routeur et non par type de contenu, et un aller-retour conditionnel par
 # module sur un site de vingt fichiers est un prix qu'on paie sans le voir. La
 # raffiner par chemin serait une optimisation, pas une correction.
+#
+# UN SEUL ÉMETTEUR DE CET EN-TÊTE, et c'est le complément du 2 août. Le serveur
+# statique en pose un de son côté, déduit du type de contenu — 24 heures pour le
+# HTML, un an pour le reste. Deux autorités pour un même en-tête est un état où
+# la question « qui gagne ? » a une réponse, mais où personne ne l'a décidée :
+# elle dépend de l'ordre dans lequel Traefik écrit, et donc d'une version de
+# Traefik. Le conteneur est donc lancé avec `--cache-control-headers=false`
+# (voir plus bas) : le serveur n'en pose plus aucun, celui-ci est le seul, et le
+# comportement se lit ici en entier.
 labels+=( --label "traefik.http.middlewares.${ROUTER_PREFIX}-fresh.headers.customResponseHeaders.Cache-Control=no-cache" )
 mw="${ROUTER_PREFIX}-auth@docker,${ROUTER_PREFIX}-sec@docker,${ROUTER_PREFIX}-fresh@docker"
 
@@ -147,7 +156,8 @@ docker run -d --name "$APP_CONTAINER" \
   --security-opt no-new-privileges:true \
   "${labels[@]}" \
   "$APP_IMAGE" \
-  --root=/public --port=80 --page-fallback=/public/index.html --compression=true >/dev/null
+  --root=/public --port=80 --page-fallback=/public/index.html --compression=true \
+  --cache-control-headers=false >/dev/null
 
 # Aucun port publié : Traefik joint le conteneur par son nom sur le réseau proxy.
 published=$(docker inspect "$APP_CONTAINER" --format '{{json .NetworkSettings.Ports}}')

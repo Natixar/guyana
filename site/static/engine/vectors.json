@@ -1,6 +1,6 @@
 {
   "_": "Vecteurs partagés du moteur de calcul. Exécutés dans le navigateur par la page d'auto-test ET dans Node par la suite du signataire. Si les deux hôtes s'accordent ici, ils s'accordent en pratique. Voir services/README.md et l'issue #66.",
-  "version": "4",
+  "version": "5",
   "taxonomy": "agm-h1-v2",
   "conditions": {
     "export": "GHGP",
@@ -377,8 +377,8 @@
       }
     },
     {
-      "name": "allocation — le non-alloué du mois se divise entre les barres de ce mois",
-      "why": "Règle §14.2 « spécifique validée », décidée le 1er août 2026. C'est ce qui fait qu'une barre porte sa part des frais généraux.",
+      "name": "allocation — le partagé se divise par les lots vus, puis par les barres du lot",
+      "why": "Un seul lot dans la fenêtre : le partagé revient entier à ce lot, puis se divise entre ses quatre barres. C'est le cas de base, et il fixe l'ordre des deux divisions.",
       "cells": [
         {
           "subPost": null,
@@ -402,16 +402,17 @@
           "2025-01": 2680.0
         }
       },
-      "allocate": {
-        "bars": {
-          "2025-01": 4
-        },
+      "allocateToBar": {
+        "allocated": 0,
+        "shared": 2680.0,
+        "lotsInWindow": 1,
+        "barsInLot": 4,
         "expectPerBar": 670.0
       }
     },
     {
-      "name": "allocation — deux mois, deux productions, deux parts distinctes",
-      "why": "Le non-alloué ne se moyenne pas sur l'année : un mois creux en production charge davantage chaque barre coulée ce mois-là.",
+      "name": "allocation — élargir la fenêtre ne déplace pas le chiffre",
+      "why": "LE CAS QUI CONDAMNE L'ANCIENNE RÈGLE. Deux mois au lieu d'un : le partagé double, mais le nombre de lots actifs double aussi. L'ancienne règle sommait les mois et faisait porter à la barre les frais généraux d'un lot qui n'est pas le sien — 2010 au lieu de 670. L'utilisateur choisit ses bornes ; son choix ne doit pas déplacer le résultat.",
       "cells": [
         {
           "subPost": null,
@@ -449,17 +450,65 @@
           "2025-02": 2680.0
         }
       },
-      "allocate": {
-        "bars": {
-          "2025-01": 4,
-          "2025-02": 2
-        },
-        "expectPerBar": 2010.0
+      "allocateToBar": {
+        "allocated": 0,
+        "shared": 5360.0,
+        "lotsInWindow": 2,
+        "barsInLot": 4,
+        "expectPerBar": 670.0
       }
     },
     {
-      "name": "allocation — un mois sans coulée est refusé, jamais divisé par zéro",
-      "why": "Ses émissions existent et n'ont aucune barre à porter. Les taire donnerait un total par barre plus flatteur que la réalité.",
+      "name": "allocation — le retenu ne se partage pas, seul le partagé se divise par les lots",
+      "why": "Les deux termes ne subissent pas la même division. Ce qui est attribué au lot de la barre lui revient entier avant d'être divisé entre ses barres ; seul ce qui n'appartient à aucun lot passe d'abord par le nombre de lots vus. Confondre les deux serait diluer le lot dans le voisin.",
+      "cells": [
+        {
+          "subPost": null,
+          "partType": null,
+          "caracterisation": 1,
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
+          "factor": 2.68,
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z",
+          "step": 7
+        },
+        {
+          "subPost": null,
+          "partType": null,
+          "caracterisation": 1,
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
+          "factor": 2.68,
+          "origin": "MEASURED",
+          "periodStart": "2025-02-01T00:00:00Z",
+          "periodEnd": "2025-02-01T00:16:40Z",
+          "step": 7
+        }
+      ],
+      "expect": {
+        "lines": {},
+        "origin": "MEASURED",
+        "unallocated": 5360.0,
+        "unallocatedByPeriod": {
+          "2025-01": 2680.0,
+          "2025-02": 2680.0
+        }
+      },
+      "allocateToBar": {
+        "allocated": 4000.0,
+        "shared": 5360.0,
+        "lotsInWindow": 2,
+        "barsInLot": 4,
+        "expectPerBar": 1670.0
+      }
+    },
+    {
+      "name": "allocation — un lot sans barre est refusé, jamais divisé par zéro",
+      "why": "Ses émissions existent et n'ont aucune barre à porter. Les taire donnerait un chiffre par barre plus flatteur que la réalité.",
       "cells": [
         {
           "subPost": null,
@@ -483,11 +532,46 @@
           "2025-01": 2680.0
         }
       },
-      "allocate": {
-        "bars": {
-          "2025-01": 0
-        },
-        "expectError": "PRODUCTION_EMPTY"
+      "allocateToBar": {
+        "allocated": 0,
+        "shared": 2680.0,
+        "lotsInWindow": 1,
+        "barsInLot": 0,
+        "expectError": "BARS_IN_LOT_INVALID"
+      }
+    },
+    {
+      "name": "allocation — une fenêtre sans lot actif est refusée",
+      "why": "Diviser le partagé par zéro lot donnerait l'infini ; le passer sous silence donnerait zéro. Aucun des deux n'est un contenu carbone.",
+      "cells": [
+        {
+          "subPost": null,
+          "partType": null,
+          "caracterisation": 1,
+          "flux": 1,
+          "dimension": "volume",
+          "displayUnit": "L",
+          "factor": 2.68,
+          "origin": "MEASURED",
+          "periodStart": "2025-01-01T00:00:00Z",
+          "periodEnd": "2025-01-01T00:16:40Z",
+          "step": 7
+        }
+      ],
+      "expect": {
+        "lines": {},
+        "origin": "MEASURED",
+        "unallocated": 2680.0,
+        "unallocatedByPeriod": {
+          "2025-01": 2680.0
+        }
+      },
+      "allocateToBar": {
+        "allocated": 0,
+        "shared": 2680.0,
+        "lotsInWindow": 0,
+        "barsInLot": 4,
+        "expectError": "LOTS_IN_WINDOW_INVALID"
       }
     },
     {
@@ -534,5 +618,6 @@
   "resultUnit": "kgCO2e",
   "_resultUnit": "L'unité est celle du CALCUL, pas celle de la donnée : une cellule porte un débit, et c'est le facteur qui en fait des kgCO2e. Elle vit donc sur le profil et sur aucune cellule — le jour où le même débit servira à calculer une consommation d'eau, une cellule qui aurait emporté « kgCO2e » dans sa forme serait devenue fausse sans que rien ne bouge. La conversion des unités d'origine a lieu à l'ingestion — voir services/store/load_2025.py.",
   "_window": "Aucun cas de fenetre ici, et c'est une decision du 2 aout 2026 : le decoupage appartient au MAGASIN. Une extraction revient deja taillee a la fenetre demandee, et le moteur n'integre que sur la periode qu'on lui sert. Les proprietes du decoupage — recouvrement partiel, intervalles disjoints, intervalles qui se chevauchent et qui sont refuses — sont exercees la ou elles vivent, dans services/store/test_app.py, contre du vrai SQL.",
-  "_step": "En H1 l'etape EST l'unite de production, et l'unite de production EST le departement : deux bijections posees le 2 aout 2026, faute de donnees pour faire autrement. Une unite flexible ferait tantot une operation tantot une autre ; ce n'est pas le cas ici. L'entier vient d'une taxonomie masquee, donc il voyage dans une attestation sans rien divulguer."
+  "_step": "En H1 l'etape EST l'unite de production, et l'unite de production EST le departement : deux bijections posees le 2 aout 2026, faute de donnees pour faire autrement. Une unite flexible ferait tantot une operation tantot une autre ; ce n'est pas le cas ici. L'entier vient d'une taxonomie masquee, donc il voyage dans une attestation sans rien divulguer.",
+  "_allocation": "La part d'une cellule dans le contenu carbone d'une barre depend de sa DISPOSITION : retenue (elle appartient au lot de la barre) -> 1/barsInLot ; partagee (elle n'appartient a aucun lot) -> 1/(lotsInWindow x barsInLot) ; ecartee (elle appartient a un autre lot) -> zero, et elle reste dans la matrice avec son motif. La division par le nombre de lots vus est ce qui rend la fenetre neutre : doubler la fenetre double le partage et double le nombre de lots."
 }

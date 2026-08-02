@@ -78,16 +78,24 @@ export function runVectors(aggregate, vectors, taxonomy, allocate) {
       }
       // L'allocation est une étape distincte de l'agrégation : la règle peut
       // changer sans que le cube bouge, et le vecteur la teste séparément.
-      if (c.allocate && allocate) {
+      //
+      // ELLE NE PREND PLUS L'AGRÉGAT EN ENTRÉE, et c'est ce qui a changé le
+      // 2 août 2026. L'ancienne règle lisait le non-alloué par mois et sommait
+      // les mois ; elle ne pouvait donc pas compter les lots, puisqu'un mois ne
+      // dit pas combien de lots il porte. La nouvelle prend deux totaux et deux
+      // diviseurs, tous quatre déclarés par l'appelant — et donc tous quatre
+      // vérifiables dans l'attestation.
+      if (c.allocateToBar && allocate) {
+        const spec = c.allocateToBar;
         try {
-          const out = allocate(got.unallocatedByPeriod, c.allocate.bars);
-          if (c.allocate.expectError) {
-            failures.push(`${c.name} : allocation aurait dû lever ${c.allocate.expectError}`);
-          } else if (Math.abs(out.perBar - c.allocate.expectPerBar) > 5e-3) {
-            failures.push(`${c.name} : ${out.perBar.toFixed(3)} par barre, ${c.allocate.expectPerBar} attendu`);
+          const out = allocate(spec);
+          if (spec.expectError) {
+            failures.push(`${c.name} : allocation aurait dû lever ${spec.expectError}`);
+          } else if (Math.abs(out.perBar - spec.expectPerBar) > 5e-3) {
+            failures.push(`${c.name} : ${out.perBar.toFixed(3)} par barre, ${spec.expectPerBar} attendu`);
           }
         } catch (e) {
-          if (e.code !== c.allocate.expectError) {
+          if (e.code !== spec.expectError) {
             failures.push(`${c.name} : allocation ${e.code ?? "erreur"} — ${e.message}`);
           }
         }

@@ -157,6 +157,18 @@ export function recomputeTotal(commitments, disclosures) {
   if (missing.length) {
     return { known: false, withheld: missing.length, total: null };
   }
-  const total = counted.reduce((sum, c) => sum + (byIndex.get(c.index).amount ?? 0), 0);
+  // MONTANT × PART, et non montant seul. Une cellule de la matrice porte ce que
+  // la mine a réellement consommé sur sa période — donc un chiffre comparable au
+  // cube et au classeur d'AGM — et, à côté, la fraction que CETTE barre en
+  // supporte. Le contenu carbone est le produit des deux, sommé : la règle
+  // d'allocation devient une multiplication que le vérificateur refait, au lieu
+  // d'un chiffre déjà divisé sur lequel il faudrait nous croire.
+  //
+  // `share ?? 1` garde vérifiables les attestations émises avant le 2 août 2026,
+  // où la part n'existait pas et valait implicitement l'unité.
+  const total = counted.reduce((sum, c) => {
+    const d = byIndex.get(c.index);
+    return sum + (d.amount ?? 0) * (d.share ?? 1);
+  }, 0);
   return { known: true, withheld: 0, total };
 }
