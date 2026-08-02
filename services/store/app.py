@@ -177,6 +177,34 @@ def _parse_period(item: dict) -> Range:
     return Range(start.astimezone(timezone.utc), end.astimezone(timezone.utc), "[)")
 
 
+def _assert_disjoint(ranges_: list[Range]) -> None:
+    """Deux intervalles demandés qui se recouvrent sont une ERREUR.
+
+    Décision du 2 août 2026. La requête décrit un temps pendant lequel un lot a
+    été dans l'entreprise ; un recouvrement décrirait deux fois le même temps, et
+    la même émission serait servie deux fois — exactement là où l'activité est la
+    plus dense, puisque c'est là que les opérations se chevauchent.
+
+    Les refuser plutôt que les fusionner : fusionner accepterait une requête qui
+    ne veut rien dire et rendrait un chiffre juste, ce qui apprendrait au client
+    que la forme n'a pas d'importance. Le jour où le recouvrement viendrait d'un
+    bogue de son côté, il n'aurait rien pour s'en apercevoir.
+
+    LES TROUS, EUX, SONT LÉGITIMES et ne sont pas contrôlés : entre deux
+    opérations un produit intermédiaire peut dormir en stock sans rien émettre.
+    C'est au client de décider s'il veut l'intervalle englobant — qui capte tout
+    ce qui a couru pendant que le lot était là — ou la seule réunion des
+    opérations.
+    """
+    ordered = sorted(ranges_, key=lambda r: r.lower)
+    for previous, following in zip(ordered, ordered[1:]):
+        if following.lower < previous.upper:
+            raise HTTPException(422, {
+                "error": "PERIODS_OVERLAP",
+                "detail": f"{previous.upper.isoformat()} > {following.lower.isoformat()}",
+            })
+
+
 @app.get("/healthz")
 def healthz() -> dict:
     return {"ok": True}
@@ -236,6 +264,11 @@ async def ranges(request: Request, x_webauth_user: str | None = Header(default=N
     La requête ne porte QUE du temps. Le client filtre les autres dimensions
     après réception — c'est ce qui garde la surface de requête, donc la surface
     de fuite, réduite à un seul axe.
+
+    Les cellules sortent TAILLÉES aux intervalles demandés, débit inchangé : rien
+    de ce qui est servi ne porte de temps situé hors de la requête. Les
+    intervalles demandés doivent être disjoints ; les trous entre eux sont
+    légitimes.
     """
     _require(x_webauth_user, "cube")
     body = await request.json()
@@ -246,6 +279,7 @@ async def ranges(request: Request, x_webauth_user: str | None = Header(default=N
         raise HTTPException(422, {"error": "TOO_MANY_INTERVALS", "detail": f"max {MAX_INTERVALS}"})
 
     ranges_ = [_parse_period(p) for p in periods]
+    _assert_disjoint(ranges_)
 
     with db.connect() as conn:
         cells = db.cells_overlapping(conn, ranges_)

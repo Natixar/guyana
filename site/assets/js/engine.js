@@ -162,62 +162,24 @@ function ownSpan(cell) {
 }
 
 /**
- * Normalise une liste de fenêtres : triées, fusionnées, jamais chevauchantes.
+ * L'intervalle d'intégration d'une cellule : le sien, et jamais un autre.
  *
- * L'empreinte temporelle d'un lot est un MULTI-intervalle — un par opération —
- * et deux opérations peuvent se recouvrir. Intégrer sur chacune séparément
- * compterait deux fois le recouvrement, ce qui gonflerait l'empreinte du lot
- * exactement là où les opérations sont les plus denses. La fusion se fait donc
- * ici, une fois, avant toute arithmétique.
- */
-function mergedWindows(windows) {
-  const spans = windows
-    .map((w) => [Date.parse(w.start ?? w.periodStart), Date.parse(w.end ?? w.periodEnd)])
-    .filter(([a, b]) => !Number.isNaN(a) && !Number.isNaN(b) && b > a)
-    .sort((x, y) => x[0] - y[0]);
-
-  const out = [];
-  for (const [a, b] of spans) {
-    const last = out[out.length - 1];
-    if (last && a <= last[1]) last[1] = Math.max(last[1], b);
-    else out.push([a, b]);
-  }
-  return out;
-}
-
-const iso = (ms) => new Date(ms).toISOString();
-
-/**
- * Les intervalles sur lesquels une cellule est réellement intégrée.
+ * LE DÉCOUPAGE APPARTIENT AU MAGASIN, décision du 2 août 2026. Une extraction
+ * revient déjà taillée à la fenêtre demandée : une cellule mensuelle
+ * interrogée sur trois jours arrive avec trois jours de période et son débit
+ * inchangé — un débit est extensif dans le temps, le lire sur un intervalle
+ * plus court ne le modifie pas.
  *
- * Sans fenêtre, c'est sa propre période : la quantité entière que la cellule
- * décrit. Avec des fenêtres, c'est le recouvrement — et il en sort UN
- * intervalle par morceau, jamais un intervalle enveloppe. Une enveloppe
- * couvrant deux opérations séparées d'un mois prétendrait avoir intégré le mois
- * qui les sépare.
+ * Ce moteur avait un temps porté ce découpage, avec des fenêtres qu'il
+ * fusionnait avant de calculer. C'était deux endroits pour une seule
+ * arithmétique, et le mauvais : le magasin est le seul à connaître à la fois la
+ * période stockée et la fenêtre demandée, et il signe ce qu'il sert. Ce qui
+ * arrive ici a donc déjà la bonne durée, et il ne reste qu'à intégrer.
  */
-function integrationSpans(cell, windows) {
+function ownInterval(cell) {
   const [from, to] = ownSpan(cell);
-
-  // LES BORNES INCHANGÉES SONT RENDUES TELLES QUELLES, et non reformatées. Le
-  // magasin a signé ses horodatages sous une certaine écriture ; les réécrire
-  // ferait diverger le document signé de l'extraction dont il est tiré, pour
-  // rien. Seul un intervalle que le moteur a lui-même découpé — un morceau
-  // taillé par une fenêtre — sort dans la forme normalisée du moteur.
-  const whole = { start: cell.periodStart, end: cell.periodEnd,
-                  seconds: secondsBetween(from, to) };
-  if (!windows) return [whole];
-
-  const spans = [];
-  for (const [a, b] of windows) {
-    const start = Math.max(from, a);
-    const end = Math.min(to, b);
-    if (end <= start) continue;
-    spans.push(start === from && end === to
-      ? whole
-      : { start: iso(start), end: iso(end), seconds: secondsBetween(start, end) });
-  }
-  return spans;
+  return { start: cell.periodStart, end: cell.periodEnd,
+           seconds: secondsBetween(from, to) };
 }
 
 /**
@@ -284,20 +246,15 @@ export function translate({ subPost, partType, caracterisation }, taxonomy) {
  * - **le non-alloué se déclare** dans son propre poste et ne se répartit jamais
  *   en silence, faute de quoi le total serait complet et faux.
  *
- * @param {Array<object>} cells
+ * @param {Array<object>} cells déjà taillées à la fenêtre par le magasin
  * @param {object} taxonomy
- * @param {Array<{start: string, end: string}>} [windows] les intervalles sur
- *        lesquels intégrer. Absents, chaque cellule est intégrée sur sa propre
- *        période — la quantité entière qu'elle décrit.
  * @returns {{pivot: Array<object>, lines: Record<string, number>, origin: string,
  *            unallocated: number, unit: string, groups: number}}
  *          `pivot` est ce qui se signe ; `lines` est la vue dérivée. Montants en kgCO2e.
  */
-export function aggregate(cells, taxonomy, windows = null) {
+export function aggregate(cells, taxonomy) {
   if (!Array.isArray(cells)) throw fault("CELLS_REQUIRED");
   if (!taxonomy) throw fault("TAXONOMY_REQUIRED");
-
-  const merged = Array.isArray(windows) && windows.length ? mergedWindows(windows) : null;
 
   const groups = new Map();
   const unallocatedByPeriod = {};
@@ -310,32 +267,30 @@ export function aggregate(cells, taxonomy, windows = null) {
     // pèse zéro sur cette fenêtre-ci embellirait l'agrégat par un effet de bord.
     origin = worstOrigin(origin, cell.origin ?? "NOT_MEASURED");
 
-    // Un débit s'intègre sur une durée, et sur chaque morceau séparément : deux
-    // fenêtres disjointes donnent deux cellules pivot datées, pas une moyenne
-    // que personne ne saurait situer.
-    for (const span of integrationSpans(cell, merged)) {
-      const emission = cell.flux * cell.factor * span.seconds;
+    // Un débit s'intègre sur une durée, et celle-ci est celle que le magasin a
+    // servie — déjà taillée à la fenêtre demandée, déjà signée.
+    const span = ownInterval(cell);
+    const emission = cell.flux * cell.factor * span.seconds;
 
-      // Ce que la cartographie n'atteint pas reste visible en tant que tel. Le
-      // seau non-alloué est un objet de plein droit, pas un état d'erreur (#6).
-      if (cell.subPost === null || cell.subPost === undefined) {
-        unallocated += emission;
-        // Ventilé par période, parce que la règle d'allocation l'est : le
-        // non-alloué d'un mois revient aux barres coulées CE mois-là. Un total
-        // global ne saurait plus à quel mois il appartient.
-        const key = monthOf(span);
-        unallocatedByPeriod[key] = (unallocatedByPeriod[key] ?? 0) + emission;
-        continue;
-      }
+    // Ce que la cartographie n'atteint pas reste visible en tant que tel. Le
+    // seau non-alloué est un objet de plein droit, pas un état d'erreur (#6).
+    if (cell.subPost === null || cell.subPost === undefined) {
+      unallocated += emission;
+      // Ventilé par période, parce que la règle d'allocation l'est : le
+      // non-alloué d'un mois revient aux barres coulées CE mois-là. Un total
+      // global ne saurait plus à quel mois il appartient.
+      const key = monthOf(span);
+      unallocatedByPeriod[key] = (unallocatedByPeriod[key] ?? 0) + emission;
+      continue;
+    }
 
-      const key = groupKey(cell, span);
-      const g = groups.get(key);
-      if (g) {
-        g.emission += emission;
-        g.origin = worstOrigin(g.origin, cell.origin ?? "NOT_MEASURED");
-      } else {
-        groups.set(key, { cell, span, emission, origin: cell.origin ?? "NOT_MEASURED" });
-      }
+    const key = groupKey(cell, span);
+    const g = groups.get(key);
+    if (g) {
+      g.emission += emission;
+      g.origin = worstOrigin(g.origin, cell.origin ?? "NOT_MEASURED");
+    } else {
+      groups.set(key, { cell, span, emission, origin: cell.origin ?? "NOT_MEASURED" });
     }
   }
 

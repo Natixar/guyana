@@ -97,6 +97,43 @@ def test_a_multirange_does_not_over_collect(conn):
     assert [c["id"] for c in got] == ["janvier", "mars"]
 
 
+def test_a_served_cell_is_clipped_to_the_window(conn):
+    """LA BASE FAIT L'ARITHMÉTIQUE DES INTERVALLES — décision du 2 août 2026.
+
+    Rien de ce qui est servi ne doit porter du temps situé hors de la requête.
+    Une cellule mensuelle interrogée sur un jour sort donc avec un jour de
+    période, et son DÉBIT INCHANGÉ : un débit est extensif dans le temps, le lire
+    sur un intervalle plus court ne le modifie pas. C'est ce qui rend
+    l'intégration correcte chez celui qui recalcule sans qu'il ait à refaire le
+    découpage de mémoire.
+    """
+    _cell(conn, "janvier", "2026-01-01", "2026-02-01")
+    got = db.cells_overlapping(conn, [_range("2026-01-10", "2026-01-11")])[0]
+
+    assert got["periodStart"].startswith("2026-01-10")
+    assert got["periodEnd"].startswith("2026-01-11")
+    assert got["flux"] == 1000, "le débit a été modifié en même temps que la période"
+    assert got["id"] == "janvier", "une cellule entière dans la fenêtre garde son identifiant"
+
+
+def test_a_cell_straddling_two_windows_is_served_once_per_window(conn):
+    """Deux morceaux, deux lignes, et deux identifiants distincts.
+
+    Une enveloppe couvrant les deux prétendrait avoir intégré ce qui les sépare.
+    Et deux lignes sous le MÊME identifiant se perdraient à la couche de
+    couverture, qui exige une disposition par cellule servie et refuse un
+    identifiant en double : le client rendrait compte d'une cellule en croyant
+    en avoir couvert deux.
+    """
+    _cell(conn, "janvier", "2026-01-01", "2026-02-01")
+    got = db.cells_overlapping(
+        conn, [_range("2026-01-05", "2026-01-06"), _range("2026-01-20", "2026-01-21")])
+
+    assert len(got) == 2
+    assert len({c["id"] for c in got}) == 2, "deux morceaux partagent un identifiant"
+    assert all(c["id"].startswith("janvier@") for c in got)
+
+
 def test_an_empty_period_is_refused_by_the_database(conn):
     """Une ligne qui existe sans rien dire fausserait un dénombrement de
     couverture : le signataire exigerait une disposition pour une cellule qui ne
@@ -221,6 +258,31 @@ def client(conn):
 
 def _as(client, user, path, method="get", **kw):
     return getattr(client, method)(path, headers={"X-Webauth-User": user}, **kw)
+
+
+def test_overlapping_windows_are_refused_rather_than_merged(client, conn):
+    """Deux intervalles demandés qui se recouvrent sont une erreur.
+
+    Les fusionner rendrait un chiffre juste pour une requête qui ne veut rien
+    dire, et apprendrait au client que la forme n'a pas d'importance : le jour où
+    le recouvrement viendrait d'un bogue de son côté, rien ne le lui dirait.
+
+    Les TROUS ne sont pas contrôlés, et c'est délibéré : entre deux opérations un
+    produit intermédiaire peut dormir en stock sans rien émettre.
+    """
+    _cell(conn, "janvier", "2026-01-01", "2026-02-01")
+    body = {"periods": [{"start": "2026-01-05T00:00:00Z", "end": "2026-01-20T00:00:00Z"},
+                        {"start": "2026-01-15T00:00:00Z", "end": "2026-01-25T00:00:00Z"}]}
+    r = _as(client, "agm-randy", "/api/v1/ranges", "post", json=body)
+    assert r.status_code == 422
+    assert r.json()["detail"]["error"] == "PERIODS_OVERLAP"
+
+    # Les mêmes intervalles avec un trou entre eux passent le contrôle : c'est ce
+    # qui prouve qu'il vise le recouvrement et non le multi-intervalle lui-même.
+    # Appelé directement plutôt que par HTTP — la réponse serait signée, et une
+    # clé de signature n'a rien à faire dans un cas qui parle d'intervalles.
+    store_app._assert_disjoint(
+        [_range("2026-01-05", "2026-01-20"), _range("2026-01-22", "2026-01-25")])
 
 
 def test_the_verifier_cannot_browse_the_cube(client):

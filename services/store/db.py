@@ -43,28 +43,49 @@ def cells_overlapping(conn: psycopg.Connection, periods: list[Range]) -> list[di
     passer les intervalles réels ne sur-collecte pas, et le serveur n'apprend
     toujours pas que ce multi-intervalle désigne un lot.
 
-    `&& ANY(...)` reste indexable par le GiST, là où une disjonction construite
-    à la main ne le serait pas nécessairement.
+    LES CELLULES SORTENT TAILLÉES À LA FENÊTRE, et c'est la base qui taille —
+    décision du 2 août 2026. Une cellule mensuelle interrogée sur trois jours
+    sort avec trois jours de période et son DÉBIT INCHANGÉ : un débit est
+    extensif dans le temps, et le lire sur un intervalle plus court ne le
+    modifie pas. C'est ce qui permet de ne jamais servir de donnée située hors
+    de l'intervalle demandé.
 
-    LES CELLULES SORTENT ENTIÈRES, avec leur période et leur débit, et non
-    tronquées à la fenêtre demandée. L'intégration appartient au moteur, qui
-    tourne des DEUX côtés — dans le navigateur qui explore et dans le signataire
-    qui recalcule. La faire ici mettrait l'arithmétique du temps dans le seul
-    endroit que le signataire ne rejoue pas, et un débit servi est justement ce
-    qui permet au navigateur de rejouer mille fenêtres sans revenir demander.
+    Le magasin est le seul à connaître à la fois la période stockée et la
+    fenêtre demandée, et il signe ce qu'il sert : le découpage entre donc dans
+    ce que le signataire vérifie, au lieu d'être refait de mémoire par chaque
+    hôte du moteur.
+
+    UNE CELLULE PEUT SORTIR DEUX FOIS, une par intervalle qu'elle recouvre. Elle
+    ne prend un identifiant dérivé QUE dans ce cas-là, et alors il porte le début
+    du morceau. Sans cela deux lignes partageraient un identifiant, et la couche
+    de couverture — qui exige une disposition par cellule servie et refuse un
+    doublon — en perdrait une sans le dire.
+
+    Le découpage seul ne renomme rien : un identifiant du cube est la clé dont le
+    client se sert pour rejoindre ses propres données, et la lui changer parce
+    que la fenêtre était étroite lui coûterait la jointure pour rien.
+
+    La jointure latérale sur `unnest` garde l'index GiST utilisable : le
+    planificateur balaie les intervalles demandés — il y en a au plus une
+    poignée — et interroge l'index pour chacun.
     """
     if not periods:
         return []
     rows = conn.execute(
         """
-        SELECT c.id, c.sub_post AS "subPost", c.part_type AS "partType",
+        SELECT CASE WHEN count(*) OVER (PARTITION BY c.id) = 1 THEN c.id
+                    ELSE c.id || '@' || EXTRACT(epoch FROM lower(c.period * r))::bigint
+               END                     AS id,
+               c.sub_post              AS "subPost",
+               c.part_type             AS "partType",
                c.caracterisation, c.flux, c.dimension,
-               c.display_unit AS "displayUnit",
+               c.display_unit          AS "displayUnit",
                c.factor, c.origin,
-               lower(c.period) AS "periodStart", upper(c.period) AS "periodEnd"
-          FROM cell c
-         WHERE c.period && ANY(%s)
-         ORDER BY c.id
+               lower(c.period * r)     AS "periodStart",
+               upper(c.period * r)     AS "periodEnd"
+          FROM cell c, unnest(%s::tstzrange[]) AS r
+         WHERE c.period && r
+         ORDER BY 1
         """,
         (periods,),
     ).fetchall()
