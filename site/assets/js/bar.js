@@ -32,6 +32,7 @@ import { esc } from "./escape.js";
 import { signView } from "./sign-state.js";
 import { depositCredential } from "./deposit.js";
 import { requestCarbonCredential, originRef } from "./carbon-request.js";
+import { fetchLabels, applyTo } from "./pivot-labels.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -87,9 +88,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const wanted = new URLSearchParams(location.search).get("id");
   // L'identité en même temps que le jeu d'essai : elle décide au nom de qui on
   // signe, et la page ne peut pas afficher son bouton avant de le savoir.
-  const [fixture, me] = await Promise.all([
+  // Les libellés de la taxonomie, chargés une fois. Leur absence ne casse
+  // rien : les positions s'affichent alors en clair, sous leur numéro.
+  const [fixture, me, labels] = await Promise.all([
     loadFixture().catch(() => null),
     fetchMe(),
+    fetchLabels(),
   ]);
   const did = issuerDid(me);
   const bar = fixture?.bars?.find((b) => b.internalId === wanted);
@@ -207,7 +211,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     // les montants qui les ouvrent sont nés dans la réponse du signataire et
     // n'ont pas bougé de ce navigateur. Sans elles, la matrice affiche son
     // dénombrement et rien d'autre, ce qui est la propriété, pas une panne.
-    certificatesBody.innerHTML = renderCertificates(foreign, ctx.carbon?.byDigest ?? {});
+    // LES LIBELLÉS SONT CONFRONTÉS À LA VERSION QUE L'ATTESTATION DÉCLARE.
+    // Un libellé emprunté à une autre version se lirait comme une information
+    // alors qu'il serait une supposition.
+    const declared = foreign[0]?.document?.credentialSubject?.method?.taxonomy;
+    certificatesBody.innerHTML = renderCertificates(
+      foreign, ctx.carbon?.byDigest ?? {}, applyTo(labels, declared));
 
     // Le carbone se demande une fois l'origine signée : `derivedFrom` la
     // désigne par empreinte, et sans elle l'intensité flotterait sur un

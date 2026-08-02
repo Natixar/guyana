@@ -6,13 +6,20 @@ import { resolveDid } from "./did-source.js";
 import { esc } from "./escape.js";
 import { verifyMatrix, recomputeTotal, commitTotal } from "./commitments.js";
 import { showLoaded } from "./loaded-text.js";
+import { renderBlocks } from "./certificate-view.js";
+import { fetchLabels, applyTo } from "./pivot-labels.js";
 
 const $ = (s) => document.querySelector(s);
 const state = { credential: null, didDoc: null, didSource: null,
                 disclosures: [], totalSalt: null,
                 // Ce que le document a RÉELLEMENT fait, et non d'où il vient.
                 // Les deux étaient confondus : voir `provenance`.
-                didUsed: null };
+                didUsed: null,
+                // Les libellés de la taxonomie servie. Absents, la page rend
+                // les numéros et fonctionne : ils n'apportent que des mots, et
+                // une page qui tomberait faute de mots aurait confondu la
+                // présentation avec la preuve.
+                labels: null };
 
 /**
  * Ce que le porteur remet : une PRÉSENTATION, ou une attestation nue.
@@ -261,9 +268,25 @@ async function renderMatrix(doc) {
       `</ul>`
     : "";
 
+  // LA MÊME DÉCOMPOSITION QUE CELLE QUE LE PORTEUR VOIT, par le même code.
+  // Deux rendus écrits séparément finiraient par différer, et la mine
+  // montrerait un tableau là où l'acheteur en verrait un autre, sur le même
+  // document signé. Ne s'affiche que ce qui a été divulgué : le reste est
+  // dénombré plus haut, et c'est la propriété.
+  const opened = (state.disclosures ?? [])
+    .map((d) => {
+      const entry = matrix[d.index];
+      return entry && { ...d, used: entry.used !== false, reason: entry.reason ?? "" };
+    })
+    .filter(Boolean);
+  const decomposition = opened.length
+    ? `<h3 class="subhead">${T.vDecomposition}</h3>` +
+      renderBlocks(opened, applyTo(state.labels ?? {}, doc?.credentialSubject?.method?.taxonomy))
+    : "";
+
   return `<h3 class="subhead">${T.vMatrix}</h3>
           <p class="muted">${T.vMatrixBody}</p>
-          <dl class="facts">${rows.join("")}</dl>${unusable}`;
+          <dl class="facts">${rows.join("")}</dl>${unusable}${decomposition}`;
 }
 
 /**
@@ -391,7 +414,10 @@ async function refresh() {
     </dl>`;
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  // Chargés au démarrage et jamais exigés : `fetchLabels` ne lève pas, et la
+  // page rend les numéros si la table n'est pas servie.
+  state.labels = await fetchLabels();
   wireInput("vc", (j) => { state.credential = unwrap(j); });
   // Un document déposé à la main l'emporte : le vérificateur qui apporte le
   // sien sait ce qu'il fait, et la provenance devient « fourni ».

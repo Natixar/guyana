@@ -104,6 +104,23 @@ main { flex: 1; padding: 2.5rem 0 3rem; }
 .facts dt { color: var(--muted-foreground); font-size: .9375rem; }
 .facts dd { margin: 0; font-family: var(--font-mono); font-weight: var(--fw-medium); }
 
+/* Blocs de décomposition — cent quarante cellules ne se lisent pas en tableau.
+   Une carte par position pivot, la plus lourde d'abord, et dans chaque carte le
+   total, le nombre de cellules et l'écart du plus petit au plus grand. */
+.blocks { display: grid; gap: .75rem; margin: 1rem 0;
+          grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr)); }
+.block { border: 1px solid var(--border); border-radius: var(--radius);
+         padding: .875rem 1rem; background: var(--card, transparent); }
+.block h5 { margin: 0 0 .25rem; font-size: 1rem; font-weight: var(--fw-medium); }
+.block p { margin: .25rem 0; font-size: .875rem; }
+/* Une cellule écartée reste lisible, et se distingue sans disparaître : elle
+   est dénombrable, c'est tout l'objet de la décision 1 de l'issue #61. */
+.block--withheld { border-style: dashed; }
+.block--withheld h5 { color: var(--muted-foreground); }
+.facts--tight { gap: .25rem; margin-top: .5rem; }
+.facts--tight > div { grid-template-columns: minmax(7rem, 55%) 1fr; gap: .5rem; }
+.facts--tight dt, .facts--tight dd { font-size: .875rem; }
+
 /* Statuts — reprend le vocabulaire de la maquette ---------------------- */
 .badge {
   display: inline-flex; align-items: center; gap: .4rem;

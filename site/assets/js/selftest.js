@@ -25,6 +25,8 @@ import { planForBar, disposeCells, departmentsOnPath, tally } from "./lot-select
 import { computeForBar } from "./carbon-request.js";
 import { showLoaded } from "./loaded-text.js";
 import { provenanceKind, missingKey } from "./verify-page.js";
+import { groupCells, summarise } from "./matrix-blocks.js";
+import { labelsFrom, applyTo, subPostLabel } from "./pivot-labels.js";
 
 
 const cases = [];
@@ -280,6 +282,114 @@ test("portefeuille — l'auto-test ne laisse pas ses attestations derrière lui"
     ? `des attestations d'auto-test subsistent : ${left.length} — clés ${
         left.map((r) => JSON.stringify(r.key ?? null)).join(", ")}`
     : null;
+});
+
+// --- La matrice doit se LIRE ----------------------------------------------
+// Cent quarante cellules ne se lisent pas ligne à ligne, et « sous-poste 1002 »
+// n'est une information que pour qui détient la table.
+
+const CELL = (over) => ({
+  step: 7, subPost: 1000, partType: 1, caracterisation: 1, mode: "aggregate",
+  origin: "MEASURED", used: true, reason: "",
+  period: { start: "2025-01-01T00:00:00Z", end: "2025-02-01T00:00:00Z" },
+  amount: 100, share: 0.5, ...over,
+});
+
+test("blocs — une même position sur douze mois ne fait qu'un bloc", () => {
+  const months = ["2025-01", "2025-02", "2025-03"].map((m, i) => CELL({
+    amount: [100, 300, 200][i],
+    period: { start: `${m}-01T00:00:00Z`, end: `${m}-28T00:00:00Z` },
+  }));
+  const [b] = groupCells(months);
+  if (!b || b.cells !== 3) return `${b?.cells} cellule(s) dans le bloc`;
+  if (b.total !== 600) return `total ${b.total}`;
+  // MIN ET MAX NE SONT PAS DE L'ORNEMENT : un total seul ne distingue pas trois
+  // mois réguliers d'un mois qui porte tout.
+  if (b.min !== 100 || b.max !== 300) return `étendue ${b.min}…${b.max}`;
+  if (b.borneTotal !== 300) return `porté par la barre : ${b.borneTotal}`;
+  if (!b.from.startsWith("2025-01") || !b.to.startsWith("2025-03")) return `période ${b.from}→${b.to}`;
+  return null;
+});
+
+test("blocs — la disposition sépare, et c'est elle qui porte le lot", () => {
+  // Le lot n'est pas un champ de la cellule et n'a pas à l'être. Mais une
+  // cellule écartée porte son motif, et le motif nomme le lot : regrouper par
+  // motif regroupe par lot sans faire voyager le lot dans le document signé.
+  const blocks = groupCells([
+    CELL({}),
+    CELL({ used: false, reason: "production lot LOT-B, not LOT-A" }),
+    CELL({ used: false, reason: "production lot LOT-C, not LOT-A" }),
+  ]);
+  if (blocks.length !== 3) return `${blocks.length} bloc(s) au lieu de 3`;
+  // Le plus lourd d'abord : c'est la question qu'on se pose en ouvrant.
+  if (!blocks[0].used) return "un bloc écarté passe devant un bloc qui compte";
+  return null;
+});
+
+test("blocs — une position différente ne fond pas dans la même carte", () => {
+  const blocks = groupCells([CELL({}), CELL({ subPost: 1002 }), CELL({ partType: 2 })]);
+  return blocks.length === 3 ? null : `${blocks.length} bloc(s) au lieu de 3`;
+});
+
+test("blocs — l'unité de production n'est pas dans la maille, elle est dénombrée", () => {
+  // MESURÉ, ET NON SUPPOSÉ. En H1 l'étape est le département, et le cube porte
+  // déjà une cellule par (département, sous-poste, mois) : la mettre dans la
+  // maille donnait 110 blocs d'une à trois cellules sur une extraction réelle
+  // de 142 — un tableau à peine plus court, où total, minimum et maximum ne
+  // comparent rien. Retirée, la même extraction donne 12 blocs de trois à
+  // vingt-huit cellules.
+  const blocks = groupCells([CELL({ step: 7 }), CELL({ step: 9 }), CELL({ step: 7 })]);
+  if (blocks.length !== 1) return `${blocks.length} bloc(s) : l'étape sépare encore`;
+  const [b] = blocks;
+  if (b.cells !== 3) return `${b.cells} cellules`;
+  // Elle n'est pas perdue : le bloc dit combien d'unités il couvre, et
+  // l'étendue min–max mesure justement leur dispersion.
+  if (b.steps.size !== 2) return `${b.steps.size} unité(s) dénombrée(s)`;
+  return null;
+});
+
+test("blocs — le résumé ne mélange pas ce qui compte et ce qui a été écarté", () => {
+  // Les additionner donnerait un nombre qui ne veut rien dire mais qui
+  // ressemble à un total.
+  const t = summarise(groupCells([
+    CELL({}), CELL({ used: false, reason: "autre lot" }),
+  ]));
+  if (t.borne !== 50) return `porté ${t.borne}`;
+  if (t.setAside !== 100) return `écarté ${t.setAside}`;
+  if (t.cells !== 2 || t.kept !== 1 || t.out !== 1) return `dénombrement ${JSON.stringify(t)}`;
+  return null;
+});
+
+test("blocs — l'origine d'un bloc ne vaut pas mieux que sa pire entrée", () => {
+  const [b] = groupCells([CELL({}), CELL({ origin: "ESTIMATED" })]);
+  return b.origin === "ESTIMATED" ? null : `origine ${b.origin}`;
+});
+
+test("libellés — 1002 s'affiche en toutes lettres, avec son poste", async () => {
+  const taxonomy = await fetch("/engine/taxonomy.json").then((r) => r.json());
+  const labels = labelsFrom(taxonomy);
+  const got = subPostLabel(labels, 1002);
+  if (!got.includes("Internal freight")) return `sous-poste 1002 rendu « ${got} »`;
+  if (!got.includes("Fret")) return `le poste manque : « ${got} »`;
+  return null;
+});
+
+test("libellés — une autre version de taxonomie ne prête pas ses mots", () => {
+  // Un libellé emprunté à une autre version se lirait comme une information
+  // alors qu'il serait une supposition. On revient au numéro.
+  const labels = labelsFrom({ version: "v1", subPosts: [{ id: 1002, poste: 1, label: "X" }],
+                              postes: [{ id: 1, key: "P" }] });
+  if (subPostLabel(applyTo(labels, "v1"), 1002) !== "X (P)") return "la bonne version ne traduit pas";
+  if (subPostLabel(applyTo(labels, "v2"), 1002) !== "#1002") return "une autre version prête ses mots";
+  // Version non déclarée : on traduit faute de mieux, plutôt que de refuser des
+  // mots sur un doute.
+  return subPostLabel(applyTo(labels, undefined), 1002) === "X (P)"
+    ? null : "une version non déclarée bloque la traduction";
+});
+
+test("libellés — sans table servie, la page rend le numéro et ne tombe pas", () => {
+  const none = labelsFrom(null);
+  return subPostLabel(none, 1002) === "#1002" ? null : "le repli sur le numéro manque";
 });
 
 // --- La page de vérification : le DID doit pouvoir verdir ------------------
@@ -928,13 +1038,24 @@ async function wireReset() {
   const status = document.querySelector("[data-reset-status]");
   if (!btn) return;
 
+  // CE GARDE-FOU REFUSAIT TOUJOURS, et c'est pour cela qu'il disparaît.
+  //
+  // Il désactivait le bouton dès qu'un compte était connecté. Or TOUTE page de
+  // ce site est derrière l'authentification : la condition était vraie en
+  // permanence, la fonction n'a jamais été atteignable, et le message conseillait
+  // « utilisez la rotation de clé » — c'est-à-dire exactement ce que ce bouton
+  // fait, puisque supprimer la clé EST la rotation depuis la révision de la
+  // PR #70. Un refus qui renvoie à lui-même n'est pas une protection.
+  //
+  // CE QUI PROTÈGE VRAIMENT EST DÉJÀ LÀ, et n'a pas bougé : il faut retaper
+  // l'empreinte exacte de la clé, et présenter le document DID installé — ou
+  // forcer explicitement, en cochant, ce qui interdit alors de toucher aux
+  // attestations. Trois gestes délibérés, dont un que l'on ne peut pas produire
+  // sans avoir la clé sous les yeux.
+  //
+  // L'identité reste lue : la fusion de documents DID a besoin de savoir au nom
+  // de QUI le document se construit. C'est le seul usage qu'elle en avait.
   const me = await fetchMe();
-  if (me.authenticated) {                       // en production, on tourne, on n'efface pas
-    btn.disabled = true;
-    if (status) status.textContent = T.resetProduction;
-    return;
-  }
-
   const stored = await loadKeyPair();
   const expected = stored ? readable(await thumbprint(stored)) : null;
   if (!stored) { btn.disabled = true; if (status) status.textContent = T.resetNoKey; return; }
