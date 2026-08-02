@@ -20,6 +20,7 @@
  */
 import T from "./labels.js";
 import { credentialsByRef, putCredential } from "./wallet.js";
+import { renderCertificates } from "./certificate-view.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
 import { formatMass } from "./mass.js";
 import { loadKeyPair } from "./keys.js";
@@ -121,6 +122,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     </p>
     <p class="muted" data-bar-sign-status></p>
     <p class="muted" data-bar-deposit hidden></p>
+
+    <section data-bar-certificates hidden>
+      <h3 class="subhead">${T.certHeld}</h3>
+      <p class="muted">${T.certHeldWhy}</p>
+      <div data-bar-certificates-body></div>
+    </section>
+
     <p><a href="/register/">${T.barBackToRegister}</a></p>
   `;
 
@@ -131,6 +139,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const deposit = $("[data-bar-deposit]");
   const fetchBtn = $("[data-bar-fetch]");
   const fetchStatus = $("[data-bar-fetch-status]");
+  const certificates = $("[data-bar-certificates]");
+  const certificatesBody = $("[data-bar-certificates-body]");
 
   /**
    * L'état que l'affichage ne peut pas relire.
@@ -142,22 +152,43 @@ document.addEventListener("DOMContentLoaded", async () => {
    */
   const ctx = { deposit: null };
 
-  /** Le magasin détient-il CETTE barre ? L'index complet n'a pas sa place ici. */
-  async function storeHasIt() {
+  /**
+   * Ce que le magasin détient pour CETTE barre. L'index complet n'a pas sa place ici.
+   *
+   * Un seul aller-retour sert deux questions — « la barre est-elle certifiée
+   * ailleurs ? » et « que dit ce que Natixar a signé ? ». Les poser séparément
+   * ferait deux requêtes pour une réponse, et laisserait les deux vues diverger
+   * le jour où l'une répondrait et l'autre non.
+   */
+  async function storeHolds() {
     const res = await fetch(`/api/v1/credentials/${encodeURIComponent(bar.subjectId)}`)
       .catch(() => null);
     // Un 200 portant du HTML n'est pas une attestation : c'est le site qui a
     // répondu à la place du magasin.
-    return res?.ok === true && (res.headers.get("content-type") ?? "").includes("json");
+    if (!res?.ok || !(res.headers.get("content-type") ?? "").includes("json")) return [];
+    const body = await res.json().catch(() => null);
+    return Array.isArray(body?.credentials) ? body.credentials : [];
   }
 
   /** Un seul écrivain de l'état, comme sur la page d'accueil (#64). */
   async function render() {
     const [pair, current] = await Promise.all([loadKeyPair(), credentialsByRef(bar.internalId)]);
     const mine = current.DoreBarOriginCredential?.document ?? null;
-    // « Ailleurs » ne se demande que faute de l'avoir ici : détenir l'attestation
-    // rend la question sans objet, et l'aller-retour avec elle.
-    const elsewhere = mine ? false : await storeHasIt();
+
+    // CE QUE LE MAGASIN DÉTIENT SE DEMANDE TOUJOURS, même quand le portefeuille
+    // a l'attestation d'origine. Ce qu'on vient chercher n'est pas seulement
+    // « est-elle certifiée ailleurs » : c'est l'attestation CARBONE, que la mine
+    // n'a pas faite, qui est signée sous une autre clé que la sienne, et qu'elle
+    // n'a aucun autre endroit où lire.
+    const held = await storeHolds();
+    const elsewhere = mine ? false : held.length > 0;
+
+    // Ce qui vient d'être signé dans ce navigateur est déjà à l'écran juste
+    // au-dessus ; le répéter ici n'apprendrait rien. Ne s'affiche donc que ce
+    // que quelqu'un d'AUTRE a signé.
+    const foreign = held.filter((r) => r?.document?.issuer && r.document.issuer !== did);
+    certificates.hidden = foreign.length === 0;
+    certificatesBody.innerHTML = renderCertificates(foreign);
 
     badge.textContent = mine ? T.barStatusHere : (elsewhere ? T.barStatusElsewhere : T.barStatusNone);
     badge.className = `badge badge--${mine ? "verified" : (elsewhere ? "warning" : "pending")}`;
