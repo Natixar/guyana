@@ -25,6 +25,28 @@
  * en kilogrammes, et additionner leurs quantités n'aurait aucun sens. Leurs
  * émissions, si — elles sont dans la même unité par construction.
  *
+ * ─── UNE DONNÉE EST UN DÉBIT, PAS UNE QUANTITÉ ───────────────────────────
+ *
+ * H1 n'a qu'un mode de calcul, et c'est ce qui le rend simple : une métrique
+ * multipliée par un facteur d'émission. La métrique est stockée DIVISÉE PAR LA
+ * DURÉE de son intervalle — un débit moyen, supposé uniforme sur l'intervalle —
+ * et l'émission se lit donc
+ *
+ *     débit × facteur × durée de l'intervalle d'intégration
+ *
+ * Cette division n'est pas une commodité. Sans elle, « intégrer sur un
+ * intervalle quelconque » n'a pas de sens : une cellule mensuelle recouvrant à
+ * moitié la fenêtre demandée devrait compter pour moitié, et la seule façon d'y
+ * arriver en partant d'une quantité est de la rediviser par sa durée — c'est-à-
+ * dire de reconstituer le débit qu'on avait refusé de stocker. Le cube indexe
+ * les périodes en `tstzrange` et interroge en `&&` précisément pour servir des
+ * recouvrements partiels ; les servir puis les sommer entiers serait un
+ * sur-comptage silencieux.
+ *
+ * L'hypothèse d'uniformité est le prix, et elle est explicite : entre deux
+ * relevés mensuels, rien ne dit comment la consommation s'est répartie, et un
+ * débit constant est la seule répartition qui n'invente pas de structure.
+ *
  * @see services/README.md
  * @see site/static/engine/taxonomy.json
  */
@@ -48,9 +70,9 @@ function fault(code, detail) {
  * TOUT EST EN SI, ET UN FACTEUR EST UN NOMBRE.
  *
  * Le moteur produit des kgCO2e et ne convertit rien. Un facteur vaut des kgCO2e
- * par unité d'activité, et cette unité est celle de la cellule : la porter une
- * seconde fois à côté du facteur créerait deux sources de vérité, donc une
- * occasion de divergence, pour une information déjà présente.
+ * par unité d'activité, et cette unité se déduit de la dimension de la cellule
+ * sous l'hypothèse SI : un débit de carburant est en m3/s, et il n'y a rien à
+ * porter à côté du nombre.
  *
  * Il n'y a donc rien à contrôler ici. La conversion — onces vers kilogrammes,
  * litres vers mètres cubes, facteurs par litre vers facteurs par mètre cube —
@@ -58,10 +80,29 @@ function fault(code, detail) {
  * Au-delà de cette frontière, il n'y a que des nombres, et un nombre n'a pas
  * d'unité à trahir.
  *
+ * L'UNITÉ EST CELLE DU CALCUL, PAS CELLE DE LA DONNÉE, et c'est pourquoi elle
+ * est ici et non sur chaque cellule. Une cellule porte un débit de gazole ; que
+ * ce débit devienne des kgCO2e tient au facteur qu'on lui applique, et le jour
+ * où le même débit servira à calculer une consommation d'eau, une cellule qui
+ * aurait emporté « kgCO2e » dans sa forme serait devenue fausse sans que rien
+ * ne bouge. L'unité appartient donc au profil — au résultat d'UN calcul.
+ *
  * Publier en tCO2e quand un référentiel l'exige est une affaire de rendu : on
  * divise par mille en écrivant un rapport, jamais en calculant ni en signant.
  */
 const RESULT_UNIT = "kgCO2e";
+
+/**
+ * Le mode d'impact — UN champ d'annotation, jamais sept colonnes.
+ *
+ * Décision 3 de l'issue #61. Les facteurs par gaz sont rares dans les bases :
+ * sept colonnes seraient vides presque partout. On n'émet sept cellules que là
+ * où un facteur est réellement décomposé, ce qui répète la mesure de base et
+ * reste acceptable puisque le cas est rare. Le champ nomme aussi le fluide dans
+ * une cellule de fuite directe, et c'est par lui que les impacts non
+ * climatiques entreront.
+ */
+const MODE_DEFAULT = "aggregate";
 
 const worstOrigin = (a, b) =>
   ORIGIN_RANK.indexOf(a) >= ORIGIN_RANK.indexOf(b) ? a : b;
@@ -73,10 +114,92 @@ const worstOrigin = (a, b) =>
  * dire exactement les entrées de la fonction de traduction. Regrouper sur moins
  * que cela fusionnerait des cellules qui n'aboutissent pas à la même ligne.
  */
-const groupKey = (cell) => `${cell.subPost}/${cell.partType}/${cell.caracterisation}`;
+/**
+ * La maille d'agrégation, et ce qu'elle refuse de fondre ensemble.
+ *
+ * LA PÉRIODE Y ENTRE, ET C'EST UNE CORRECTION. Sans elle, douze cellules
+ * mensuelles de même position pivot se fondaient en une seule dont personne ne
+ * pouvait plus dire à quel mois elle appartenait. Or la période est un axe de la
+ * matrice de l'issue #61 : une cellule porte un flux moyen SUR UN INTERVALLE, et
+ * une intégration sur un intervalle quelconque n'a de sens que si l'intervalle
+ * a survécu à l'agrégation.
+ *
+ * L'ÉTAPE Y ENTRE, et elle y entre en PREMIER parce que c'est l'axe de
+ * trajectoire matière de l'issue #61. Sans elle, deux unités de production qui
+ * font la même chose au même moment se fondent en une cellule dont plus rien ne
+ * dit où elle a eu lieu — et c'est justement le long de cet axe qu'un porteur
+ * divulgue la ligne de transport sans la ligne de minage.
+ *
+ * LA MÉTROLOGIE DE LA CELLULE N'Y ENTRE PAS, et le vecteur qui l'affirme a
+ * raison : ce qui se somme dans un groupe est l'ÉMISSION, pas la donnée
+ * d'activité. Ni la dimension ni l'unité d'affichage ne comptent — mille
+ * kilogrammes d'explosif et une tonne sont le même débit SI écrit de deux
+ * façons, et leurs émissions se somment. Séparer les groupes là-dessus
+ * produirait deux cellules là où le référentiel n'en voit qu'une.
+ */
+const groupKey = (cell, span) =>
+  [cell.step ?? "", cell.subPost, cell.partType, cell.caracterisation,
+   span.start, span.end,
+   cell.mode ?? MODE_DEFAULT].join("/");
 
-/** Le mois d'une cellule, « 2025-01 », depuis le début de sa période. */
-const monthOf = (cell) => String(cell.periodStart ?? "").slice(0, 7) || "undated";
+/** Le mois d'un intervalle, « 2025-01 », depuis son début. */
+const monthOf = (span) => span.start.slice(0, 7);
+
+/** Millisecondes vers secondes : le débit est en unité SI PAR SECONDE. */
+const secondsBetween = (fromMs, toMs) => (toMs - fromMs) / 1000;
+
+/**
+ * L'intervalle propre d'une cellule, en millisecondes epoch.
+ *
+ * Une cellule SANS période est refusée et non intégrée sur une durée par
+ * défaut : un débit sans intervalle ne désigne aucune quantité, et lui en
+ * prêter une produirait un nombre plausible que la signature figerait.
+ */
+function ownSpan(cell) {
+  const from = Date.parse(cell.periodStart ?? "");
+  const to = Date.parse(cell.periodEnd ?? "");
+  if (Number.isNaN(from) || Number.isNaN(to)) {
+    throw fault("PERIOD_REQUIRED", String(cell.id ?? "cellule sans identifiant"));
+  }
+  if (!(to > from)) {
+    throw fault("PERIOD_EMPTY", String(cell.id ?? "cellule sans identifiant"));
+  }
+  return [from, to];
+}
+
+/**
+ * L'intervalle d'intégration d'une cellule : le sien, et jamais un autre.
+ *
+ * LE DÉCOUPAGE APPARTIENT AU MAGASIN, décision du 2 août 2026. Une extraction
+ * revient déjà taillée à la fenêtre demandée : une cellule mensuelle
+ * interrogée sur trois jours arrive avec trois jours de période et son débit
+ * inchangé — un débit est extensif dans le temps, le lire sur un intervalle
+ * plus court ne le modifie pas.
+ *
+ * Ce moteur avait un temps porté ce découpage, avec des fenêtres qu'il
+ * fusionnait avant de calculer. C'était deux endroits pour une seule
+ * arithmétique, et le mauvais : le magasin est le seul à connaître à la fois la
+ * période stockée et la fenêtre demandée, et il signe ce qu'il sert. Ce qui
+ * arrive ici a donc déjà la bonne durée, et il ne reste qu'à intégrer.
+ */
+function ownInterval(cell) {
+  const [from, to] = ownSpan(cell);
+  return { start: cell.periodStart, end: cell.periodEnd,
+           seconds: secondsBetween(from, to) };
+}
+
+/**
+ * L'émission d'une cellule sur sa propre période, en kgCO2e.
+ *
+ * Exportée parce que le signataire en a besoin hors agrégation : une cellule
+ * ÉCARTÉE entre dans la matrice avec son montant, et ce montant doit se calculer
+ * par la même formule que celui d'une cellule retenue. Deux formules, même
+ * d'accord aujourd'hui, divergeraient un jour sans que rien ne le signale.
+ */
+export function emissionOf(cell) {
+  const [from, to] = ownSpan(cell);
+  return cell.flux * cell.factor * secondsBetween(from, to);
+}
 
 /**
  * Traduit un groupe vers sa ligne du référentiel cible.
@@ -129,7 +252,7 @@ export function translate({ subPost, partType, caracterisation }, taxonomy) {
  * - **le non-alloué se déclare** dans son propre poste et ne se répartit jamais
  *   en silence, faute de quoi le total serait complet et faux.
  *
- * @param {Array<object>} cells
+ * @param {Array<object>} cells déjà taillées à la fenêtre par le magasin
  * @param {object} taxonomy
  * @returns {{pivot: Array<object>, lines: Record<string, number>, origin: string,
  *            unallocated: number, unit: string, groups: number}}
@@ -145,8 +268,15 @@ export function aggregate(cells, taxonomy) {
   let origin = ORIGIN_RANK[0];
 
   for (const cell of cells) {
-    const emission = cell.value * cell.factor;
+    // L'origine se propage même quand la fenêtre ne retient rien de la cellule :
+    // une cellule servie a été jugée pertinente, et la taire au motif qu'elle
+    // pèse zéro sur cette fenêtre-ci embellirait l'agrégat par un effet de bord.
     origin = worstOrigin(origin, cell.origin ?? "NOT_MEASURED");
+
+    // Un débit s'intègre sur une durée, et celle-ci est celle que le magasin a
+    // servie — déjà taillée à la fenêtre demandée, déjà signée.
+    const span = ownInterval(cell);
+    const emission = cell.flux * cell.factor * span.seconds;
 
     // Ce que la cartographie n'atteint pas reste visible en tant que tel. Le
     // seau non-alloué est un objet de plein droit, pas un état d'erreur (#6).
@@ -155,18 +285,18 @@ export function aggregate(cells, taxonomy) {
       // Ventilé par période, parce que la règle d'allocation l'est : le
       // non-alloué d'un mois revient aux barres coulées CE mois-là. Un total
       // global ne saurait plus à quel mois il appartient.
-      const key = monthOf(cell);
+      const key = monthOf(span);
       unallocatedByPeriod[key] = (unallocatedByPeriod[key] ?? 0) + emission;
       continue;
     }
 
-    const key = groupKey(cell);
+    const key = groupKey(cell, span);
     const g = groups.get(key);
     if (g) {
       g.emission += emission;
       g.origin = worstOrigin(g.origin, cell.origin ?? "NOT_MEASURED");
     } else {
-      groups.set(key, { cell, emission, origin: cell.origin ?? "NOT_MEASURED" });
+      groups.set(key, { cell, span, emission, origin: cell.origin ?? "NOT_MEASURED" });
     }
   }
 
@@ -180,14 +310,31 @@ export function aggregate(cells, taxonomy) {
   // signé épinglerait tout inventaire passé à un cadre qui change (#61).
   const lines = {};
   const pivot = [];
-  for (const { cell, emission, origin: groupOrigin } of groups.values()) {
+  for (const { cell, span, emission, origin: groupOrigin } of groups.values()) {
     const line = translate(cell, taxonomy);
     lines[line] = (lines[line] ?? 0) + emission;
     pivot.push({
+      // L'ÉTAPE — l'unité de production, qui est l'opération sous les bijections
+      // H1. Un ENTIER d'une taxonomie masquée, et c'est ce qui rend l'axe
+      // publiable : « étape 7 » ne dit rien de l'organigramme du client, alors
+      // que « Sinohydro » le dirait. Une attestation sans cet axe ne permettrait
+      // pas de retirer une ligne de minage en gardant une ligne de transport,
+      // ce qui est l'usage même de la divulgation maîtrisée.
+      step: cell.step ?? null,
+      // La catégorie : une position dans la taxonomie pivot, JAMAIS une ligne
+      // de référentiel. C'est `lines` qui porte la ligne dérivée, et elle ne se
+      // signe pas — un cadre qui change épinglerait tout inventaire passé.
       subPost: cell.subPost,
       partType: cell.partType ?? null,
       caracterisation: cell.caracterisation,
+      // L'INTERVALLE RÉELLEMENT INTÉGRÉ, et non la période déclarée de la
+      // cellule. Les deux coïncident quand on intègre tout ; ils divergent dès
+      // qu'une fenêtre ne prend qu'un morceau, et c'est alors le morceau qui
+      // rend compte du montant. Afficher la période déclarée à côté d'un montant
+      // partiel dirait « voici janvier » en montrant trois jours.
+      period: { start: span.start, end: span.end },
       amount: emission,
+      mode: cell.mode ?? MODE_DEFAULT,
       origin: groupOrigin,
     });
   }

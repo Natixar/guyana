@@ -37,7 +37,10 @@ export function runVectors(aggregate, vectors, taxonomy, allocate) {
 
   for (const c of vectors.cases) {
     try {
-      const got = aggregate(c.cells, taxonomy);
+      // La fenêtre d'intégration fait partie du cas : un débit ne désigne une
+      // quantité qu'une fois l'intervalle fixé, et les cas qui n'en donnent pas
+      // intègrent chaque cellule sur sa propre période.
+      const got = aggregate(c.cells, taxonomy, c.windows ?? null);
 
       if (c.expect.error) {
         failures.push(`${c.name} : aurait dû lever ${c.expect.error}`);

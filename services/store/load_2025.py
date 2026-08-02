@@ -69,6 +69,15 @@ TO_SI = {
 }
 
 
+#: L'unité SI d'activité vers la DIMENSION qu'elle mesure.
+#:
+#: C'est la dimension qui est stockée, pas l'unité : sous l'hypothèse SI, elle
+#: détermine l'unité sans laisser de choix — « volume » se lit m3, et divisé par
+#: la durée de sa période, m3/s. Nommer l'unité par-dessus n'ajouterait qu'une
+#: occasion de la contredire.
+DIMENSION_OF = {"m3": "volume", "kg": "mass", "kWh": "energy"}
+
+
 def si_factor(name: str) -> tuple[float, str]:
     """Le facteur ramené au SI, et l'unité d'activité qui va avec."""
     value, unit = SOURCE_FACTORS[name]
@@ -78,16 +87,39 @@ def si_factor(name: str) -> tuple[float, str]:
     return value * scale, si_unit
 
 
-DIESEL_COMBUSTION, DIESEL_UNIT = si_factor("diesel-combustion")
+def cell_metrology(name: str) -> tuple[str, str, float]:
+    """La dimension, l'unité d'affichage, et le facteur qui va du SI vers elle.
+
+    L'unité d'affichage est celle de la SOURCE — le litre des bons de sortie
+    d'AGM — et elle ne sert qu'à relire la donnée brute sans compter les zéros.
+    Aucun calcul ne la lit : la seule unité qui compte est celle du SI, et elle
+    se déduit de la dimension.
+
+    LE FACTEUR EST STOCKÉ PLUTÔT QUE DÉDUIT DU SYMBOLE, et c'est ce qui évite
+    d'écrire un système d'unités. Savoir qu'une donnée « est en litres » ne sert
+    à rien sans une table des symboles, de leurs préfixes et de leurs multiples,
+    tenue juste. `display = SI x facteur` dit la même chose en un double.
+
+    C'est le MÊME nombre que celui qui convertit le facteur d'émission, et pour
+    la même raison : mille litres dans un mètre cube. `TO_SI` le porte une fois,
+    et les deux usages le lisent là.
+    """
+    _, source_unit = SOURCE_FACTORS[name]
+    scale, si_unit = TO_SI[source_unit]
+    return DIMENSION_OF[si_unit], source_unit, scale
+
+
+DIESEL_COMBUSTION, _ = si_factor("diesel-combustion")
 DIESEL_UPSTREAM, _ = si_factor("diesel-upstream")
-EXPLOSIVE, EXPLOSIVE_UNIT = si_factor("explosive")
+EXPLOSIVE, _ = si_factor("explosive")
+
+DIESEL_DIMENSION, DIESEL_DISPLAY, DIESEL_SCALE = cell_metrology("diesel-combustion")
+EXPLOSIVE_DIMENSION, EXPLOSIVE_DISPLAY, EXPLOSIVE_SCALE = cell_metrology("explosive")
 
 #: Identifiants de la taxonomie servie, agm-h1-v2.
 PART_COMBUSTION, PART_AMONT = 1, 2
 CARAC_OPERATED, CARAC_PROCEDEED = 1, 2
 SUBPOST_EXPLOSIVES = 1005
-
-UNITS = {"m3": 1, "kg": 2}
 
 #: L'organisation de tête du client, racine de son sous-arbre.
 #:
@@ -114,25 +146,6 @@ HEAD = {
     # inscrit comme émetteur des attestations d'origine.
     "did": "did:web:guygold.com",
 }
-
-#: Les règles de calcul qui exigent PLUSIEURS grandeurs.
-#:
-#: Une émission dont la règle demande deux entrées n'est pas calculable si une
-#: seule est présente : un tonnage transporté sans la distance parcourue est une
-#: donnée exacte dont on ne peut rien tirer. La cellule survivante est alors
-#: marquée INCOMPLETE — elle existe, elle est juste, et elle ne suffit pas.
-#:
-#: Le gazole est le cas qui existe dans le paquet AGM : chaque litre porte une
-#: combustion ET un amont, et charger la première sans la seconde perdrait 22,8 %
-#: de l'empreinte. Le chargeur produit toujours les deux, donc le compte vaut
-#: zéro aujourd'hui — mais c'est un zéro CALCULÉ. Le jour où une source n'en
-#: fournit qu'une, ou lorsque le fret arrivera avec son tonnage et sa distance,
-#: le compte cesse de valoir zéro sans que personne ait à y penser.
-MULTI_PART_RULES = {
-    1000: frozenset({PART_COMBUSTION, PART_AMONT}),   # CombustiblesFossiles
-    1002: frozenset({PART_COMBUSTION, PART_AMONT}),   # FretInterne
-}
-
 
 #: Le Guyana est à UTC−4 toute l'année, sans heure d'été.
 GUYANA = timezone(timedelta(hours=-4))
@@ -225,34 +238,14 @@ def reconstruct(rows, donors):
     return rows + made
 
 
-def mark_incomplete(cells) -> int:
-    """Marque les cellules dont la règle de calcul attend une compagne absente.
+def period_seconds(period: Range) -> float:
+    """La durée d'un intervalle, en secondes.
 
-    Le groupe est (entité, période, sous-poste) : c'est la maille d'UNE émission.
-    Si les `part_type` réunis ne couvrent pas ce que la règle exige, chacune des
-    cellules du groupe est incomplète — pas seulement celle qui manque, qui par
-    définition n'est pas là pour être marquée.
+    C'est le diviseur qui fait d'une quantité un débit. Un intervalle vide est
+    impossible ici — la contrainte `period_not_empty` du schéma le refuse — donc
+    il n'y a pas de division par zéro à craindre, et rien à contrôler deux fois.
     """
-    from collections import defaultdict
-
-    seen = defaultdict(set)
-    for c in cells:
-        if c["sub_post"] in MULTI_PART_RULES:
-            seen[(c["entity_id"], c["period"], c["sub_post"])].add(c["part_type"])
-
-    n = 0
-    for c in cells:
-        required = MULTI_PART_RULES.get(c["sub_post"])
-        if not required:
-            continue
-        if required - seen[(c["entity_id"], c["period"], c["sub_post"])]:
-            # MISSING l'emporte : une cellule qui comble un trou de calendrier
-            # est d'abord un trou de calendrier. Le dire deux fois en une colonne
-            # est impossible, et c'est l'absence de la date qui explique l'autre.
-            if c["coverage"] == "COMPLETE":
-                c["coverage"] = "INCOMPLETE"
-                n += 1
-    return n
+    return (period.upper - period.lower).total_seconds()
 
 
 def build_cells(fuel, explosives, assignment, org):
@@ -273,17 +266,25 @@ def build_cells(fuel, explosives, assignment, org):
             print(f"  département hors taxonomie, ignoré : {row['department']}", file=sys.stderr)
             continue
         slug = row["department"].replace(" ", "_")[:40]
+        period = month_range(row["month"])
+        # LA DIVISION QUI FAIT LE DÉBIT, et elle a lieu ici, à l'ingestion, au
+        # même endroit que la conversion des unités et pour la même raison :
+        # c'est le dernier point où la donnée source existe encore telle que la
+        # mine l'a écrite. Au-delà, il n'y a qu'un débit sur un intervalle.
+        flux = row["m3"] / period_seconds(period)
         # Deux cellules par litre : la combustion, et l'amont. Charger seulement
         # la première perdrait 22,8 % de l'empreinte sans que rien ne le signale.
         for part, factor, tag in ((PART_COMBUSTION, DIESEL_COMBUSTION, "comb"),
                                   (PART_AMONT, DIESEL_UPSTREAM, "amont")):
             cells.append({
                 "id": f"d/{row['month']}/{slug}/{tag}",
-                "period": month_range(row["month"]),
+                "period": period,
                 "entity_id": dept["id"],
                 "sub_post": sub_post, "part_type": part,
                 "caracterisation": CARAC_OPERATED,
-                "value": row["m3"], "unit": DIESEL_UNIT,
+                "flux": flux,
+                "dimension": DIESEL_DIMENSION, "display_unit": DIESEL_DISPLAY,
+                "display_scale": DIESEL_SCALE,
                 "factor": factor,
                 "origin": "MEASURED",
                 "coverage": row.get("coverage", "COMPLETE"),
@@ -291,16 +292,19 @@ def build_cells(fuel, explosives, assignment, org):
 
     blast_dept = org["Sinohydro"]["id"]
     for row in explosives:
+        period = month_range(row["month"])
         cells.append({
             "id": f"x/{row['month']}/{row['product'].replace(' ', '_')}",
-            "period": month_range(row["month"]),
+            "period": period,
             # Le paquet donne les explosifs par produit et par mois, jamais par
             # département : ils vont au département de minage. Les répartir
             # entre plusieurs inventerait une ventilation que personne n'a.
             "entity_id": blast_dept,
             "sub_post": SUBPOST_EXPLOSIVES, "part_type": None,
             "caracterisation": CARAC_PROCEDEED,
-            "value": row["kg"], "unit": EXPLOSIVE_UNIT,
+            "flux": row["kg"] / period_seconds(period),
+            "dimension": EXPLOSIVE_DIMENSION, "display_unit": EXPLOSIVE_DISPLAY,
+            "display_scale": EXPLOSIVE_SCALE,
             "factor": EXPLOSIVE,
             "origin": "MEASURED",
             "coverage": row.get("coverage", "COMPLETE"),
@@ -311,10 +315,6 @@ def build_cells(fuel, explosives, assignment, org):
 
 def load(conn, cells, org) -> None:
     db.apply_schema(conn)
-    for symbol, uid in UNITS.items():
-        conn.execute("INSERT INTO unit (id, symbol) VALUES (%s, %s) "
-                     "ON CONFLICT (id) DO UPDATE SET symbol = EXCLUDED.symbol",
-                     (uid, symbol))
     # La taxonomie d'organisation. Les noms sont en clair PROVISOIREMENT : ce
     # sont eux que le chiffrement des dimensions couvrira. Le client n'en connaît
     # déjà que les entiers.
@@ -347,18 +347,21 @@ def load(conn, cells, org) -> None:
     with conn.cursor() as cur:
         cur.executemany(
             """INSERT INTO cell (id, period, entity_id, sub_post, part_type, caracterisation,
-                                 value, unit_id, factor, origin, coverage)
+                                 flux, dimension, display_unit, display_scale,
+                                 factor, origin, coverage)
                     VALUES (%(id)s, %(period)s, %(entity_id)s, %(sub_post)s, %(part_type)s,
-                            %(caracterisation)s, %(value)s, %(unit_id)s, %(factor)s,
-                            %(origin)s, %(coverage)s)
+                            %(caracterisation)s, %(flux)s, %(dimension)s, %(display_unit)s,
+                            %(display_scale)s, %(factor)s, %(origin)s, %(coverage)s)
                ON CONFLICT (id) DO UPDATE SET
                     period = EXCLUDED.period, entity_id = EXCLUDED.entity_id,
                     sub_post = EXCLUDED.sub_post, part_type = EXCLUDED.part_type,
                     caracterisation = EXCLUDED.caracterisation,
-                    value = EXCLUDED.value, unit_id = EXCLUDED.unit_id,
+                    flux = EXCLUDED.flux, dimension = EXCLUDED.dimension,
+                    display_unit = EXCLUDED.display_unit,
+                    display_scale = EXCLUDED.display_scale,
                     factor = EXCLUDED.factor, origin = EXCLUDED.origin,
                     coverage = EXCLUDED.coverage""",
-            [{**c, "unit_id": UNITS[c["unit"]]} for c in cells],
+            cells,
         )
 
 
@@ -381,13 +384,6 @@ def emit_sql(cells, org) -> None:
     dont personne ne saurait dire s'il est complet.
     """
     print("BEGIN;")
-    for symbol, uid in UNITS.items():
-        # DO UPDATE, jamais DO NOTHING : le passage de « L » à « m3 » laisserait
-        # sinon l'identifiant 1 sur l'ancien symbole, et les cellules porteraient
-        # des mètres cubes étiquetés litres. Une erreur d'unité muette, celle-là
-        # même que le SI existe pour supprimer.
-        print(f"INSERT INTO unit (id, symbol) VALUES ({uid}, {sql_literal(symbol)}) "
-              "ON CONFLICT (id) DO UPDATE SET symbol = EXCLUDED.symbol;")
     # La tête d'abord : `parent` la référence.
     print("INSERT INTO entity (id, label, industrial, legal_name, jurisdiction, "
           "registered_office, did) VALUES "
@@ -409,19 +405,22 @@ def emit_sql(cells, org) -> None:
         hi = c["period"].upper.isoformat()
         print(
             "INSERT INTO cell (id, period, entity_id, sub_post, part_type, caracterisation,"
-            " value, unit_id, factor, origin, coverage) VALUES ("
+            " flux, dimension, display_unit, display_scale, factor, origin, coverage)"
+            " VALUES ("
             f"{sql_literal(c['id'])}, "
             f"tstzrange({sql_literal(lo)}::timestamptz, {sql_literal(hi)}::timestamptz, '[)'), "
             f"{c['entity_id']}, {sql_literal(c['sub_post'])}, {sql_literal(c['part_type'])}, "
-            f"{c['caracterisation']}, {c['value']!r}, {UNITS[c['unit']]}, {c['factor']!r}, "
+            f"{c['caracterisation']}, {c['flux']!r}, {sql_literal(c['dimension'])}, "
+            f"{sql_literal(c['display_unit'])}, {c['display_scale']!r}, {c['factor']!r}, "
             f"{sql_literal(c['origin'])}, {sql_literal(c['coverage'])}) "
             # Toutes les colonnes, sans exception : un rechargement qui change
-            # d'unité doit changer l'unité. En omettre une laisse une valeur
-            # neuve sous une étiquette ancienne.
+            # de dimension doit changer la dimension. En omettre une laisse une
+            # valeur neuve sous une étiquette ancienne.
             "ON CONFLICT (id) DO UPDATE SET period = EXCLUDED.period, "
             "entity_id = EXCLUDED.entity_id, sub_post = EXCLUDED.sub_post, "
             "part_type = EXCLUDED.part_type, caracterisation = EXCLUDED.caracterisation, "
-            "value = EXCLUDED.value, unit_id = EXCLUDED.unit_id, "
+            "flux = EXCLUDED.flux, dimension = EXCLUDED.dimension, "
+            "display_unit = EXCLUDED.display_unit, display_scale = EXCLUDED.display_scale, "
             "factor = EXCLUDED.factor, origin = EXCLUDED.origin, "
             "coverage = EXCLUDED.coverage;"
         )
@@ -453,11 +452,15 @@ def main() -> int:
     explosives = reconstruct(explosives, donors)
 
     cells = build_cells(fuel, explosives, assignment, org)
-    incomplete = mark_incomplete(cells)
     missing = sum(1 for c in cells if c["coverage"] == "MISSING")
 
-    m3 = sum(c["value"] for c in cells if c["unit"] == "m3" and c["part_type"] == PART_COMBUSTION)
-    tonnes = sum(c["value"] * c["factor"] for c in cells) / 1000
+    # Le résumé reparle en quantités, parce qu'un débit de gazole en m3/s ne se
+    # relit pas. C'est exactement l'opération que le moteur fait ensuite : débit
+    # multiplié par la durée de sa période.
+    quantity = lambda c: c["flux"] * period_seconds(c["period"])
+    m3 = sum(quantity(c) for c in cells
+             if c["dimension"] == "volume" and c["part_type"] == PART_COMBUSTION)
+    tonnes = sum(quantity(c) * c["factor"] for c in cells) / 1000
 
     # Le résumé est un diagnostic, pas une donnée : il va sur stderr, sinon il
     # se mêle au SQL quand celui-ci part dans un tuyau.
@@ -465,8 +468,7 @@ def main() -> int:
     say = lambda m: print(m, file=sys.stderr)
     say(f"{len(cells)} cellules — {m3:,.0f} m3 de gazole, {tonnes:,.0f} tCO2e au total")
     say(f"  organisation : {HEAD['key']} + {len(org)} départements, dont {industrial} industriels")
-    say(f"  couverture : {missing} MISSING ({', '.join(donors) or 'aucun mois reconstitué'}), "
-        f"{incomplete} INCOMPLETE")
+    say(f"  couverture : {missing} MISSING ({', '.join(donors) or 'aucun mois reconstitué'})")
     say(f"  affectation : {assignment['version']} ({assignment['status'].split(' - ')[0]})")
 
     if args.dry_run:
