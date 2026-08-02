@@ -2,30 +2,230 @@
   "_": "Vecteurs de sérialisation canonique RFC 8785, partagés par les TROIS hôtes : le navigateur, le signataire en Node, et le magasin en Python. Le magasin signe ce qu'il sert et le signataire vérifie cette signature : si les deux langages ne sérialisent pas au même octet, rien ne se vérifie et la panne est silencieuse. Voir services/README.md.",
   "version": "1",
   "cases": [
-    { "name": "clés triées", "value": { "b": 1, "a": 2 }, "expect": "{\"a\":2,\"b\":1}" },
-    { "name": "imbrication et tableaux", "value": { "z": [3, { "y": 1, "x": 2 }], "a": null }, "expect": "{\"a\":null,\"z\":[3,{\"x\":2,\"y\":1}]}" },
-    { "name": "aucun espace insignifiant", "value": { "a": "x y" }, "expect": "{\"a\":\"x y\"}" },
-    { "name": "tri par unités de code UTF-16", "value": { "é": 1, "e": 2, "Z": 3 }, "expect": "{\"Z\":3,\"e\":2,\"é\":1}" },
-    { "name": "objet vide", "value": {}, "expect": "{}" },
-    { "name": "tableau vide", "value": [], "expect": "[]" },
-    { "name": "booléens et nul", "value": { "t": true, "f": false, "n": null }, "expect": "{\"f\":false,\"n\":null,\"t\":true}" },
-    { "name": "entier négatif", "value": { "a": -42 }, "expect": "{\"a\":-42}" },
-    { "name": "zéro négatif se sérialise en 0", "value": { "a": -0.0 }, "expect": "{\"a\":0}" },
-    { "name": "décimal — le format ECMAScript, pas le format natif", "value": { "a": 2.68 }, "expect": "{\"a\":2.68}" },
-    { "name": "décimal court", "value": { "a": 0.61 }, "expect": "{\"a\":0.61}" },
-    { "name": "somme flottante — la valeur réellement représentée", "value": { "a": 3.2900000000000005 }, "expect": "{\"a\":3.2900000000000005}" },
-    { "name": "entier issu d'un flottant ne garde pas le .0", "value": { "a": 1.0 }, "expect": "{\"a\":1}" },
-    { "name": "grand entier exactement représentable", "value": { "a": 9007199254740991 }, "expect": "{\"a\":9007199254740991}" },
-    { "name": "notation exponentielle pour les très petits", "value": { "a": 1e-7 }, "expect": "{\"a\":1e-7}" },
-    { "name": "notation exponentielle pour les très grands", "value": { "a": 1e21 }, "expect": "{\"a\":1e+21}" },
-    { "name": "échappements JSON minimaux", "value": { "a": "guillemet \" barre \\ saut \n tab \t" }, "expect": "{\"a\":\"guillemet \\\" barre \\\\ saut \\n tab \\t\"}" },
-    { "name": "contrôle non nommé en \\u", "value": { "a": "\u0001" }, "expect": "{\"a\":\"\\u0001\"}" },
-    { "name": "non-ASCII conservé tel quel, jamais échappé", "value": { "a": "coulée à 1 083 °C" }, "expect": "{\"a\":\"coulée à 1 083 °C\"}" },
-    { "name": "hors du plan multilingue de base", "value": { "a": "\ud83d\udd25" }, "expect": "{\"a\":\"🔥\"}" },
-    { "name": "une cellule du cube, telle qu'elle est servie", "value": { "id": "c1", "subPost": 1000, "partType": 1, "caracterisation": 1, "value": 1000, "unit": "L", "factor": 2.68, "factorUnit": "kgCO2e/L", "origin": "MEASURED" }, "expect": "{\"caracterisation\":1,\"factor\":2.68,\"factorUnit\":\"kgCO2e/L\",\"id\":\"c1\",\"origin\":\"MEASURED\",\"partType\":1,\"subPost\":1000,\"unit\":\"L\",\"value\":1000}" }
+    {
+      "name": "clés triées",
+      "value": {
+        "b": 1,
+        "a": 2
+      },
+      "expect": "{\"a\":2,\"b\":1}"
+    },
+    {
+      "name": "imbrication et tableaux",
+      "value": {
+        "z": [
+          3,
+          {
+            "y": 1,
+            "x": 2
+          }
+        ],
+        "a": null
+      },
+      "expect": "{\"a\":null,\"z\":[3,{\"x\":2,\"y\":1}]}"
+    },
+    {
+      "name": "aucun espace insignifiant",
+      "value": {
+        "a": "x y"
+      },
+      "expect": "{\"a\":\"x y\"}"
+    },
+    {
+      "name": "tri par unités de code UTF-16",
+      "value": {
+        "é": 1,
+        "e": 2,
+        "Z": 3
+      },
+      "expect": "{\"Z\":3,\"e\":2,\"é\":1}"
+    },
+    {
+      "name": "objet vide",
+      "value": {},
+      "expect": "{}"
+    },
+    {
+      "name": "tableau vide",
+      "value": [],
+      "expect": "[]"
+    },
+    {
+      "name": "booléens et nul",
+      "value": {
+        "t": true,
+        "f": false,
+        "n": null
+      },
+      "expect": "{\"f\":false,\"n\":null,\"t\":true}"
+    },
+    {
+      "name": "entier négatif",
+      "value": {
+        "a": -42
+      },
+      "expect": "{\"a\":-42}"
+    },
+    {
+      "name": "zéro négatif se sérialise en 0",
+      "value": {
+        "a": -0.0
+      },
+      "expect": "{\"a\":0}"
+    },
+    {
+      "name": "décimal — le format ECMAScript, pas le format natif",
+      "value": {
+        "a": 2.68
+      },
+      "expect": "{\"a\":2.68}"
+    },
+    {
+      "name": "décimal court",
+      "value": {
+        "a": 0.61
+      },
+      "expect": "{\"a\":0.61}"
+    },
+    {
+      "name": "somme flottante — la valeur réellement représentée",
+      "value": {
+        "a": 3.2900000000000005
+      },
+      "expect": "{\"a\":3.2900000000000005}"
+    },
+    {
+      "name": "entier issu d'un flottant ne garde pas le .0",
+      "value": {
+        "a": 1.0
+      },
+      "expect": "{\"a\":1}"
+    },
+    {
+      "name": "grand entier exactement représentable",
+      "value": {
+        "a": 9007199254740991
+      },
+      "expect": "{\"a\":9007199254740991}"
+    },
+    {
+      "name": "notation exponentielle pour les très petits",
+      "value": {
+        "a": 1e-07
+      },
+      "expect": "{\"a\":1e-7}"
+    },
+    {
+      "name": "notation exponentielle pour les très grands",
+      "value": {
+        "a": 1e+21
+      },
+      "expect": "{\"a\":1e+21}"
+    },
+    {
+      "name": "échappements JSON minimaux",
+      "value": {
+        "a": "guillemet \" barre \\ saut \n tab \t"
+      },
+      "expect": "{\"a\":\"guillemet \\\" barre \\\\ saut \\n tab \\t\"}"
+    },
+    {
+      "name": "contrôle non nommé en \\u",
+      "value": {
+        "a": "\u0001"
+      },
+      "expect": "{\"a\":\"\\u0001\"}"
+    },
+    {
+      "name": "non-ASCII conservé tel quel, jamais échappé",
+      "value": {
+        "a": "coulée à 1 083 °C"
+      },
+      "expect": "{\"a\":\"coulée à 1 083 °C\"}"
+    },
+    {
+      "name": "hors du plan multilingue de base",
+      "value": {
+        "a": "🔥"
+      },
+      "expect": "{\"a\":\"🔥\"}"
+    },
+    {
+      "name": "une cellule du cube, telle qu'elle est servie",
+      "value": {
+        "id": "c1",
+        "subPost": 1000,
+        "partType": 1,
+        "caracterisation": 1,
+        "value": 1000,
+        "unit": "L",
+        "factor": 2.68,
+        "factorUnit": "kgCO2e/L",
+        "origin": "MEASURED"
+      },
+      "expect": "{\"caracterisation\":1,\"factor\":2.68,\"factorUnit\":\"kgCO2e/L\",\"id\":\"c1\",\"origin\":\"MEASURED\",\"partType\":1,\"subPost\":1000,\"unit\":\"L\",\"value\":1000}"
+    },
+    {
+      "name": "nombre — un débit réel, là où Python et ECMAScript divergeaient",
+      "value": {
+        "flux": 2.0798730958781364e-05
+      },
+      "expect": "{\"flux\":0.000020798730958781364}"
+    },
+    {
+      "name": "nombre — 1e-7 est la première valeur en notation exponentielle",
+      "value": [
+        1e-07,
+        9.9e-08
+      ],
+      "expect": "[1e-7,9.9e-8]"
+    },
+    {
+      "name": "nombre — juste au-dessus du seuil, la notation reste positionnelle",
+      "value": [
+        1.0000000000000002e-07,
+        1e-06,
+        0.0001
+      ],
+      "expect": "[1.0000000000000002e-7,0.000001,0.0001]"
+    },
+    {
+      "name": "nombre — 1e21 est la première valeur en notation exponentielle, vers le haut",
+      "value": [
+        1e+20,
+        1e+21,
+        1.2e+22
+      ],
+      "expect": "[100000000000000000000,1e+21,1.2e+22]"
+    },
+    {
+      "name": "nombre — un flottant entier s'écrit sans partie décimale",
+      "value": [
+        1.0,
+        610.0,
+        1000.0,
+        -0.0
+      ],
+      "expect": "[1,610,1000,0]"
+    },
+    {
+      "name": "nombre — les extrêmes du double",
+      "value": [
+        5e-324,
+        1.7976931348623157e+308
+      ],
+      "expect": "[5e-324,1.7976931348623157e+308]"
+    }
   ],
   "refuse": [
-    { "name": "NaN n'a pas de représentation", "value": "NaN" },
-    { "name": "Infinity n'a pas de représentation", "value": "Infinity" }
-  ]
+    {
+      "name": "NaN n'a pas de représentation",
+      "value": "NaN"
+    },
+    {
+      "name": "Infinity n'a pas de représentation",
+      "value": "Infinity"
+    }
+  ],
+  "_numbers": "LE FORMAT DES NOMBRES EST LE PIEGE, et il a coute une panne en production le 3 aout 2026. Python et ECMAScript choisissent les MEMES chiffres — la plus courte chaine qui reconstruit le flottant — mais pas la meme NOTATION : Python passe en exponentiel sous 1e-4, ECMAScript seulement sous 1e-6. Tout nombre de [1e-7, 1e-4[ s'ecrivait donc 2.08e-5 d'un cote et 0.0000208 de l'autre. C'est exactement l'intervalle ou vivent les DEBITS — une metrique mensuelle divisee par deux millions six cent mille secondes — et aucune extraction du cube ne se verifiait. Les cas ci-dessous tiennent les quatre bornes de la regle ECMAScript."
 }

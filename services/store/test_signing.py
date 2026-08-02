@@ -65,8 +65,15 @@ def test_writes_a_sample_for_the_javascript_host():
     payload = {
         "cells": [{
             "id": "c1", "subPost": 1000, "partType": 1, "caracterisation": 1,
-            "flux": 1000, "dimension": "volume", "displayUnit": "L",
-            "factor": 2.68, "origin": "MEASURED",
+            # UN DÉBIT RÉEL, ET C'EST TOUT L'INTÉRÊT DE CET ÉCHANTILLON.
+            # Il portait `1000`, un entier — que les deux langages écrivent
+            # forcément pareil. Le contrôle croisé passait donc en ne
+            # contrôlant rien de ce qui pouvait casser. Une métrique mensuelle
+            # divisée par la durée du mois tombe dans [1e-7, 1e-4[, l'intervalle
+            # où Python et ECMAScript ne s'accordaient pas sur la notation.
+            "flux": 2.0798730958781364e-05,
+            "dimension": "volume", "displayUnit": "L", "displayScale": 1000.0,
+            "factor": 610.0, "origin": "MEASURED",
         }],
         "servedAt": "2026-08-01T00:00:00Z",
         # Non-ASCII et décimaux : les deux endroits où les sérialisations
