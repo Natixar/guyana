@@ -32,8 +32,60 @@ class JcsError(ValueError):
     """Ce que la RFC exclut, refusé plutôt que sérialisé approximativement."""
 
 
+def _digits_and_point(text: str) -> tuple[str, int]:
+    """Décompose `repr` en (chiffres significatifs, position du point).
+
+    Rend `(s, n)` tels que la valeur vaut `0.s × 10ⁿ`, `s` étant dépourvu de
+    zéro de tête comme de queue. C'est la forme dans laquelle ECMAScript énonce
+    sa règle, et la traduire une fois évite de la réinventer par cas.
+    """
+    mantissa, _, exponent = text.partition("e")
+    exp = int(exponent) if exponent else 0
+    integer, _, fraction = mantissa.partition(".")
+
+    raw = integer + fraction
+    stripped = raw.lstrip("0")
+    lead = len(raw) - len(stripped)
+    return stripped.rstrip("0"), len(integer) + exp - lead
+
+
 def _number(value: float | int) -> str:
-    """Le format ECMAScript, seul format que la RFC 8785 admette."""
+    """Le format ECMAScript, seul format que la RFC 8785 admette.
+
+    ─── POURQUOI CETTE FONCTION EST ÉCRITE EN ENTIER ────────────────────────
+
+    Elle se contentait de retoucher la sortie de `repr`, et cela paraissait
+    suffire parce que les deux langages choisissent les MÊMES chiffres — la plus
+    courte chaîne qui reconstruit le flottant. Ils ne choisissent pas la même
+    NOTATION, et le seuil diffère : Python passe en exponentiel sous 1e-4,
+    ECMAScript seulement sous 1e-6.
+
+    Tout nombre de l'intervalle [1e-7, 1e-4[ était donc écrit `2.08e-5` d'un
+    côté et `0.0000208` de l'autre. Deux chaînes, deux condensats, une signature
+    qui ne se vérifie pas.
+
+    C'EST L'INTERVALLE OÙ VIVENT LES DÉBITS. Une métrique mensuelle divisée par
+    la durée du mois — deux millions six cent mille secondes — y tombe presque
+    toujours. Aucune extraction du cube ne pouvait donc être vérifiée par le
+    signataire : `EXTRACTION_SIGNATURE_INVALID` sur la première demande
+    d'attestation carbone réellement faite en ligne, le 3 août 2026.
+
+    Le raccourci `value == int(value)` disparaît : l'algorithme le couvre, et un
+    raccourci qui double une règle est un endroit où les deux peuvent diverger.
+
+    ─── LA RÈGLE, TELLE QUE ECMAScript L'ÉNONCE ────────────────────────────
+
+    La valeur vaut `0.s × 10ⁿ`, où `s` porte `k` chiffres significatifs. Alors :
+
+        k ≤ n ≤ 21      s suivi de (n − k) zéros
+        0 < n ≤ 21      s, point décimal après n chiffres
+        −6 < n ≤ 0      « 0. », (−n) zéros, puis s
+        sinon           notation exponentielle, exposant n − 1
+
+    Les quatre branches sont écrites telles quelles plutôt que dérivées les unes
+    des autres : c'est la forme sous laquelle on peut les relire contre la
+    spécification, et c'est la seule relecture qui protège de ce défaut-ci.
+    """
     if isinstance(value, bool):  # bool hérite de int en Python : à intercepter avant
         raise JcsError("un booléen n'est pas un nombre")
     if isinstance(value, int):
@@ -42,20 +94,20 @@ def _number(value: float | int) -> str:
         raise JcsError(f"nombre non sérialisable : {value}")
     if value == 0:
         return "0"  # couvre -0.0, que ECMAScript écrit « 0 »
-    if value == int(value) and abs(value) < 1e21:
-        return str(int(value))
 
-    # `repr` donne la plus courte chaîne qui reconstruit la valeur — la même
-    # propriété que ECMAScript. Restent les différences de notation.
-    text = repr(value)
-    if "e" in text or "E" in text:
-        mantissa, _, exponent = text.partition("e")
-        exp = int(exponent)
-        mantissa = mantissa.rstrip("0").rstrip(".") if "." in mantissa else mantissa
-        # ECMAScript n'emploie la notation exponentielle que hors de [1e-7, 1e21[
-        # et écrit « e+21 » / « e-7 », sans zéro de tête dans l'exposant.
-        return f"{mantissa}e{'+' if exp >= 0 else '-'}{abs(exp)}"
-    return text
+    sign = "-" if value < 0 else ""
+    s, n = _digits_and_point(repr(abs(value)))
+    k = len(s)
+
+    if k <= n <= 21:
+        return sign + s + "0" * (n - k)
+    if 0 < n <= 21:
+        return sign + s[:n] + "." + s[n:]
+    if -6 < n <= 0:
+        return sign + "0." + "0" * -n + s
+    exponent = n - 1
+    mantissa = s if k == 1 else s[0] + "." + s[1:]
+    return f"{sign}{mantissa}e{'+' if exponent >= 0 else '-'}{abs(exponent)}"
 
 
 _ESCAPES = {
