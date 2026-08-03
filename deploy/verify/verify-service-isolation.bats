@@ -132,8 +132,38 @@ running_image() { remote "docker inspect $1 --format '{{.Config.Image}}'"; }
     #
     # On n'affirme pas la priorité, qui est un moyen : on affirme que /api/v1
     # ne renvoie pas de HTML, qui est la propriété.
-    run curl_auth -o /dev/null -w '%{content_type}' \
-        "https://$(primary_domain)/api/v1/credentials/index"
-    [ "$status" -eq 0 ]
-    [[ "$output" != *"text/html"* ]]
+    #
+    # DEUX ÉCHECS DIFFÉRENTS, ET ILS SE LISAIENT PAREIL. « `[ "$status" -eq 0 ]'
+    # failed » ne dit pas si l'API a servi du HTML — une faute de routage, grave
+    # et durable — ou si la requête n'a jamais abouti. Le 3 août 2026 c'était le
+    # second, sur une cible qui répondait en 70 ms dix fois de suite quelques
+    # minutes plus tard, et le message a été lu comme une régression de la
+    # livraison en cours. Un invariant qui accuse la mauvaise cause coûte plus
+    # cher que pas d'invariant du tout.
+    #
+    # LA ROUTE CHOISIE EST CELLE QUI TOUCHE LA BASE, délibérément : c'est celle
+    # qu'un routeur mal prioritaire détourne vers la page d'accueil. C'est donc
+    # aussi celle qui est lente au premier appel après un déploiement, le temps
+    # que le magasin ouvre sa connexion. Une seconde tentative distingue le
+    # démarrage à froid d'une panne — elle sert à OBTENIR la preuve, jamais à
+    # obtenir un succès : le verdict sur la propriété reste celui d'un appel qui
+    # a abouti.
+    local url type=""
+    url="https://$(primary_domain)/api/v1/credentials/index"
+    for _ in 1 2; do
+        run curl_auth --max-time 30 -o /dev/null -w '%{content_type}' "$url"
+        if [ "$status" -eq 0 ]; then type="$output"; break; fi
+        sleep 3
+    done
+
+    [ -n "$type" ] || {
+        echo "la requête n'a jamais abouti (curl a rendu $status) — transport,"
+        echo "et non routage : rien n'est établi ni infirmé sur la propriété."
+        false
+    }
+
+    [[ "$type" != *"text/html"* ]] || {
+        echo "/api/v1 a servi du HTML ($type) : le routeur du site bat celui de l'API"
+        false
+    }
 }
