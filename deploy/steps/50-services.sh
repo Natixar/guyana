@@ -122,6 +122,33 @@ docker run -d --name "$STORE_CONTAINER" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-store.priority=1000" \
   --label "traefik.http.routers.${ROUTER_PREFIX}-store.middlewares=${store_ns}-auth@docker,${store_ns}-sec@docker" \
   --label "traefik.http.services.${ROUTER_PREFIX}-store.loadbalancer.server.port=${STORE_PORT}" \
+  `# --- /api/v1/me SANS AUTHENTIFICATION, et c'est ce qui ferme la fenêtre` \
+  `# de connexion sur la page publique.` \
+  `#` \
+  `# LE SYMPTÔME. /verify/ est publique, ses feuilles de style, ses modules,` \
+  `# ses polices et son logo aussi. Mais nav.js interroge /api/v1/me sur` \
+  `# TOUTES les pages pour construire le menu, et Traefik y répondait 401` \
+  `# avec « www-authenticate: Basic ». Le navigateur ouvre alors sa fenêtre` \
+  `# d'identification — pour la requête, pas pour la page. Un vérificateur` \
+  `# se voyait donc demander un mot de passe sur une page qui répond 200,` \
+  `# ce qui est exactement le contraire de ce qu'elle démontre.` \
+  `#` \
+  `# CE N'EST PAS UN AFFAIBLISSEMENT. Sans en-tête d'utilisateur, la route` \
+  `# rend { authenticated: false, organisation: null, issuer: { did } } :` \
+  `# aucune personne, aucun droit, aucune organisation. Le DID de l'émetteur` \
+  `# est déjà public par construction — c'est une clé publique publiée sur un` \
+  `# domaine. Il n'y a rien à protéger, et l'authentification n'y protégeait` \
+  `# donc rien : elle ne faisait que refuser bruyamment.` \
+  `#` \
+  `# Chemin EXACT et non préfixe : /api/v1 tout entier reste fermé. Priorité` \
+  `# au-dessus du routeur du magasin, sur le modèle de /api/v1/pour.` \
+  --label "traefik.http.routers.${ROUTER_PREFIX}-me.rule=Host(\`${primary}\`) && Path(\`/api/v1/me\`)" \
+  --label "traefik.http.routers.${ROUTER_PREFIX}-me.entrypoints=websecure" \
+  --label "traefik.http.routers.${ROUTER_PREFIX}-me.tls=true" \
+  --label "traefik.http.routers.${ROUTER_PREFIX}-me.tls.certresolver=${CERT_RESOLVER}" \
+  --label "traefik.http.routers.${ROUTER_PREFIX}-me.priority=3000" \
+  --label "traefik.http.routers.${ROUTER_PREFIX}-me.middlewares=${store_ns}-sec@docker" \
+  --label "traefik.http.routers.${ROUTER_PREFIX}-me.service=${ROUTER_PREFIX}-store" \
   "$STORE_IMAGE" >/dev/null
 
 # Le magasin parle à Traefik ET à la base : deuxième réseau, ajouté après coup

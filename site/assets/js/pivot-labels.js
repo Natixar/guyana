@@ -57,7 +57,11 @@ export function labelsFrom(taxonomy) {
  */
 export async function fetchLabels(fetchImpl = fetch) {
   try {
-    const r = await fetchImpl("/engine/taxonomy.json", { headers: { accept: "application/json" } });
+    // `credentials: "omit"` : la table est publique, et si elle cessait de
+    // l'être un 401 ferait ouvrir la fenêtre d'identification au lieu de nous
+    // faire retomber sur les numéros. Le repli doit rester silencieux.
+    const r = await fetchImpl("/engine/taxonomy.json",
+                              { headers: { accept: "application/json" }, credentials: "omit" });
     if (!r.ok || !(r.headers.get("content-type") ?? "").includes("json")) return empty;
     return labelsFrom(await r.json());
   } catch {
