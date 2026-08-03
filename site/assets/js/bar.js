@@ -24,7 +24,7 @@ import { renderCertificates } from "./certificate-view.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
 import { formatMass } from "./mass.js";
 import { loadKeyPair } from "./keys.js";
-import { fetchMe, issuerDid } from "./me.js";
+import { fetchMe, issuerDid, issuerBlocker } from "./me.js";
 import { barClaims } from "./bar-claims.js";
 import { buildCredential, signCredential } from "./credential.js";
 import { verificationMethodId } from "./did.js";
@@ -252,7 +252,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     const view = signView({ pair, did, pour: bar, signed: mine });
     signBtn.hidden = Boolean(mine);
     signBtn.disabled = view.disabled || elsewhere;
-    signStatus.textContent = elsewhere ? T.barSignElsewhere : view.text;
+    // L'OBSTACLE D'IDENTITÉ NOMME LE COMPTE ET LE REMÈDE. « No organisation
+    // identity available » est vrai et inutilisable : il ne dit ni qui est
+    // connecté, ni que le refus est NORMAL, ni quoi faire. L'opérateur en
+    // conclut que le produit est cassé, alors qu'une règle d'autorisation vient
+    // de faire son travail — signer l'origine d'un lingot est un acte de la
+    // MINE, et un compte de la plateforme n'est pas la mine.
+    const identity = issuerBlocker(me);
+    signStatus.textContent = elsewhere ? T.barSignElsewhere
+                           : (view.text === T.issuerUnknown && identity) ? identity
+                           : view.text;
 
     deposit.hidden = !ctx.deposit;
     if (ctx.deposit) {
