@@ -40,6 +40,9 @@ demoTitle         = "Demonstration mode."
 demoBody          = "No one is signed in. A key created here is for testing and must not be published."
 signedInAs        = "Signed in as"
 navNotSignedIn    = "Not signed in"
+# La page publique, et non le visiteur : vrai même quand le navigateur détient
+# des identifiants valides, puisque la page ne s'en sert pas.
+navNoAccountUsed  = "No account used"
 navNoOrganisation = "no issuing organisation"
 issuerUnknown     = "No organisation identity available — signing is disabled"
 issuerUnknownFor  = "Signed in as {who}, which belongs to no issuing organisation — see the banner. Certifying a bar and publishing a DID document are the mine operator's actions, and this account is not the mine."
