@@ -14,8 +14,22 @@ setup() { load_env; DOM="$(primary_domain)"; }
 }
 
 @test "sans identifiants, aucun point d'entrée de l'API ne répond" {
-    [ "$(http_code_anon "https://$DOM/api/v1/me")" = "401" ]
+    # UNE SEULE EXCEPTION, ET ELLE EST NOMMÉE ICI PLUTÔT QUE DÉCOUVERTE.
+    # `/api/v1/me` est ouverte depuis le 3 août : elle ne protégeait rien, et
+    # son 401 faisait ouvrir au navigateur sa fenêtre d'identification sur la
+    # page publique — `nav.js` l'interroge sur toutes les pages. Le contrôle de
+    # ce qu'elle rend sans identifiant vit dans `verify-public.bats`, qui exige
+    # « authenticated: false » et l'absence de toute donnée nominative.
+    #
+    # Écrire l'exception ici est le point : deux fichiers d'invariants qui se
+    # contredisent, c'est une règle qu'on a changée sans regarder l'autre. Cela
+    # vient d'arriver, et cette ligne existe pour que cela se voie la prochaine
+    # fois.
     [ "$(http_code_anon "https://$DOM/api/v1/pour")" = "401" ]
+    [ "$(http_code_anon "https://$DOM/api/v1/counts")" = "401" ]
+    [ "$(http_code_anon "https://$DOM/api/v1/ranges")" = "401" ]
+    [ "$(http_code_anon "https://$DOM/api/v1/credentials")" = "401" ]
+    [ "$(http_code_anon "https://$DOM/api/v1/sign")" = "401" ]
 }
 
 @test "un mot de passe erroné est refusé" {
@@ -51,4 +65,10 @@ setup() { load_env; DOM="$(primary_domain)"; }
     [ "$(http_code_anon "https://$DOM/quality/")" = "401" ]
     [ "$(http_code_anon "https://$DOM/api/v1/counts")" = "401" ]
     [ "$(http_code_anon "https://$DOM/engine/erp-fixture.json")" = "401" ]
+    # Le jeu d'essai ERP porte l'organigramme du client : 34 départements
+    # nommés. La taxonomie, elle, est ouverte — c'est le référentiel, il dit ce
+    # que « 1002 » signifie et rien de l'exploitation. Les deux voisinent sous
+    # `/engine/`, et c'est pour cela que l'ouverture y est par chemin exact.
+    [ "$(http_code_anon "https://$DOM/engine/vectors.json")" = "401" ]
+    [ "$(http_code_anon "https://$DOM/engine/taxonomy.json")" = "200" ]
 }
