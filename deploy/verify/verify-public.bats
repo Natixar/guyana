@@ -84,6 +84,55 @@ _refs() { # $1 = corps du document
     [ -z "$fails" ] || { echo "ressources de style fermées :"; echo "$fails"; false; }
 }
 
+# LE 401 QUI OUVRE UNE FENÊTRE. Les deux cas ci-dessus suivent ce que le HTML et
+# la CSS déclarent ; ils ne voient pas ce que le JAVASCRIPT demande à
+# l'exécution. C'est par là que la fenêtre d'identification revenait : `nav.js`
+# interroge `/api/v1/me` sur toutes les pages, Traefik y répondait 401 avec
+# `www-authenticate: Basic`, et le navigateur ouvre alors sa boîte de connexion
+# POUR LA REQUÊTE. La page répond 200 ; l'utilisateur voit un mot de passe
+# demandé.
+#
+# DEUX RÉPONSES SELON CE QUE L'APPEL EST. Un appel qui doit ABOUTIR se règle en
+# ouvrant la route — c'est `/api/v1/me`, qui ne protégeait rien. Un appel qui ne
+# doit PAS aboutir se règle dans le code, en `credentials: "omit"` : il reçoit
+# toujours 401 et n'ouvre rien. C'est le cas de `/engine/did/`, dont le repli
+# silencieux est délibéré — s'y rabattre ferait de cette page une démonstration
+# truquée.
+
+@test "/api/v1/me est ouverte, et elle ne divulgue rien" {
+    # Ouverte parce qu'elle ne protège rien : sans en-tête d'utilisateur elle
+    # rend « authenticated: false », aucune personne, aucun droit, aucune
+    # organisation. C'est le seul appel de la page publique fait AVEC
+    # identifiants, donc le seul qui puisse ouvrir la fenêtre.
+    [ "$(http_code_anon "https://$DOM/api/v1/me")" = "200" ]
+
+    local body
+    body="$(curl -sS --max-time 15 "https://$DOM/api/v1/me")"
+    echo "$body" | grep -q '"authenticated": *false'
+    # LA CONTREPARTIE : rien de nominatif ne sort sans identifiant.
+    ! echo "$body" | grep -q '"person"'
+    ! echo "$body" | grep -q '"grants"'
+}
+
+@test "les replis silencieux le restent : fermés, et sans demande de mot de passe" {
+    # `/engine/did/` reste fermé — c'est l'invariant suivant — et le module qui
+    # l'interroge le fait en `credentials: "omit"`. Le contrôle porte donc sur
+    # la SOURCE servie : c'est là que vit la propriété, et un appel ajouté sans
+    # `omit` se verrait ici.
+    local page refs js
+    page="$(curl -sS --max-time 20 "https://$DOM/verify/")"
+    refs="$(_refs "$page" | grep -E '^/js/.*\.js$')"
+    [ -n "$refs" ]
+
+    js="$(while read -r f; do
+            [ -n "$f" ] && curl -sS --max-time 20 "https://$DOM$f"
+          done <<< "$refs")"
+
+    # Le repli embarqué est bien demandé, et il l'est en silence.
+    echo "$js" | grep -q '/engine/did'
+    echo "$js" | grep -qE 'credentials: *"omit"'
+}
+
 @test "l'exemplaire embarqué du document DID reste fermé" {
     # LA CONTREPARTIE, et elle est aussi importante que l'ouverture. Si la page
     # publique pouvait se rabattre sur notre copie locale du document DID, elle

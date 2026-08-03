@@ -54,10 +54,27 @@ const BUNDLED = "/engine/did";
  * @property {string|null} url l'adresse où il DEVRAIT être publié
  */
 
+/**
+ * `credentials: "omit"` SUR LES DEUX REPLIS, et ce n'est pas une précaution
+ * théorique — c'est ce qui empêchait la page publique d'être publique.
+ *
+ * Un 401 portant `www-authenticate: Basic` fait ouvrir au navigateur sa fenêtre
+ * d'identification POUR LA REQUÊTE, même si la page, elle, répond 200. Le
+ * vérificateur se voyait donc réclamer un mot de passe sur la seule page qui
+ * existe pour démontrer qu'il n'a besoin de rien de nous.
+ *
+ * `omit` a en outre le sens juste dans les deux cas. Vers le domaine de
+ * l'émetteur : on ne présente pas nos identifiants à un tiers. Vers notre
+ * exemplaire embarqué : ce repli ne DOIT pas aboutir sur la page publique — s'y
+ * rabattre en silence ferait de cette page une démonstration truquée — et un
+ * repli qui ne doit pas aboutir n'a pas à frapper à la porte.
+ */
+const NO_CREDENTIALS = { headers: { accept: "application/json" }, credentials: "omit" };
+
 async function fromNetwork(did, url) {
   if (!url) return null;
   try {
-    const r = await fetch(url, { headers: { accept: "application/json" } });
+    const r = await fetch(url, NO_CREDENTIALS);
     if (!r.ok) return null;
     if (!(r.headers.get("content-type") ?? "").includes("json")) return null;
     return { document: await r.json(), source: "network", url };
@@ -70,8 +87,7 @@ async function fromNetwork(did, url) {
 
 async function fromBundle(did, url) {
   try {
-    const r = await fetch(`${BUNDLED}/${encodeURIComponent(did)}.json`,
-                          { headers: { accept: "application/json" } });
+    const r = await fetch(`${BUNDLED}/${encodeURIComponent(did)}.json`, NO_CREDENTIALS);
     if (!r.ok || !(r.headers.get("content-type") ?? "").includes("json")) return null;
     return { document: await r.json(), source: "bundled", url };
   } catch {

@@ -136,6 +136,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     </p>
     <p class="muted" data-bar-carbon-status></p>
 
+    <section data-bar-export hidden>
+      <h3 class="subhead">${T.barExport}</h3>
+      <p class="muted">${T.barExportWhy}</p>
+      <p class="actions">
+        <a class="btn btn--ghost" data-bar-export-origin hidden download>${T.barExportOrigin}</a>
+        <a class="btn btn--ghost" data-bar-export-carbon hidden download>${T.barExportCarbon}</a>
+      </p>
+    </section>
+
     <section data-bar-certificates hidden>
       <h3 class="subhead">${T.certHeld}</h3>
       <p class="muted">${T.certHeldWhy}</p>
@@ -168,6 +177,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   const carbonBtn = $("[data-bar-carbon]");
   const carbonStatus = $("[data-bar-carbon-status]");
   const carbonLink = $("[data-bar-carbon-download]");
+  const exportBox = $("[data-bar-export]");
+  const exportOrigin = $("[data-bar-export-origin]");
+  const exportCarbon = $("[data-bar-export-carbon]");
+
+  /**
+   * Un fichier à télécharger, reconstruit à chaque affichage.
+   *
+   * Les URL d'objet ne se recyclent pas : on révoque la précédente, sinon
+   * chaque passage de `render` en laisse une derrière lui.
+   */
+  function offer(link, name, payload) {
+    if (!link) return;
+    if (link.dataset.url) URL.revokeObjectURL(link.dataset.url);
+    if (!payload) { link.hidden = true; delete link.dataset.url; return; }
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(payload, null, 2) + "\n"], { type: "application/json" }));
+    link.href = url;
+    link.dataset.url = url;
+    link.download = name;
+    link.hidden = false;
+  }
 
   /**
    * Ce que le magasin détient pour CETTE barre. L'index complet n'a pas sa place ici.
@@ -228,6 +258,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     certificatesBody.innerHTML = renderCertificates(
       withLocal, {}, applyTo(labels, declared));
+
+    // L'EXTRACTION EST PERMANENTE, ET C'EST TOUT L'OBJET DE CE BLOC. Le lien de
+    // téléchargement n'existait qu'à l'instant de la signature, sur un objet
+    // gardé en mémoire : un rechargement l'emportait, et il n'y avait alors PLUS
+    // AUCUN MOYEN de sortir une attestation de la plateforme. La page de
+    // vérification n'avait donc rien à recevoir — elle était inutilisable, ce
+    // qui vide de son sens la seule séquence que le dossier FIDES demande.
+    //
+    // Tout est reconstruit depuis le portefeuille à chaque affichage : le
+    // portefeuille est durable depuis #86, divulgations comprises.
+    //
+    // DEUX FICHIERS, ET PAS UN SEUL. L'attestation d'origine est un document
+    // nu — la mine l'a signée, elle se vérifie seule. L'attestation carbone
+    // voyage en PRÉSENTATION : le document, les divulgations que le porteur
+    // veut bien remettre, et le sel du total. C'est la forme que `/verify/`
+    // sait déposer, et c'est aussi ce qui rend la divulgation partielle
+    // possible — retirer une ligne du fichier ne touche à aucun octet signé.
+    const originHeld = current.DoreBarOriginCredential;
+    const carbonHeld = current.CarbonIntensityCredential;
+
+    offer(exportOrigin, `${bar.internalId}-origin.json`,
+          originHeld?.document ?? null);
+    offer(exportCarbon, `${bar.internalId}-carbon.json`,
+          carbonHeld?.document
+            ? { credential: carbonHeld.document,
+                disclosures: carbonHeld.disclosures ?? [],
+                totalSalt: carbonHeld.totalSalt ?? null }
+            : null);
+    exportBox.hidden = !originHeld && !carbonHeld;
 
     // Le carbone se demande une fois l'origine signée : `derivedFrom` la
     // désigne par empreinte, et sans elle l'intensité flotterait sur un
