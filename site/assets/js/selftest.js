@@ -358,6 +358,21 @@ test("identité — l'anonyme est un état, et il doit se voir", () => {
     ? null : "l'état anonyme ne se nomme pas";
 });
 
+test("identité — une page publique ne se dit pas « pas connecté »", () => {
+  // DEUX PROPOSITIONS DIFFÉRENTES. « Aucun compte utilisé » décrit la PAGE ;
+  // « pas connecté » décrit le VISITEUR. Sur /verify/ la première est vraie même
+  // pour Randy, dont le navigateur détient des identifiants valides : la page ne
+  // s'en sert pas, et c'est ce qu'elle démontre. Les confondre afficherait
+  // « Not signed in » à quelqu'un qui l'est — le défaut même que ce bandeau
+  // existe pour empêcher, reproduit là où il se remarque le moins.
+  const host = slot();
+  const state = renderIdentity(null, host, true);
+  const el = host.querySelector("[data-nav-user]");
+  if (state !== "public") return `état ${state}`;
+  if (el.textContent === T.navNotSignedIn) return "la page publique se dit anonyme";
+  return el.textContent === T.navNoAccountUsed ? null : `muet : ${el.textContent}`;
+});
+
 test("identité — /api/v1/me injoignable ne fait pas passer pour connecté", () => {
   // Hors ligne, ou 401 sur la page publique : `me` est nul. Le repli doit être
   // « pas connecté », jamais un affichage ambigu.

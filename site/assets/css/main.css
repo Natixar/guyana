@@ -186,8 +186,13 @@ main { flex: 1; padding: 2.5rem 0 3rem; }
 .site-user[data-state="issuer"]::before { background: #3ddc84; }
 /* Authentifié, sans organisation émettrice — l'exploitant, un vérificateur. */
 .site-user[data-state="no-org"]::before { background: #7fb2ff; }
-/* Personne : l'état du vérificateur sur la page publique, et il doit se voir. */
+/* Personne : authentifié nulle part, sur une page qui l'aurait accepté. */
 .site-user[data-state="anonymous"]::before { background: rgba(255, 255, 255, .45); }
+/* La page publique elle-même : aucun compte n'est utilisé ici, et c'est ce
+   qu'elle démontre. Creux plutôt que plein — rien n'est engagé. */
+.site-user[data-state="public"]::before {
+  background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7);
+}
 /* Tant que /api/v1/me n'a pas répondu, rien plutôt qu'une pastille vide. */
 .site-user:empty { display: none; }
 .site-header .wrap { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }

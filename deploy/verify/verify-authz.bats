@@ -14,22 +14,43 @@ setup() { load_env; DOM="$(primary_domain)"; }
 }
 
 @test "sans identifiants, aucun point d'entrée de l'API ne répond" {
-    # UNE SEULE EXCEPTION, ET ELLE EST NOMMÉE ICI PLUTÔT QUE DÉCOUVERTE.
-    # `/api/v1/me` est ouverte depuis le 3 août : elle ne protégeait rien, et
-    # son 401 faisait ouvrir au navigateur sa fenêtre d'identification sur la
-    # page publique — `nav.js` l'interroge sur toutes les pages. Le contrôle de
-    # ce qu'elle rend sans identifiant vit dans `verify-public.bats`, qui exige
-    # « authenticated: false » et l'absence de toute donnée nominative.
+    # AUCUNE EXCEPTION — il y en a eu une pendant vingt-quatre heures, et elle
+    # est la raison d'être de la première ligne ci-dessous.
     #
-    # Écrire l'exception ici est le point : deux fichiers d'invariants qui se
-    # contredisent, c'est une règle qu'on a changée sans regarder l'autre. Cela
-    # vient d'arriver, et cette ligne existe pour que cela se voie la prochaine
-    # fois.
+    # `/api/v1/me` a été ouverte le 3 août pour empêcher le navigateur d'ouvrir
+    # sa fenêtre de mot de passe sur la page publique. Refermée le 4 : cette
+    # route ne PROTÈGE pas une identité, elle la DÉCRIT, et elle la lit dans
+    # l'en-tête que pose le middleware d'authentification. L'ouvrir revenait à
+    # répondre « authenticated: false » à un opérateur connecté — pastille
+    # « Not signed in » partout, et plus aucune barre certifiable faute
+    # d'organisation émettrice.
+    #
+    # La fenêtre se ferme du côté de la page : `/verify/` se déclare publique et
+    # n'appelle rien. Invariant correspondant dans `verify-public.bats`.
+    [ "$(http_code_anon "https://$DOM/api/v1/me")" = "401" ]
     [ "$(http_code_anon "https://$DOM/api/v1/pour")" = "401" ]
     [ "$(http_code_anon "https://$DOM/api/v1/counts")" = "401" ]
     [ "$(http_code_anon "https://$DOM/api/v1/ranges")" = "401" ]
     [ "$(http_code_anon "https://$DOM/api/v1/credentials")" = "401" ]
     [ "$(http_code_anon "https://$DOM/api/v1/sign")" = "401" ]
+}
+
+@test "avec identifiants, l'API NOMME le porteur et son organisation" {
+    # LE RÉCIPROQUE DU PRÉCÉDENT, ET IL MANQUAIT. Les invariants disaient à qui
+    # l'API se refuse ; aucun ne disait ce qu'elle rend à qui elle accepte. Une
+    # route d'identité rendue aveugle continuait donc de répondre 200, sans que
+    # rien ne s'allume : c'est exactement ce qui est arrivé le 3 août.
+    #
+    # Les trois brins comptent séparément. Le nom fait la pastille du bandeau ;
+    # l'organisation fait le DID signataire, sans lequel `/bar/` refuse toute
+    # certification ; les droits font le menu. Un seul absent est une panne
+    # visible ailleurs, et loin d'ici.
+    local body
+    body="$(body_as agm-randy "https://$DOM/api/v1/me")"
+    echo "$body" | grep -qE '"authenticated": *true'
+    echo "$body" | grep -q 'agm-randy'
+    echo "$body" | grep -qE '"organisation": *\{'
+    echo "$body" | grep -q '"grants"'
 }
 
 @test "un mot de passe erroné est refusé" {

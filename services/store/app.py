@@ -232,6 +232,17 @@ def me(x_webauth_user: str | None = Header(default=None)) -> dict:
     Répondre `authenticated: false` n'est pas une panne : c'est la page qui dit
     la vérité sur son état. Le bandeau de mode dégradé en découle.
 
+    CETTE ROUTE DÉPEND DU MIDDLEWARE, ET LA DÉPENDANCE EST INVISIBLE DEPUIS ICI.
+    `X-Webauth-User` n'existe que parce que `store-auth` s'exécute en amont ; la
+    signature de cette fonction ne le dit pas, et rien dans ce fichier ne casse
+    si on l'enlève. Le 3 août 2026 un routeur Traefik a été posé sur ce chemin
+    sans ce middleware, pour fermer une fenêtre de mot de passe. La route a
+    continué de répondre 200 — en rendant « authenticated: false » à tout le
+    monde. Conséquences : la pastille du bandeau annonçait « Not signed in » à un
+    opérateur connecté, et `me.js` n'y trouvant plus d'organisation, plus aucune
+    barre ne pouvait être certifiée. Une route qui DÉCRIT l'authentification ne
+    peut pas être ouverte : l'ouvrir, c'est la vider.
+
     LE CONTRAT EST CELUI QUE LE FRONT A ÉCRIT EN PREMIER. `me.js` dit depuis le
     début : « Aujourd'hui /api/me est un fichier statique. Demain c'est un point
     d'entrée qui interroge FusionAuth. La page ne verra pas la différence. » Ce

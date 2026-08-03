@@ -1,7 +1,12 @@
 <!doctype html>
 <html lang="{{ site.Language.Locale }}">
 <head>{{ partial "head.html" . }}</head>
-<body>
+{{/* UNE PAGE PUBLIQUE N'INTERROGE PAS UNE ROUTE AUTHENTIFIÉE. Le marqueur naît
+     du front matter — `public: true` — et non d'une liste de chemins recopiée
+     dans le JavaScript, qui divergerait au premier ajout. Sans lui, `nav.js`
+     appelle `/api/v1/me`, reçoit 401 sur la page publique, et le navigateur
+     ouvre sa fenêtre de mot de passe sur une page qui répond 200. */}}
+<body{{ if .Params.public }} data-public-page{{ end }}>
   <header class="site-header">
     <div class="wrap">
       <span class="brand">{{ partial "logo.html" (dict "variant" "white") }}</span>

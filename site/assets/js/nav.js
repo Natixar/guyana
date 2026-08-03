@@ -31,15 +31,48 @@ const DESTINATIONS = [
   { href: "/verify/", label: () => T.navVerify, grant: null },
 ];
 
+/**
+ * La page se déclare-t-elle publique ?
+ *
+ * ─── POURQUOI CETTE QUESTION SE POSE ICI ────────────────────────────────
+ *
+ * `/api/v1/me` est authentifiée, donc elle répond 401 sans identifiants, donc
+ * le navigateur ouvre sa fenêtre de mot de passe POUR LA REQUÊTE — sur une page
+ * qui, elle, répond 200. Un vérificateur se voyait demander un mot de passe sur
+ * la page qui démontre qu'il n'en faut pas.
+ *
+ * LA PREMIÈRE RÉPARATION S'EST TROMPÉE DE CÔTÉ : elle a ouvert la route. Mais
+ * l'identité de `/api/v1/me` NE VIENT PAS DU CORPS DE LA REQUÊTE, elle vient de
+ * l'en-tête `X-Webauth-User` que pose le middleware d'authentification. Retirer
+ * le middleware n'a pas rendu la route permissive : il l'a rendue AVEUGLE. Elle
+ * répondait « authenticated: false » à tout le monde, y compris à Randy connecté
+ * — d'où la pastille « Not signed in » sur `/register/`, et, plus grave, la
+ * disparition de l'organisation émettrice : `me.js` en tire le DID signataire,
+ * donc plus aucune barre ne pouvait être certifiée.
+ *
+ * LA BONNE RÉPARATION EST DE NE PAS APPELER. Une page publique n'a pas d'identité
+ * à afficher ; elle n'a donc aucune raison d'interroger une route qui en rend
+ * une. Le marqueur vient du gabarit — `public: true` dans le front matter — et
+ * non d'une liste de chemins recopiée ici, qui divergerait au premier ajout.
+ */
+const isPublicPage = () => document.body?.hasAttribute("data-public-page") ?? false;
+
 export async function renderNav() {
   const slot = document.querySelector("[data-nav]");
   if (!slot) return;
 
+  const publicPage = isPublicPage();
+
   let me = null;
-  try {
-    const r = await fetch("/api/v1/me", { headers: { accept: "application/json" } });
-    if (r.ok && (r.headers.get("content-type") ?? "").includes("json")) me = await r.json();
-  } catch { /* hors ligne : on retombe sur le minimum */ }
+  if (!publicPage) {
+    try {
+      const r = await fetch("/api/v1/me", {
+        headers: { accept: "application/json" },
+        credentials: "same-origin",
+      });
+      if (r.ok && (r.headers.get("content-type") ?? "").includes("json")) me = await r.json();
+    } catch { /* hors ligne : on retombe sur le minimum */ }
+  }
 
   const grants = new Set(me?.grants ?? []);
   const here = location.pathname.replace(/\/+$/, "") || "/";
@@ -54,7 +87,7 @@ export async function renderNav() {
 
   slot.innerHTML = links.join("");
 
-  renderIdentity(me);
+  renderIdentity(me, document, publicPage);
 }
 
 /**
@@ -75,11 +108,15 @@ export async function renderNav() {
  * gouverne : signer l'origine d'un lingot suppose d'appartenir à la mine. Un
  * nom d'utilisateur seul ne dit pas si l'on peut agir ; le couple le dit.
  *
- * Trois états, trois pastilles, parce que trois est le nombre de situations
- * réelles — et que la première, l'anonyme, est celle du vérificateur sur la
- * page publique : elle doit se voir aussi, c'est même ce qu'elle démontre.
+ * QUATRE ÉTATS, ET LE QUATRIÈME N'EST PAS UNE NUANCE DU TROISIÈME. « Aucun
+ * compte utilisé » est une propriété de la PAGE ; « pas connecté » est une
+ * propriété du VISITEUR. Sur `/verify/` la première est vraie même pour Randy,
+ * dont le navigateur détient des identifiants valides : la page ne s'en sert
+ * pas, et c'est précisément ce qu'elle démontre. Les confondre ferait afficher
+ * « Not signed in » à quelqu'un qui l'est — le défaut que ce bandeau existe pour
+ * empêcher, reproduit à l'endroit où il se remarque le moins.
  */
-export function renderIdentity(me, root = document) {
+export function renderIdentity(me, root = document, publicPage = false) {
   const who = root.querySelector("[data-nav-user]");
   if (!who) return null;
 
@@ -87,7 +124,8 @@ export function renderIdentity(me, root = document) {
   const org = me?.organisation?.name ?? null;
 
   const [state, text] =
-    !me?.authenticated ? ["anonymous", T.navNotSignedIn]
+    publicPage         ? ["public", T.navNoAccountUsed]
+    : !me?.authenticated ? ["anonymous", T.navNotSignedIn]
     : org              ? ["issuer", `${T.signedInAs} ${person} · ${org}`]
     // Authentifié mais sans organisation émettrice : l'exploitant de la
     // plateforme, un vérificateur muni d'un compte. Ce n'est pas une anomalie,
