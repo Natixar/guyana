@@ -25,6 +25,7 @@ import { planForBar, disposeCells, departmentsOnPath, tally } from "./lot-select
 import { computeForBar } from "./carbon-request.js";
 import { showLoaded } from "./loaded-text.js";
 import { provenanceKind, missingKey } from "./verify-page.js";
+import { renderIdentity } from "./nav.js";
 import { groupCells, summarise } from "./matrix-blocks.js";
 import { labelsFrom, applyTo, subPostLabel } from "./pivot-labels.js";
 
@@ -308,6 +309,66 @@ test("portefeuille — l'auto-test ne laisse pas ses attestations derrière lui"
     ? `des attestations d'auto-test subsistent : ${left.length} — clés ${
         left.map((r) => JSON.stringify(r.key ?? null)).join(", ")}`
     : null;
+});
+
+// --- Qui est connecté, en permanence ---------------------------------------
+// L'information existait — /api/v1/me la donne, le menu l'appelle déjà — et
+// s'affichait en un mot gris à 70 % d'opacité au bout d'un bandeau en dégradé.
+// Les trois états ne permettent pas les mêmes actions ; ils doivent se
+// distinguer.
+
+const slot = () => {
+  const host = document.createElement("div");
+  host.innerHTML = '<span class="site-user" data-nav-user></span>';
+  return host;
+};
+
+test("identité — un compte rattaché à une organisation émettrice se voit", () => {
+  const host = slot();
+  const state = renderIdentity(
+    { authenticated: true, person: { name: "agm-randy" },
+      organisation: { name: "AGM Inc." } }, host);
+  const el = host.querySelector("[data-nav-user]");
+  if (state !== "issuer") return `état ${state}`;
+  // L'ORGANISATION, ET PAS SEULEMENT LA PERSONNE : c'est elle qui gouverne.
+  // Un nom d'utilisateur seul ne dit pas si l'on peut signer.
+  if (!el.textContent.includes("AGM Inc.")) return `sans organisation : ${el.textContent}`;
+  if (!el.textContent.includes("agm-randy")) return `sans personne : ${el.textContent}`;
+  return null;
+});
+
+test("identité — un compte sans organisation émettrice le DIT", () => {
+  // L'exploitant de la plateforme. Ce n'est pas une anomalie, et l'afficher
+  // évite de le découvrir en cliquant sur un bouton inerte.
+  const host = slot();
+  const state = renderIdentity({ authenticated: true, person: { name: "natixar" } }, host);
+  const el = host.querySelector("[data-nav-user]");
+  if (state !== "no-org") return `état ${state}`;
+  if (!el.textContent.includes("natixar")) return `sans le compte : ${el.textContent}`;
+  return el.textContent.includes(T.navNoOrganisation) ? null : `muet : ${el.textContent}`;
+});
+
+test("identité — l'anonyme est un état, et il doit se voir", () => {
+  // C'est celui du vérificateur sur la page publique : il ne détient rien de
+  // nous, et c'est précisément ce que cette page démontre.
+  const host = slot();
+  const state = renderIdentity({ authenticated: false }, host);
+  if (state !== "anonymous") return `état ${state}`;
+  return host.querySelector("[data-nav-user]").textContent === T.navNotSignedIn
+    ? null : "l'état anonyme ne se nomme pas";
+});
+
+test("identité — /api/v1/me injoignable ne fait pas passer pour connecté", () => {
+  // Hors ligne, ou 401 sur la page publique : `me` est nul. Le repli doit être
+  // « pas connecté », jamais un affichage ambigu.
+  const host = slot();
+  return renderIdentity(null, host) === "anonymous"
+    ? null : "l'absence de réponse est prise pour une session";
+});
+
+test("identité — sans emplacement dans la page, rien n'explose", () => {
+  return renderIdentity({ authenticated: true }, document.createElement("div")) === null
+    ? null : "un gabarit sans emplacement devrait rendre null";
 });
 
 // --- La matrice doit se LIRE ----------------------------------------------

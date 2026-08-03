@@ -4,7 +4,7 @@ import T from "./labels.js";
 import { loadKeyPair, createKeyPair, thumbprint, readable } from "./keys.js";
 import { buildDidDocument, downloadJson, verificationMethodId } from "./did.js";
 import { wireDidMerge } from "./did-merge.js";
-import { fetchMe, issuerDid, isDemo } from "./me.js";
+import { fetchMe, issuerDid, isDemo, issuerBlocker } from "./me.js";
 import { fetchPour, renderPour, operatorClaims } from "./pour.js";
 import { buildCredential, signCredential, newSubjectId } from "./credential.js";
 import { signView } from "./sign-state.js";
@@ -81,7 +81,10 @@ async function refreshState(ctx) {
 
   const view = signView({ pair, did, pour, signed });
   if (signBtn) signBtn.disabled = view.disabled;
-  if (signStatus) signStatus.textContent = view.text;
+  if (signStatus) {
+    signStatus.textContent =
+      view.text === T.issuerUnknown && ctx.identity ? ctx.identity : view.text;
+  }
 
   // Le compte rendu du dépôt est un état que l'affichage ne peut pas relire :
   // réinterroger le magasin ne dirait pas si CE dépôt-ci a abouti. Il passe donc
@@ -123,8 +126,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   // derrière, ce qui est précisément la double écriture supprimée ici.
   const pour = await fetchPour();
 
+  // L'obstacle d'identité, calculé une fois : il nomme le compte connecté et
+  // le remède, là où « No organisation identity available » ne disait ni qui ni
+  // quoi faire.
+  const identity = issuerBlocker(me);
+
   const ctx = { status, createBtn: $("[data-create-key]"), signBtn: $("[data-sign]"),
-                signStatus: $("[data-sign-status]"), did,
+                signStatus: $("[data-sign-status]"), did, identity,
                 pour: pour && renderPour(pour) ? pour : null, signed: null, deposit: null };
 
   // Le portefeuille est consulté AVANT le premier rendu : une coulée déjà
@@ -229,7 +237,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const p = await loadKeyPair();
       if (!p) { sayDid(T.envKeyMissing, "warning"); return; }
-      if (!did) { sayDid(T.issuerUnknown, "warning"); return; }
+      if (!did) { sayDid(identity ?? T.issuerUnknown, "warning"); return; }
       // En mode dégradé le nom du fichier porte la mention : rien de ce qui sort
       // d'ici sans authentification ne doit pouvoir être publié par inadvertance.
       const doc = await buildDidDocument(p, did, merge.previous());
