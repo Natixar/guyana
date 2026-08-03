@@ -224,6 +224,10 @@ barCarbonFailed    = "No carbon certificate"
 barCarbonCounts    = "{served} cells served - {used} for this lot, {shared} shared, {excluded} for another lot"
 barCarbonSaved     = "Disclosures saved next to the certificate - they are what a verifier needs to recompute the total"
 barCarbonDownload  = "Download the presentation (certificate + disclosures)"
+barExport          = "Take the certificates out"
+barExportWhy       = "Whatever this browser holds for this bar, as files. The origin certificate travels on its own — the mine signed it, it verifies alone. The carbon certificate travels as a presentation: the document, the disclosures you are willing to hand over, and the total salt. Drop either into the public verification page. Remove a disclosure from the file before sending it and the signature still holds — that is the point."
+barExportOrigin    = "Origin certificate (.json)"
+barExportCarbon    = "Carbon presentation (.json)"
 
 # Navigation (#68)
 navLabel           = "Sections"
