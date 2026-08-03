@@ -92,26 +92,36 @@ _refs() { # $1 = corps du document
 # POUR LA REQUÊTE. La page répond 200 ; l'utilisateur voit un mot de passe
 # demandé.
 #
-# DEUX RÉPONSES SELON CE QUE L'APPEL EST. Un appel qui doit ABOUTIR se règle en
-# ouvrant la route — c'est `/api/v1/me`, qui ne protégeait rien. Un appel qui ne
-# doit PAS aboutir se règle dans le code, en `credentials: "omit"` : il reçoit
+# DEUX RÉPONSES SELON CE QUE L'APPEL EST, ET LA PREMIÈRE S'EST TROMPÉE. Ouvrir
+# la route a paru la réponse évidente : `/api/v1/me` « ne protège rien ». Faux —
+# elle ne protège rien, mais elle DÉCRIT l'authentification, et elle la lit dans
+# l'en-tête que pose le middleware. Sans middleware, plus d'en-tête : la route
+# répondait « authenticated: false » à un opérateur connecté, la pastille du
+# bandeau annonçait « Not signed in » partout, et plus aucune barre ne pouvait
+# être certifiée faute d'organisation émettrice. Vingt-quatre heures.
+#
+# LA RÉPONSE JUSTE EST DE NE PAS APPELER. Une page publique n'a pas d'identité à
+# afficher. `/verify/` se déclare publique, `nav.js` n'y appelle rien, et la
+# route reste fermée comme le reste de l'API. Un appel qui ne doit PAS aboutir
+# et qu'on garde quand même se règle en `credentials: "omit"` : il reçoit
 # toujours 401 et n'ouvre rien. C'est le cas de `/engine/did/`, dont le repli
 # silencieux est délibéré — s'y rabattre ferait de cette page une démonstration
 # truquée.
 
-@test "/api/v1/me est ouverte, et elle ne divulgue rien" {
-    # Ouverte parce qu'elle ne protège rien : sans en-tête d'utilisateur elle
-    # rend « authenticated: false », aucune personne, aucun droit, aucune
-    # organisation. C'est le seul appel de la page publique fait AVEC
-    # identifiants, donc le seul qui puisse ouvrir la fenêtre.
-    [ "$(http_code_anon "https://$DOM/api/v1/me")" = "200" ]
+@test "la page publique se déclare telle, et le code lit cette déclaration" {
+    # LES DEUX MOITIÉS, PARCE QU'UNE SEULE NE TIENT PAS. Le marqueur dans la
+    # page servie ne vaut que si le module le consulte ; la garde dans le module
+    # ne vaut que si la page la porte. Retirer l'une ou l'autre rouvre la
+    # fenêtre de mot de passe, et le symptôme est distant de sa cause.
+    local page nav
+    page="$(curl -sS --max-time 20 "https://$DOM/verify/")"
+    echo "$page" | grep -q 'data-public-page'
 
-    local body
-    body="$(curl -sS --max-time 15 "https://$DOM/api/v1/me")"
-    echo "$body" | grep -q '"authenticated": *false'
-    # LA CONTREPARTIE : rien de nominatif ne sort sans identifiant.
-    ! echo "$body" | grep -q '"person"'
-    ! echo "$body" | grep -q '"grants"'
+    # Le bundle du menu, LU dans la page plutôt qu'écrit ici : son nom porte une
+    # empreinte qui change à chaque construction.
+    nav="$(_refs "$page" | grep -E '^/js/nav\..*\.js$' | head -1)"
+    [ -n "$nav" ]
+    curl -sS --max-time 20 "https://$DOM$nav" | grep -q 'data-public-page'
 }
 
 @test "les replis silencieux le restent : fermés, et sans demande de mot de passe" {
