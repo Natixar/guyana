@@ -117,6 +117,14 @@ main { flex: 1; padding: 2.5rem 0 3rem; }
    est dénombrable, c'est tout l'objet de la décision 1 de l'issue #61. */
 .block--withheld { border-style: dashed; }
 .block--withheld h5 { color: var(--muted-foreground); }
+/* Les dispositions seules — ce qui reste lisible d'une attestation reçue sans
+   ses divulgations. Pas de carte : il n'y a ni total ni étendue à porter, et
+   une carte vide de chiffres promettrait des chiffres. */
+.dispositions { list-style: none; margin: .75rem 0; padding: 0;
+                display: grid; gap: .4rem; }
+.dispositions li { font-size: .875rem;
+                   display: flex; align-items: baseline; gap: .5rem;
+                   flex-wrap: wrap; }
 .facts--tight { gap: .25rem; margin-top: .5rem; }
 .facts--tight > div { grid-template-columns: minmax(7rem, 55%) 1fr; gap: .5rem; }
 .facts--tight dt, .facts--tight dd { font-size: .875rem; }

@@ -1056,7 +1056,15 @@ test("a certificate says what it does NOT contain", () => {
   }]);
 
   if (!html.includes("2 cells")) return "le dénombrement des cellules manque";
+  // LE MOTIF VOYAGE EN CLAIR, DONC IL DOIT SE LIRE SANS AUCUNE DIVULGATION.
+  // Il est délibérément hors de l'engagement scellé : le cacher le rendrait
+  // invérifiable, alors qu'il est ce qui rend une exclusion auditable sans
+  // divulguer le moindre chiffre. Le tableau ligne à ligne le rendait ; son
+  // remplacement par des cartes de blocs a fait retomber tout le cas « sans
+  // divulgation » sur une phrase, et les motifs ont disparu avec le tableau.
   if (!html.includes("outside the pilot window")) return "le motif d'exclusion ne voyage pas jusqu'à l'écran";
+  // « 1 cells » sur l'écran qu'on projette à un jury.
+  if (html.includes("1 cells")) return "le singulier n'est pas traité";
   return null;
 });
 

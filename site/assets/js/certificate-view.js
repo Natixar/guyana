@@ -153,6 +153,51 @@ export function renderBlocks(cells, labels = emptyLabels) {
     `<div class="blocks">${blocks.map((b) => block(b, labels)).join("")}</div>`;
 }
 
+/**
+ * LES MOTIFS VOYAGENT EN CLAIR, ET ILS DOIVENT SE LIRE SANS AUCUNE DIVULGATION.
+ *
+ * Une entrée signée porte trois choses : un engagement scellé, le fait qu'elle
+ * ait compté, et — quand elle n'a pas compté comme les autres — LE MOTIF, en
+ * clair. Le motif est délibérément hors de l'engagement : le cacher le rendrait
+ * invérifiable, alors qu'il est précisément ce qui rend une exclusion auditable
+ * sans divulguer le moindre chiffre.
+ *
+ * LE DÉFAUT QUE CETTE FONCTION RÉPARE. Le tableau ligne à ligne rendait le motif
+ * même sans divulgations — les colonnes chiffrées affichaient « — », la colonne
+ * motif était pleine. Son remplacement par des cartes de blocs (#85) a fait
+ * retomber tout le cas « sans divulgation » sur une seule phrase, et les motifs
+ * ont disparu avec le tableau. L'écran promettait pourtant le contraire, mot
+ * pour mot : « it carries the reason it did not count ».
+ *
+ * CE QUI RESTE GROUPABLE ICI EST EXACTEMENT (disposition, motif) — le reste de
+ * la position est dans l'engagement. C'est donc la maille, et elle n'est pas une
+ * simplification de celle des blocs : c'est tout ce que le document contient.
+ */
+function dispositions(cells) {
+  const groups = new Map();
+  for (const c of cells) {
+    const used = c.used !== false;
+    const reason = typeof c.reason === "string" ? c.reason : "";
+    const k = `${used ? "in" : "out"}/${reason}`;
+    groups.set(k, { used, reason, n: (groups.get(k)?.n ?? 0) + 1 });
+  }
+
+  // L'ÉCARTÉ D'ABORD. C'est la ligne pour laquelle ce bloc existe : ce qui a
+  // compté sans motif ne se discute pas, ce qui a été mis de côté se discute.
+  const rank = (d) => (d.used ? (d.reason ? 1 : 2) : 0);
+
+  const lines = [...groups.values()]
+    .sort((a, b) => rank(a) - rank(b) || b.n - a.n)
+    .map((d) => `<li><span class="badge badge--${
+        d.used ? (d.reason ? "info" : "verified") : "warning"}">${
+        esc(d.used ? (d.reason ? T.certShared : T.certCounted) : T.certExcluded)}</span> ${
+        esc(d.n === 1 ? T.certOneCell : T.certNCells.replace("{n}", String(d.n)))}${
+        d.reason ? ` — <span class="muted">${esc(d.reason)}</span>` : ""}</li>`)
+    .join("");
+
+  return `<ul class="dispositions">${lines}</ul>`;
+}
+
 function matrix(doc, disclosures = [], labels = emptyLabels) {
   const cells = doc?.credentialSubject?.breakdown;
   if (!Array.isArray(cells) || cells.length === 0) return "";
@@ -165,7 +210,11 @@ function matrix(doc, disclosures = [], labels = emptyLabels) {
       .replace("{used}", String(used))
       .replace("{out}", String(cells.length - used))}</p>`;
 
-  if (byIndex.size === 0) return header + `<p class="muted">${T.certAmountsElsewhere}</p>`;
+  // Sans divulgations, les chiffres manquent — les motifs, non.
+  if (byIndex.size === 0) {
+    return header + dispositions(cells) +
+      `<p class="muted">${T.certAmountsElsewhere}</p>`;
+  }
 
   // La disposition vient de l'entrée SIGNÉE, jamais de la divulgation : c'est
   // elle qui fait foi sur ce qui a compté, et la divulgation ne la porte pas.
