@@ -33,7 +33,26 @@ export async function fetchMe() {
 }
 
 /** Le DID d'émetteur vient de l'identité, pas de la configuration du site. */
+import T from "./labels.js";
+
 export const issuerDid = (me) => me?.organisation?.did ?? null;
 
 /** Vrai quand rien ne garantit qui opère : la page doit alors le dire. */
 export const isDemo = (me) => !me?.authenticated;
+
+/**
+ * Pourquoi ce compte ne peut pas signer — en nommant le compte et le remède.
+ *
+ * « No organisation identity available » est vrai et inutilisable. Il ne dit ni
+ * QUI est connecté, ni que le refus est NORMAL, ni quoi faire. L'opérateur en
+ * conclut que le produit est cassé, alors qu'une règle d'autorisation vient de
+ * faire exactement son travail : signer l'origine d'un lingot est un acte de la
+ * MINE, et un compte de la plateforme ou de vérification n'est pas la mine.
+ *
+ * Rendre `null` quand tout va bien : l'appelant n'a alors rien à afficher.
+ */
+export function issuerBlocker(me) {
+  if (issuerDid(me)) return null;
+  const who = me?.person?.name ?? me?.person?.id;
+  return who ? `${T.issuerUnknownFor.replace("{who}", who)}` : T.issuerUnknown;
+}

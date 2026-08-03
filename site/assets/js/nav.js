@@ -54,10 +54,50 @@ export async function renderNav() {
 
   slot.innerHTML = links.join("");
 
-  const who = document.querySelector("[data-nav-user]");
-  if (who) {
-    who.textContent = me?.authenticated ? me.person.name : T.vNotIdentified;
-  }
+  renderIdentity(me);
+}
+
+/**
+ * QUI EST CONNECTÉ — dans le bandeau, sur toutes les pages, en permanence.
+ *
+ * LE DÉFAUT. L'information existait : `/api/v1/me` la donne, le menu l'appelle
+ * déjà, et le gabarit portait un emplacement. Mais elle s'affichait en un mot
+ * gris, à 70 % d'opacité, au bout d'un bandeau en dégradé — invisible en
+ * pratique. En revenant sur une page on ne pouvait pas dire si l'on était
+ * anonyme, sous le compte de la mine, ou sous celui de la plateforme.
+ *
+ * Les conséquences n'étaient pas cosmétiques : les trois états ne permettent
+ * pas les mêmes actions, et un refus légitime — « ce compte n'appartient à
+ * aucune organisation émettrice » — se lit comme une panne quand rien à
+ * l'écran ne rappelle sous quel compte on se trouve.
+ *
+ * L'ORGANISATION EST AFFICHÉE, ET PAS SEULEMENT LA PERSONNE. C'est elle qui
+ * gouverne : signer l'origine d'un lingot suppose d'appartenir à la mine. Un
+ * nom d'utilisateur seul ne dit pas si l'on peut agir ; le couple le dit.
+ *
+ * Trois états, trois pastilles, parce que trois est le nombre de situations
+ * réelles — et que la première, l'anonyme, est celle du vérificateur sur la
+ * page publique : elle doit se voir aussi, c'est même ce qu'elle démontre.
+ */
+export function renderIdentity(me, root = document) {
+  const who = root.querySelector("[data-nav-user]");
+  if (!who) return null;
+
+  const person = me?.person?.name ?? me?.person?.id ?? null;
+  const org = me?.organisation?.name ?? null;
+
+  const [state, text] =
+    !me?.authenticated ? ["anonymous", T.navNotSignedIn]
+    : org              ? ["issuer", `${T.signedInAs} ${person} · ${org}`]
+    // Authentifié mais sans organisation émettrice : l'exploitant de la
+    // plateforme, un vérificateur muni d'un compte. Ce n'est pas une anomalie,
+    // et le dire ici évite de le découvrir en cliquant sur un bouton inerte.
+    :                    ["no-org", `${T.signedInAs} ${person} · ${T.navNoOrganisation}`];
+
+  who.textContent = text;
+  who.dataset.state = state;
+  who.hidden = false;
+  return state;
 }
 
 document.addEventListener("DOMContentLoaded", renderNav);
