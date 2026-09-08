@@ -1,0 +1,269 @@
+# 01 — Hébergement et routage du site statique
+
+*État constaté le 8 septembre 2026. Embryon : cette note décrit la chaîne
+réellement déployée, pas une cible.*
+
+---
+
+## En une phrase
+
+Le site est un ensemble de fichiers statiques construits par Hugo sur le poste
+de contrôle, scellés dans une image Docker, lancés sur kubb dans un conteneur
+sans port publié, et publiés par un Traefik **qui ne nous appartient pas** —
+auquel nous parlons uniquement par des étiquettes posées sur nos propres
+conteneurs.
+
+---
+
+## La chaîne, de bout en bout
+
+```
+   POSTE DE CONTRÔLE (le portable de JM)              CIBLE (kubb)
+   ─────────────────────────────────────              ────────────────────────
+
+   site/  ── hugo ──▶  site/public/
+                          │
+                          │  tar sur stdin, par ssh
+                          │  (rien ne s'écrit sur la cible)
+                          ▼
+                     docker build ────────────────▶  image  aurora-site
+                                                        │
+                                                        │  docker run, réseau `proxy`
+                                                        ▼
+                                                   conteneur  guyana-site
+                                                   ├─ /static-web-server
+                                                   ├─ --root=/public
+                                                   └─ étiquettes traefik.*
+                                                        │
+                                                        │  découverte docker
+                                                        ▼
+                                                     TRAEFIK  (autre projet)
+                                                        │  TLS, ACME « porkbun »
+                                                        ▼
+                                              https://guyana.natixar.pro/
+```
+
+Trois choses méritent d'être soulignées dans ce dessin.
+
+**Le contenu vit dans l'image.** Jamais en montage lié depuis l'hôte. Une image
+a un digest : elle s'atteste et se déploie par digest. Un répertoire déposé sur
+l'hôte, non — il dérive en silence, et plus rien ne dit ce qui est servi.
+C'est l'invariant 3 de [`deploy/README.md`](../deploy/README.md).
+
+**Rien ne s'écrit sur la cible.** Le contexte de construction et les scripts
+d'étape voyagent par `stdin`. Un fichier laissé sur kubb survivrait au
+conteneur et à notre attention.
+
+**Nous sommes locataires du proxy.** kubb nous appartient, son Traefik non : il
+est installé et configuré par un script dédié, et toute édition manuelle de sa
+configuration serait écrasée à sa prochaine exécution. Nous n'écrivons donc ni
+dans `traefik.yml`, ni dans `/home/traefik/routing`. Tout notre routage passe
+par des étiquettes sur nos conteneurs — ce qui a une conséquence pratique
+constante : **changer une règle de routage impose de recréer le conteneur**, les
+étiquettes Docker n'étant pas modifiables à chaud.
+
+---
+
+## Qui sert quel domaine — et ce que la question cache
+
+C'est le point le plus mal compris du montage, et il vaut un tableau.
+
+| Domaine | Résolution (8 sept. 2026) | Servi par | Nous ? |
+|---|---|---|---|
+| `guyana.natixar.pro` | `90.53.125.57` = `proxy.critical-optimisation.com` | Traefik sur kubb → `guyana-site` | **oui** |
+| `natixar.pro` | `75.2.60.5`, `99.83.231.61` | **Netlify** | non |
+| `www.natixar.pro` | CNAME `heroic-dango-aec695.netlify.app` | **Netlify** | non |
+
+**Le domaine principal ne passe pas par nous.** Notre Traefik ne voit jamais une
+requête pour `natixar.pro`. Aucune étiquette, aucune configuration de notre
+serveur statique ne peut donc changer ce qu'il répond — tant que
+l'enregistrement DNS de l'apex pointe ailleurs. La note
+[03](03_analyse_did-web-sous-le-domaine-principal.md) part de là.
+
+> **Anomalie à corriger.** `inventory/hosts.d/kubb.env` liste `natixar.pro=200`
+> dans `NEIGHBOURS`, la liste des voisins dont `verify-neighbours.bats` vérifie
+> la non-régression après chaque déploiement. Ce n'est pas un voisin sur kubb :
+> c'est un site tiers hébergé ailleurs. La vérification passe toujours, et elle
+> passerait même si kubb était éteint. Elle ne mesure pas ce qu'elle prétend
+> mesurer.
+
+---
+
+## Le routage Traefik, en entier
+
+Tout est déclaré dans [`deploy/steps/60-app.sh`](../deploy/steps/60-app.sh) et
+[`deploy/steps/50-services.sh`](../deploy/steps/50-services.sh). Trois
+conteneurs se partagent un même nom d'hôte, et c'est la **priorité** qui tranche.
+
+| Priorité | Routeur | Règle | Vers | Authentifié |
+|---:|---|---|---|---|
+| 3000 | `guyana-pour` | `Path(/api/v1/pour)` | site | oui |
+| 2500 | `guyana-public` | `/verify`, `/css/`, `/js/`, `/fonts/`, `/img/`, `/favicon.svg`, `Path(/engine/taxonomy.json)` | site | **non** |
+| 2000 | `guyana-signer` | `PathPrefix(/api/v1/sign)` | signataire | oui |
+| 1000 | `guyana-store` | `PathPrefix(/api/v1)` | magasin | oui |
+| 10 | `guyana-r1` | `Host(guyana.natixar.pro)` | site | oui |
+| 1 | `guyana-any` | `HostRegexp(^guyana\..+$)` | site | oui |
+
+### Pourquoi les priorités sont explicites, et si grandes
+
+Faute de priorité déclarée, **Traefik la calcule sur la longueur de la règle**.
+Le routeur du site porte ``Host(`guyana.natixar.pro`)`` — une trentaine de
+caractères, donc une priorité d'une trentaine. Des valeurs de 10 et 20 posées
+sur l'API se faisaient battre par un routeur qui ne mentionnait même pas
+`/api/v1`. Le magasin n'a jamais été joignable depuis le navigateur, et personne
+ne l'a vu : **le site répond 200 avec sa page d'accueil pour tout chemin
+inconnu**, si bien qu'une erreur de routage prenait l'apparence d'un succès.
+
+Ce mode de panne — un 200 qui masque une absence — revient trois fois dans
+l'histoire de ce déploiement. Il revient une quatrième fois dans la note
+[03](03_analyse_did-web-sous-le-domaine-principal.md), à propos du document DID.
+
+### Les exceptions nommées
+
+`/api/v1/pour` et `/api/v1/sign` sont des chemins que le préfixe `/api/v1`
+emporterait vers le magasin, qui ne les sert pas. Plutôt qu'affaiblir la règle
+du magasin, on **nomme l'exception** avec une priorité supérieure, et
+`verify-http.bats` l'affirme.
+
+### La page publique
+
+`/verify/` est ouverte sans mot de passe, et c'est une décision de fond : cette
+page existe pour démontrer qu'un acheteur ou un auditeur peut contrôler une
+attestation **sans nous faire confiance**. On ne prouve pas qu'on est superflu
+derrière une porte dont on tient la clé.
+
+Une page publique, c'est **la page et tout ce qu'elle charge**. Le 3 août 2026,
+la page était ouverte mais pas son logo ni ses polices : un navigateur qui
+reçoit `401` avec `WWW-Authenticate: Basic` sur une `<img>` ou une `@font-face`
+**ouvre la fenêtre d'identification** — pour la ressource, pas pour la page. Le
+vérificateur se voyait donc réclamer un mot de passe sur une page répondant 200.
+`verify-public.bats` suit désormais les sous-ressources, `url()` des feuilles de
+style comprises.
+
+`/engine/` reste **fermé**, délibérément : il porte l'exemplaire embarqué du
+document DID, et la page publique ne doit pas pouvoir s'y rabattre en silence —
+ce serait une démonstration truquée. Seul `/engine/taxonomy.json` est ouvert, par
+chemin **exact** et non par préfixe, parce qu'un préfixe emporterait
+`/engine/did/` avec lui.
+
+---
+
+## Les intergiciels
+
+Trois, déclarés sur nos conteneurs, appliqués par les routeurs ci-dessus.
+
+| Nom | Effet |
+|---|---|
+| `guyana-auth` | `basicauth`, avec `headerfield=X-Webauth-User` |
+| `guyana-sec` | `frameDeny`, `contentTypeNosniff`, `referrerPolicy=strict-origin-when-cross-origin` |
+| `guyana-fresh` | `Cache-Control: no-cache` sur tout ce que le site sert |
+
+**`headerfield` est le mécanisme d'identité.** Le middleware ne se contente pas
+de filtrer : il **pose** `X-Webauth-User` sur la requête, et c'est de là que
+`/api/v1/me` tire l'identité qu'il rend. Corollaire contre-intuitif, appris le
+3 août 2026 : ouvrir `/api/v1/me` sans ce middleware ne rend pas la route
+permissive, il la rend **aveugle** — plus d'en-tête, donc « non authentifié »
+pour tout le monde, y compris pour un opérateur dûment connecté.
+
+**Chaque conteneur déclare ses propres intergiciels.** Les routeurs de l'API
+référençaient ceux du site ; or le lanceur recrée le site *après* les services,
+et pendant ce laps Traefik voyait des routeurs pointant vers un intergiciel
+absent. L'API répondait 404 à chaque redéploiement jusqu'au retour du site.
+Quelques étiquettes de plus suppriment une dépendance d'ordre entre étapes.
+
+**`guyana-fresh` a une raison précise.** Hugo nomme chaque module par
+l'empreinte de son contenu ; le serveur statique met ces URL en cache un an, ce
+qui est correct. Mais le HTML est le seul document dont l'URL ne change jamais :
+un navigateur qui l'a chargé hier le ressert aujourd'hui, avec les empreintes
+d'hier, et charge donc les modules d'hier depuis son cache d'un an. Le 2 août
+2026, la page d'auto-test a exécuté un moteur de la veille contre des vecteurs
+du jour ; vingt et un cas sont tombés. Le serveur servait le bon code — le
+navigateur ne l'a jamais demandé.
+
+`no-cache` ne veut pas dire « ne garde rien » mais « revalide avant de servir » :
+avec l'ETag, une ressource inchangée coûte un 304 et zéro octet.
+
+> **Un seul émetteur par en-tête.** Le serveur statique sait poser ses propres
+> `Cache-Control`. Deux autorités pour un même en-tête est un état où la
+> question « qui gagne ? » a une réponse que personne n'a décidée — elle dépend
+> de l'ordre d'écriture, donc d'une version de Traefik. Le conteneur est donc
+> lancé avec `--cache-control-headers=false` : Traefik est seul émetteur, et le
+> comportement se lit en un seul endroit.
+
+---
+
+## Le certificat
+
+Chaque routeur TLS porte `tls.certresolver=porkbun`, dont le nom vient du
+descripteur d'environnement et n'a **aucune valeur par défaut**. C'est
+délibéré : `tls=true` sans résolveur ne demande aucun certificat — Traefik sert
+le sien, interne, et le navigateur ouvre une alerte de sécurité sur un service
+parfaitement sain. Tous les invariants qui lisent un code HTTP passent. C'est le
+mode de panne du 3 août 2026, et `verify-tls.bats` le nomme désormais
+explicitement (« pas le repli interne de Traefik »), plutôt que de le laisser se
+manifester comme un échec de poignée de main.
+
+Un nom de résolveur inventé n'échouerait pas au déploiement mais au
+renouvellement, quatre-vingt-dix jours plus tard, sur une machine que personne
+ne regarde ce jour-là. D'où l'invariant « le certificat n'expire pas dans les
+14 jours ».
+
+---
+
+## Les autres conteneurs
+
+Pour situer le site dans l'ensemble — le détail appartient à une note à écrire.
+
+| Conteneur | Réseaux | Détient |
+|---|---|---|
+| `guyana-site` | `proxy` | rien |
+| `guyana-signer` | `proxy` | la clé de signature, **aucune base** |
+| `guyana-store` | `proxy` + `guyana-data` | la base, **aucune clé d'attestation** |
+| `guyana-db` | `guyana-data` (interne) | l'état, dans un volume nommé |
+
+L'invariant fondateur — *la clé de signature et les données ne se rencontrent
+jamais* — est ici une **topologie**, pas une intention : le signataire n'est pas
+sur le réseau de la base, et `50-services.sh` le constate après coup plutôt que
+de le supposer.
+
+---
+
+## Comment on déploie, et comment on vérifie
+
+```bash
+./deploy/deploy.sh --env kubb              # simulation (défaut)
+./deploy/deploy.sh --env kubb --apply      # exécution réelle
+bats deploy/verify/*.bats                  # après coup — c'est la moitié du travail
+```
+
+`--apply` refuse de s'exécuter sur un arbre de travail modifié : ce qui est
+déployé doit être ce qui est commité.
+
+`deploy/verify/` est séparé de `deploy/steps/` parce que ce sont des
+**spécifications**, pas des tests d'implémentation : « le conteneur ne publie
+aucun port » reste vrai si l'on passe de Docker à Podman. C'est ce qui permet
+aux mêmes fichiers de tourner dans trois contextes — le job d'intégration
+continue, un cron nocturne, et `deploy.sh` après chaque déploiement.
+
+La vérification qui compte le plus est `verify-neighbours.bats` : sur une
+infrastructure partagée, le risque n'est pas que notre déploiement échoue, il
+est qu'il casse autre chose. (Voir l'anomalie signalée plus haut : cette liste
+contient aujourd'hui un domaine qui n'est pas sur la machine.)
+
+---
+
+## Ce qui est connu et non résolu
+
+1. **L'image du serveur statique n'est pas épinglée par digest.** Le Dockerfile
+   dit `static-web-server:2` — une étiquette mobile. La base PostgreSQL, elle,
+   est épinglée par `sha256:`. Ce qui tourne peut donc changer sans qu'aucune
+   ligne du dépôt ne change. Détail dans la note
+   [02](02_static-web-server.md).
+2. **Le déploiement par digest attesté n'existe pas encore.** `60-app.sh` se
+   contente de refuser toute divergence entre l'image demandée et celle présente
+   sur la cible. Mesure d'attente explicite, pas la cible.
+3. **`deploy.sh` appelle `ssh` directement** au lieu de passer par
+   `bash-deploy-libs` — écart 16 de `deploy/GAPS.md`.
+4. **`natixar.pro` n'est pas servi par nous**, et l'émetteur déclaré du système
+   est `did:web:natixar.pro`. C'est l'objet de la note
+   [03](03_analyse_did-web-sous-le-domaine-principal.md).
