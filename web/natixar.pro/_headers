@@ -1,0 +1,18 @@
+# En-têtes de natixar.pro.
+#
+# Ce fichier vit DANS la charge utile et non dans netlify.toml : si un jour on
+# repasse à un dépôt par glisser-déposer, il part avec le dossier et les
+# en-têtes survivent.
+
+/.well-known/did.json
+  # Type enregistré par la méthode did:web. `application/json` reste le repli
+  # si un résolveur tiers refusait ce type.
+  Content-Type: application/did+json
+  # INDISPENSABLE. did-source.js résout `did:web:natixar.pro` depuis le
+  # navigateur, donc depuis une AUTRE origine (guyana.natixar.pro). Sans cet
+  # en-tête la lecture échoue silencieusement et le vérificateur retombe sur
+  # l'exemplaire embarqué — il croirait vérifier en ligne sans le faire.
+  Access-Control-Allow-Origin: *
+  # Une rotation de clé doit être visible tout de suite. On revalide à chaque
+  # lecture plutôt que de servir une clé retirée pendant la durée d'un cache.
+  Cache-Control: public, max-age=0, must-revalidate
