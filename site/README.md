@@ -23,8 +23,16 @@ fichier versionné en une opération. Le HTML porte
 `integrity="sha384-…"` sur la feuille de style et sur le module. C'est
 essentiel ici : **cette page signe.** Si son JavaScript est altéré, la
 signature couvre autre chose que ce que l'opérateur croit approuver, tout en
-restant cryptographiquement valide. La CSP interdit par ailleurs toute origine
-externe (`default-src 'none'`).
+restant cryptographiquement valide. La CSP part par ailleurs de `default-src
+'none'` et n'autorise **aucune origine externe pour le code**.
+
+Elle en autorise **une, en lecture seule, pour les données** : le document DID
+de l'émetteur, sous son URL exacte dans `connect-src`. Sans elle, la page de
+vérification ne peut pas aller chercher la clé chez l'émetteur et se rabat sur
+le dépôt manuel du fichier — ce qui fonctionne, mais démontre moins que la
+résolution réelle. L'exception ne touche pas `script-src` : elle n'autorise pas
+une ligne de code de plus à s'exécuter. `deploy/verify/verify-did.bats`
+l'affirme sur la page réellement servie.
 
 **La structure.** Les écrans vivent dans `layouts/_partials/`, les libellés
 dans `hugo.toml`, le texte dans `content/`. Un rédacteur modifie une phrase

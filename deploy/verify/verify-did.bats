@@ -68,3 +68,37 @@ setup() {
     run curl -sS --max-time 15 "$DID_URL"
     [[ "$output" == *"$vm"* ]]
 }
+
+# LA PAGE DOIT POUVOIR ALLER CHERCHER LE DOCUMENT, ET RIEN NE LE DISAIT.
+#
+# Le document est publié, lisible depuis n'importe quelle origine, et pourtant
+# la page de vérification ne pouvait pas le lire : sa propre politique de
+# sécurité portait `connect-src 'self'`. La requête était bloquée dans le
+# navigateur du vérificateur — donc là où nous ne la voyons pas — et
+# `did-source.js` se rabattait sur le dépôt manuel du fichier.
+#
+# CE MODE DE PANNE NE SE VOIT NULLE PART AILLEURS. Les cinq invariants
+# ci-dessus interrogent le document depuis `curl`, qui n'applique aucune CSP :
+# ils passent tous pendant que la démonstration est dégradée. Le repli, lui,
+# fonctionne — la page reste utilisable, elle annonce honnêtement d'où vient le
+# document — de sorte que rien ne crie. C'est exactement la forme de panne que
+# ce dépôt attrape le moins bien : celle qui laisse tout en apparence de marche.
+#
+# L'invariant lit la politique RÉELLEMENT SERVIE et vérifie qu'elle nomme l'URL
+# que `did-source.js` va chercher. Il échoue si quelqu'un resserre `connect-src`
+# sans savoir ce qu'il coupe.
+@test "la page de vérification a le droit d'aller lire le document DID" {
+    local csp
+    csp="$(curl -sS --max-time 15 "https://$(primary_domain)/verify/" \
+           | grep -o 'content="default-src[^"]*"' | head -1)"
+    [ -n "$csp" ] || { echo "aucune CSP trouvée dans la page servie" >&2; return 1; }
+
+    # L'URL exacte, ou le domaine : les deux formes autorisent la lecture. On
+    # n'impose pas laquelle — c'est une décision de resserrement, pas un
+    # invariant — mais l'une des deux doit être là.
+    [[ "$csp" == *"$DID_URL"* ]] || [[ "$csp" == *"https://$DID_HOST"* ]] || {
+        echo "connect-src n'autorise pas $DID_URL" >&2
+        echo "politique servie : $csp" >&2
+        return 1
+    }
+}

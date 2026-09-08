@@ -6,8 +6,29 @@
 
 {{/* Cette page signe : si son JavaScript est altéré, la signature couvre autre
      chose que ce que l'opérateur croit approuver, et reste valide. D'où une
-     politique qui interdit toute origine externe, sans exception. */}}
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'none'; base-uri 'none'">
+     politique qui n'admet AUCUNE origine externe pour le code — `script-src
+     'self'`, doublé de l'empreinte SRI plus bas — et qui n'en admet qu'une
+     seule, en lecture, pour les données.
+
+     L'EXCEPTION, ET POURQUOI ELLE NE COÛTE RIEN. `connect-src 'self'` seul
+     empêchait la page de vérification de lire le document DID de l'émetteur,
+     alors même que natixar.pro le sert avec `Access-Control-Allow-Origin: *`.
+     Le vérificateur se rabattait sur le dépôt manuel du fichier — ce qui
+     fonctionne, mais démontre moins : la force de `did:web` est justement que
+     la clé se prend CHEZ L'ÉMETTEUR, sans passer par nos mains, et une page
+     qui ne peut pas aller la chercher n'en administre pas la preuve.
+
+     L'exception porte sur `connect-src`, jamais sur `script-src` : elle
+     n'autorise pas une ligne de code de plus à s'exécuter ici. Elle est de
+     surcroît réduite à UNE URL EXACTE et non à un domaine — CSP accepte un
+     chemin dans une source — de sorte qu'un script compromis n'y gagne pas une
+     destination d'exfiltration, seulement le droit de relire un document
+     public que n'importe qui peut déjà lire.
+
+     Le domaine de la mine n'y figure pas : il ne publie rien, l'ajouter
+     n'ouvrirait aucune requête qui aboutisse, et ce serait anticiper une
+     décision qui appartient à son propriétaire. */}}
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://natixar.pro/.well-known/did.json; form-action 'none'; base-uri 'none'">
 
 {{ $css := resources.Get "css/main.css" | resources.ExecuteAsTemplate "css/main.css" . | minify | fingerprint "sha384" }}
 <link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
