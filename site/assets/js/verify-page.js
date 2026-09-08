@@ -327,13 +327,26 @@ function keyMismatch() {
 function renderHint(url) {
   return `<p>${T.vIssuerIs} <code>${esc(state.credential.issuer)}</code></p>` +
     (url ? `<p>${T.vFetchAt} <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a></p>` +
-           // POURQUOI C'EST À VOUS DE LE FAIRE. Un navigateur ne peut pas lire
-           // le `.well-known` d'un domaine tiers : la politique de sécurité de
-           // ce site interdit toute connexion sortante, et le domaine de
-           // l'émetteur devrait en outre l'autoriser explicitement. Vous, en
-           // revanche, pouvez ouvrir ce lien — et c'est mieux ainsi, puisque le
-           // document ne passe alors par aucune de nos mains.
-           `<p class="muted">${T.vCannotFetch}</p>` +
+           // LA PAGE VA CHERCHER LE DOCUMENT, ET LE LIEN RESTE.
+           //
+           // Ce texte disait le contraire jusqu'au 8 septembre 2026 : « cette
+           // page ne peut pas aller chercher ce fichier pour vous ». C'était
+           // vrai — `connect-src 'self'` bloquait la requête — et ce ne l'est
+           // plus depuis que la politique nomme l'URL du document de
+           // l'émetteur. Un texte qui décrit une limite levée est pire qu'un
+           // texte absent : il fait renoncer à une manœuvre qui marche.
+           //
+           // LE LIEN N'EST PAS DEVENU DÉCORATIF pour autant, et c'est ce que
+           // le nouveau libellé dit. Le vérificateur l'ouvre pour constater
+           // qu'il reçoit le même fichier que nous ; c'est la vérification de
+           // notre honnêteté, et elle ne coûte qu'un onglet. Quiconque en fait
+           // un usage sérieux aura fait auditer ce code, et l'audit établit
+           // que la page lit cette adresse et aucune autre.
+           //
+           // LE DÉPÔT MANUEL RESTE, parce qu'il n'a jamais été un pis-aller :
+           // c'est la seule voie d'un vérificateur hors ligne, ou dont le
+           // réseau n'atteint pas le domaine de l'émetteur.
+           `<p class="muted">${T.vFetchedFor}</p>` +
            `<p class="muted">${T.vFetchHow}</p>`
          : `<p class="muted">${T.vNotDidWeb}</p>`) +
     provenance() + (keyMismatch() ?? "");

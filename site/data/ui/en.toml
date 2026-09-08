@@ -96,8 +96,8 @@ vPasted       = "pasted"
 
 vIssuerIs     = "This certificate declares its issuer as"
 vFetchAt      = "Their public key is published at"
-vFetchHow     = "Click the link — it opens in a new tab. Then either save the page (Ctrl+S) and choose the file above, or select everything, copy it, and paste it below. No command line is needed."
-vCannotFetch  = "This page cannot fetch that file for you. A browser is not allowed to read a .well-known from another domain, and this site forbids outgoing connections entirely. That is not a limitation to work around — you fetching it yourself is stronger, because the document then passes through none of our hands."
+vFetchedFor   = "This page reads that document from the issuer's own domain, in your browser — it is not relayed by us, and we cannot alter it on the way. Open the link to see the same file for yourself; anyone auditing this page can confirm it reads that address and no other."
+vFetchHow     = "You can also supply the document yourself, and an offline verifier must: open the link, then either save the page (Ctrl+S) and choose the file above, or select everything, copy it, and paste it below. No command line is needed."
 vNotDidWeb    = "This issuer does not use a web address, so the key cannot be fetched automatically."
 
 vValid        = "Valid signature"
