@@ -61,8 +61,7 @@ la contrepartie de la surface réduite.
 > publie aussi des variantes *rootless* (utilisateur `sws`, racine publique
 > `/home/sws/public`) que nous n'utilisons pas. Ce n'est pas gratuit ; c'est
 > partiellement compensé par `--read-only`, `--security-opt
-> no-new-privileges:true`, l'absence de shell et l'absence de port publié. À
-> reconsidérer — voir « Points ouverts » en fin de note.
+> no-new-privileges:true`, l'absence de shell et l'absence de port publié.
 
 ### Notre image
 
@@ -78,9 +77,8 @@ contexte de construction part par `stdin` : rien ne s'écrit sur kubb.
 
 > **L'étiquette `:2` est mobile.** Elle désigne aujourd'hui la 2.44.0 ; elle
 > désignera demain la 2.45. Ce qui tourne peut donc changer sans qu'aucune ligne
-> du dépôt ne change — exactement ce que l'épinglage par digest de
-> `DB_IMAGE` interdit pour PostgreSQL. Incohérence connue, reprise en fin de
-> note.
+> du dépôt ne change. `DB_IMAGE` est épinglée par `sha256:` ; celle-ci ne l'est
+> pas.
 
 ### Le durcissement, et d'où il vient
 
@@ -178,10 +176,9 @@ GET /engine/taxonomy.json   ->  200   content-type: application/json
 page d'accueil. Qui demande un fichier caché ne reçoit pas une erreur : il
 reçoit du HTML annoncé comme un succès.
 
-Le document DID de Natixar n'a pas vocation à être servi ici — il va sur le
-domaine principal, chez Netlify, voir [01](01_hebergement-et-routage.md). Le
-défaut n'en est pas moins réel : il vaut pour tout chemin caché, et rien dans le
-dispositif de vérification ne peut s'en apercevoir.
+Le document DID de Natixar n'est pas servi ici : il vit sur le domaine
+principal, chez Netlify — voir [01](01_hebergement-et-routage.md). Le
+comportement décrit vaut pour tout chemin caché de ce site.
 
 Avec `--ignore-hidden-files=false` ajouté, le même appel rend :
 
@@ -210,12 +207,9 @@ WARN static_web_server::error_page: method=GET uri=/absent status=404 error="Not
 ```
 
 Ce récapitulatif est le moyen le plus direct de savoir ce que le serveur croit
-faire, et il n'est pas disponible aujourd'hui. Le journal d'accès de Traefik,
-lui, est filtré sur les codes 4xx/5xx — mais comme `--page-fallback` rend 200
-pour tout chemin inconnu, **il ne voit pas non plus** les URL manquantes du site.
-
-> Conséquence à retenir : aujourd'hui, une ressource statique absente ne laisse
-> aucune trace nulle part, et se présente au client comme un succès.
+faire. Le journal d'accès de Traefik, lui, est filtré sur les codes 4xx/5xx —
+et comme `--page-fallback` rend 200 pour tout chemin inconnu, les URL manquantes
+du site n'y figurent pas non plus.
 
 ---
 
@@ -241,22 +235,9 @@ on se contente de refuser toute divergence entre l'image demandée et celle
 réellement présente sur la cible.
 
 La CI (`.github/workflows/pr.yml`, job `ephemeral`) rejoue la même construction
-sur un runner et interroge le site — mais avec `--page-fallback` seul, sans
-`--compression` ni `--cache-control-headers=false`. **Les drapeaux de la CI et
-ceux de la production ont divergé.** Le job vérifie d'ailleurs explicitement
-`/inconnu -> 200`, ce qui est le comportement voulu pour une application à
-routage côté client, mais qui fige aussi le mode de panne décrit plus haut.
+sur un runner et interroge le site, avec `--page-fallback` seul — sans
+`--compression` ni `--cache-control-headers=false`. Elle y vérifie
+`/inconnu -> 200`, le comportement attendu d'une application à routage côté
+client.
 
 ---
-
-## Points ouverts
-
-1. **Épingler l'image par digest**, comme `DB_IMAGE` l'est. Une étiquette mobile
-   fait varier ce qui tourne sans que le dépôt bouge.
-2. **Rendre le serveur audible** — `--log-level=info`, au moins le temps d'une
-   campagne. Aujourd'hui une ressource absente ne laisse aucune trace.
-3. **Réaligner les drapeaux de la CI sur ceux de la production**, faute de quoi
-   le job éphémère n'exerce pas le montage réellement déployé.
-4. **Reconsidérer la variante *rootless*.** Le gain est réel ; le coût est un
-   changement de racine (`/home/sws/public`) et donc du Dockerfile et des
-   drapeaux.

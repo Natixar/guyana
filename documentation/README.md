@@ -39,12 +39,3 @@ relatif, jamais par « la note 2 » en toutes lettres.
 |---|---|
 | [01 — Hébergement et routage du site statique](01_hebergement-et-routage.md) | La chaîne complète : Hugo → image → conteneur → Traefik → domaine. Qui sert quoi, et qui ne nous appartient pas. |
 | [02 — static-web-server](02_static-web-server.md) | Le serveur retenu : ce qu'il sait faire, ce que nous en utilisons, comment son conteneur est bâti et déployé. |
-
-## Ce qui reste à écrire
-
-La liste est courte et honnête — elle vaut mieux qu'un sommaire qui promet des
-chapitres vides.
-
-- la chaîne de signature (magasin, signataire, et l'invariant qui les sépare) ;
-- le modèle de données du cube et la taxonomie pivot ;
-- la couche d'identité et sa dépendance à FusionAuth.

@@ -90,51 +90,65 @@ fichiers** dont nous tenons la source :
   ce qui est le comportement que notre propre serveur statique n'a pas
   (voir [02](02_static-web-server.md)).
 
-La source vit dans un répertoire local séparé de ce dépôt
-(`Calcool Studios/Websites/Natixar.pro`, aujourd'hui un seul `index.html`, pas
-un dépôt git). **Déployer, c'est bâtir l'arborescence dans ce répertoire, en
-faire un zip, et le déposer dans le projet Netlify `heroic-dango-aec695`** — la
-dernière étape est manuelle et revient à JM.
+La source de ce site est **`natixar.pro/` dans ce dépôt**, et le répertoire que
+Netlify publie est **`natixar.pro/public`**. Le projet Netlify
+(`heroic-dango-aec695`) clone le dépôt et sert ce répertoire tel quel : **aucune
+commande de construction**. Détail dans [`natixar.pro/README.md`](../natixar.pro/README.md).
 
-### Conséquence pour `did:web:natixar.pro`
+Deux conséquences de cette absence de construction chez Netlify :
+
+- **le document DID engendré est versionné.** Un fichier produit par une étape
+  que Netlify n'exécute pas doit exister dans le dépôt, sans quoi il n'existe
+  nulle part ;
+- **le script et son test restent hors de `public/`.** Le lien profond
+  fonctionne : tout fichier placé dans le répertoire publié est servi à qui en
+  devine le chemin.
+
+### Le document DID de `did:web:natixar.pro`
 
 L'émetteur déclaré de toute la chaîne de signature est `did:web:natixar.pro`
 (`services/store/app.py`, `services/signer/server.mjs`), ce qui se résout en
-`https://natixar.pro/.well-known/did.json` — aujourd'hui un 404.
+`https://natixar.pro/.well-known/did.json`. Un vérificateur y lit la clé
+publique qui lui permet de contrôler une attestation **sans rien nous
+demander** : c'est l'énoncé que tout le projet existe pour tenir.
 
-**Publier ce document est donc un dépôt de fichier, pas un problème
-d'infrastructure.** Aucun conteneur, aucun routeur, aucune règle Traefik : le
-fichier va dans le répertoire ci-dessus et part avec le prochain zip. Ce qu'il
-doit satisfaire :
+Le document est **engendré**, jamais rédigé, par `natixar.pro/build.mjs`, qui
+lit la clé du signataire dans `deploy/secrets/local/signer_key.jwk` (hors dépôt)
+et n'en publie que la partie publique. Il satisfait quatre exigences :
 
 | | |
 |---|---|
-| type | `application/json` — Netlify le déduit de l'extension |
-| origine | `Access-Control-Allow-Origin: *`, à poser par un fichier `_headers` — un vérificateur en navigateur fait une requête *cross-origin* |
+| type | `application/json` — Netlify le déduit de l'extension, et `_headers` le confirme |
+| origine | `Access-Control-Allow-Origin: *` — un vérificateur en navigateur lit ce document depuis une AUTRE origine, et sans cet en-tête la requête échoue chez lui, sur une page que nous ne voyons pas |
 | accès | aucune authentification : c'est une clé publique |
-| fragment | **`#key-1`** — voir le piège ci-dessous |
+| fragment | **`#key-1`**, et c'est le piège ci-dessous |
 
 > **Le piège du fragment.** Le signataire inscrit dans chaque preuve
 > `${ISSUER_DID}#${KEY_NAME}`, soit `did:web:natixar.pro#key-1`. Or
 > `site/assets/js/did.js` construit ses documents avec un fragment qui est
 > **l'empreinte RFC 7638 de la clé**, jamais un nom — correction délibérée, pour
 > que deux clés distinctes cessent de recevoir le même identifiant. Les deux
-> conventions sont défendables ; elles ne sont pas compatibles. Un document
+> conventions sont défendables ; elles ne sont pas compatibles, et `verify.js`
+> exige l'identifiant **exact**, sans correspondance approximative. Un document
 > engendré par `buildDidDocument()` pour la clé de Natixar ne correspondrait à
 > **aucune preuve émise**, et la vérification échouerait en « clé absente du
 > document » — un diagnostic exact et parfaitement déroutant.
+>
+> C'est pourquoi `build.mjs` lit **les mêmes variables d'environnement que le
+> signataire, avec les mêmes défauts**. Les changer d'un côté sans l'autre reste
+> possible ; cela ne peut plus se faire par inadvertance de rédaction.
 
-La partie publique de la clé se dérive de `deploy/secrets/local/signer_key.jwk`
-(hors dépôt). **Aucun code ne produit aujourd'hui ce document**, et la rotation
-de cette clé n'a pas de procédure — le document DID étant *append-only*, un
-retrait rendrait invérifiable toute attestation déjà signée.
+**Le document est append-only.** Retirer une clé rend invérifiable toute
+attestation qu'elle a signée. `build.mjs` conserve donc les entrées existantes
+et **refuse** de republier un autre matériel sous un identifiant déjà utilisé —
+une rotation se fait en ajoutant, sous `SIGNER_KEY_NAME=key-2`, la même valeur
+devant être posée sur le signataire.
 
-> **Anomalie à corriger.** `inventory/hosts.d/kubb.env` liste `natixar.pro=200`
-> dans `NEIGHBOURS`, la liste des voisins dont `verify-neighbours.bats` vérifie
-> la non-régression après chaque déploiement. Ce n'est pas un voisin sur kubb :
-> c'est un site tiers hébergé ailleurs. La vérification passe toujours, et elle
-> passerait même si kubb était éteint. Elle ne mesure pas ce qu'elle prétend
-> mesurer.
+`natixar.pro/build.test.mjs` éprouve tout cela en signant une attestation avec
+une paire jetable, puis en la vérifiant contre le document produit. Deux de ses
+cas relisent en outre le fichier **versionné** : la CI ne peut pas le
+régénérer — la clé du signataire n'y est pas — et rien n'empêcherait sinon qu'il
+soit édité à la main.
 
 ---
 
@@ -300,19 +314,3 @@ est qu'il casse autre chose. (Voir l'anomalie signalée plus haut : cette liste
 contient aujourd'hui un domaine qui n'est pas sur la machine.)
 
 ---
-
-## Ce qui est connu et non résolu
-
-1. **L'image du serveur statique n'est pas épinglée par digest.** Le Dockerfile
-   dit `static-web-server:2` — une étiquette mobile. La base PostgreSQL, elle,
-   est épinglée par `sha256:`. Ce qui tourne peut donc changer sans qu'aucune
-   ligne du dépôt ne change. Détail dans la note
-   [02](02_static-web-server.md).
-2. **Le déploiement par digest attesté n'existe pas encore.** `60-app.sh` se
-   contente de refuser toute divergence entre l'image demandée et celle présente
-   sur la cible. Mesure d'attente explicite, pas la cible.
-3. **`deploy.sh` appelle `ssh` directement** au lieu de passer par
-   `bash-deploy-libs` — écart 16 de `deploy/GAPS.md`.
-4. **`https://natixar.pro/.well-known/did.json` n'existe pas**, alors que c'est
-   l'adresse de l'émetteur déclaré de toute la chaîne. Le fichier reste à
-   écrire, et rien ne le produit — voir plus haut.
