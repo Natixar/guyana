@@ -76,9 +76,58 @@ C'est le point le plus mal compris du montage, et il vaut un tableau.
 
 **Le domaine principal ne passe pas par nous.** Notre Traefik ne voit jamais une
 requête pour `natixar.pro`. Aucune étiquette, aucune configuration de notre
-serveur statique ne peut donc changer ce qu'il répond — tant que
-l'enregistrement DNS de l'apex pointe ailleurs. La note
-[03](03_analyse_did-web-sous-le-domaine-principal.md) part de là.
+serveur statique ne peut changer ce qu'il répond.
+
+Ce n'est pas un obstacle, parce que ce site est un **pur déploiement de
+fichiers** dont nous tenons la source :
+
+- `/` et `/index.html` rendent un HTML de 388 octets qui redirige vers
+  `www.natixar.com` — le domaine n'est qu'une redirection, il n'y a pas de site
+  derrière ;
+- **le lien profond fonctionne** : n'importe quel fichier déposé est servi à son
+  chemin, `.well-known/` compris ;
+- un chemin absent rend un **404 franc**, et non un repli déguisé en succès —
+  ce qui est le comportement que notre propre serveur statique n'a pas
+  (voir [02](02_static-web-server.md)).
+
+La source vit dans un répertoire local séparé de ce dépôt
+(`Calcool Studios/Websites/Natixar.pro`, aujourd'hui un seul `index.html`, pas
+un dépôt git). **Déployer, c'est bâtir l'arborescence dans ce répertoire, en
+faire un zip, et le déposer dans le projet Netlify `heroic-dango-aec695`** — la
+dernière étape est manuelle et revient à JM.
+
+### Conséquence pour `did:web:natixar.pro`
+
+L'émetteur déclaré de toute la chaîne de signature est `did:web:natixar.pro`
+(`services/store/app.py`, `services/signer/server.mjs`), ce qui se résout en
+`https://natixar.pro/.well-known/did.json` — aujourd'hui un 404.
+
+**Publier ce document est donc un dépôt de fichier, pas un problème
+d'infrastructure.** Aucun conteneur, aucun routeur, aucune règle Traefik : le
+fichier va dans le répertoire ci-dessus et part avec le prochain zip. Ce qu'il
+doit satisfaire :
+
+| | |
+|---|---|
+| type | `application/json` — Netlify le déduit de l'extension |
+| origine | `Access-Control-Allow-Origin: *`, à poser par un fichier `_headers` — un vérificateur en navigateur fait une requête *cross-origin* |
+| accès | aucune authentification : c'est une clé publique |
+| fragment | **`#key-1`** — voir le piège ci-dessous |
+
+> **Le piège du fragment.** Le signataire inscrit dans chaque preuve
+> `${ISSUER_DID}#${KEY_NAME}`, soit `did:web:natixar.pro#key-1`. Or
+> `site/assets/js/did.js` construit ses documents avec un fragment qui est
+> **l'empreinte RFC 7638 de la clé**, jamais un nom — correction délibérée, pour
+> que deux clés distinctes cessent de recevoir le même identifiant. Les deux
+> conventions sont défendables ; elles ne sont pas compatibles. Un document
+> engendré par `buildDidDocument()` pour la clé de Natixar ne correspondrait à
+> **aucune preuve émise**, et la vérification échouerait en « clé absente du
+> document » — un diagnostic exact et parfaitement déroutant.
+
+La partie publique de la clé se dérive de `deploy/secrets/local/signer_key.jwk`
+(hors dépôt). **Aucun code ne produit aujourd'hui ce document**, et la rotation
+de cette clé n'a pas de procédure — le document DID étant *append-only*, un
+retrait rendrait invérifiable toute attestation déjà signée.
 
 > **Anomalie à corriger.** `inventory/hosts.d/kubb.env` liste `natixar.pro=200`
 > dans `NEIGHBOURS`, la liste des voisins dont `verify-neighbours.bats` vérifie
@@ -115,8 +164,8 @@ ne l'a vu : **le site répond 200 avec sa page d'accueil pour tout chemin
 inconnu**, si bien qu'une erreur de routage prenait l'apparence d'un succès.
 
 Ce mode de panne — un 200 qui masque une absence — revient trois fois dans
-l'histoire de ce déploiement. Il revient une quatrième fois dans la note
-[03](03_analyse_did-web-sous-le-domaine-principal.md), à propos du document DID.
+l'histoire de ce déploiement, et une quatrième sur les fichiers cachés :
+mesures dans [02](02_static-web-server.md).
 
 ### Les exceptions nommées
 
@@ -264,6 +313,6 @@ contient aujourd'hui un domaine qui n'est pas sur la machine.)
    sur la cible. Mesure d'attente explicite, pas la cible.
 3. **`deploy.sh` appelle `ssh` directement** au lieu de passer par
    `bash-deploy-libs` — écart 16 de `deploy/GAPS.md`.
-4. **`natixar.pro` n'est pas servi par nous**, et l'émetteur déclaré du système
-   est `did:web:natixar.pro`. C'est l'objet de la note
-   [03](03_analyse_did-web-sous-le-domaine-principal.md).
+4. **`https://natixar.pro/.well-known/did.json` n'existe pas**, alors que c'est
+   l'adresse de l'émetteur déclaré de toute la chaîne. Le fichier reste à
+   écrire, et rien ne le produit — voir plus haut.

@@ -124,13 +124,13 @@ note [01](01_hebergement-et-routage.md).
 | `--http2`, `--https-redirect` | TLS terminé par SWS | c'est Traefik qui termine TLS |
 | `--maintenance-mode` | 503 volontaire | jamais eu l'usage |
 | `--disable-symlinks` | refuse de suivre les liens | l'image n'en contient pas |
-| `--ignore-hidden-files` | dotfiles | **c'est le sujet de la note [03](03_analyse_did-web-sous-le-domaine-principal.md)** |
+| `--ignore-hidden-files` | dotfiles | **laissé au défaut, qui les refuse — voir « deux comportements mesurés » plus bas** |
 
 ### La configuration avancée, par fichier TOML
 
 Au-delà de la ligne de commande, SWS accepte `--config-file=/chemin/sws.toml`,
 qui **seul** donne accès à quatre mécanismes. Nous n'en utilisons aucun
-aujourd'hui ; deux sont candidats dans la note 03.
+aujourd'hui.
 
 **Hôtes virtuels** — une racine différente par en-tête `Host` :
 
@@ -175,8 +175,13 @@ GET /engine/taxonomy.json   ->  200   content-type: application/json
 ```
 
 **Le 404 ne se voit pas.** `--page-fallback` le transforme en 200 portant la
-page d'accueil. Un vérificateur qui demande le document DID ne reçoit pas une
-erreur : il reçoit du HTML annoncé comme un succès.
+page d'accueil. Qui demande un fichier caché ne reçoit pas une erreur : il
+reçoit du HTML annoncé comme un succès.
+
+Le document DID de Natixar n'a pas vocation à être servi ici — il va sur le
+domaine principal, chez Netlify, voir [01](01_hebergement-et-routage.md). Le
+défaut n'en est pas moins réel : il vaut pour tout chemin caché, et rien dans le
+dispositif de vérification ne peut s'en apercevoir.
 
 Avec `--ignore-hidden-files=false` ajouté, le même appel rend :
 
