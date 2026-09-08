@@ -90,19 +90,32 @@ fichiers** dont nous tenons la source :
   ce qui est le comportement que notre propre serveur statique n'a pas
   (voir [02](02_static-web-server.md)).
 
-La source de ce site est **`natixar.pro/` dans ce dépôt**, et le répertoire que
-Netlify publie est **`natixar.pro/public`**. Le projet Netlify
-(`heroic-dango-aec695`) clone le dépôt et sert ce répertoire tel quel : **aucune
-commande de construction**. Détail dans [`natixar.pro/README.md`](../natixar.pro/README.md).
+La source de ce site est **`web/natixar.pro/` dans ce dépôt**, et c'est aussi
+le répertoire que Netlify publie — déclaré dans [`netlify.toml`](../netlify.toml)
+à la racine. Le projet Netlify s'appelle `natixar-pro` (anciennement
+`heroic-dango-aec695`) ; il clone le dépôt et sert ce répertoire tel quel.
 
-Deux conséquences de cette absence de construction chez Netlify :
+Trois réglages de `netlify.toml` méritent d'être lus.
 
-- **le document DID engendré est versionné.** Un fichier produit par une étape
-  que Netlify n'exécute pas doit exister dans le dépôt, sans quoi il n'existe
-  nulle part ;
-- **le script et son test restent hors de `public/`.** Le lien profond
-  fonctionne : tout fichier placé dans le répertoire publié est servi à qui en
-  devine le chemin.
+**`command = "true"`** — un no-op explicite. L'absence de commande laisserait la
+détection de framework de Netlify décider seule, et elle décide mal sur un dépôt
+qui contient un site Hugo qu'elle ne doit surtout pas construire.
+
+**`publish = "web/natixar.pro"`** — le site Hugo n'est PAS publié ici. Il va sur
+kubb, sous `guyana.natixar.pro`, par `deploy/`. Les deux domaines sont servis par
+deux systèmes différents à partir du même dépôt, et c'est cette ligne qui les
+sépare.
+
+**`ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- web/natixar.pro netlify.toml"`**
+— soixante tickets touchent `services/`, `deploy/` et `site/` ; les laisser
+publier `natixar.pro` serait du bruit et un risque. `git diff --quiet` sort 0
+quand rien n'a changé, et Netlify annule la construction sur un code 0. Au
+premier build `$CACHED_COMMIT_REF` est vide, la commande échoue, le code est non
+nul : on construit. **L'échec est du bon côté.**
+
+Netlify n'exécutant aucune construction, **le document DID engendré est
+versionné** : un fichier produit par une étape que personne ne joue doit exister
+dans le dépôt, sans quoi il n'existe nulle part.
 
 ### Le document DID de `did:web:natixar.pro`
 
@@ -112,43 +125,58 @@ L'émetteur déclaré de toute la chaîne de signature est `did:web:natixar.pro`
 publique qui lui permet de contrôler une attestation **sans rien nous
 demander** : c'est l'énoncé que tout le projet existe pour tenir.
 
-Le document est **engendré**, jamais rédigé, par `natixar.pro/build.mjs`, qui
-lit la clé du signataire dans `deploy/secrets/local/signer_key.jwk` (hors dépôt)
-et n'en publie que la partie publique. Il satisfait quatre exigences :
+Le document est **engendré**, jamais rédigé, par
+[`tools/make-did.mjs`](../tools/make-did.mjs). La clé privée lui arrive par
+`stdin` et ne touche jamais le disque — règle de `deploy/secrets/README.md` :
 
-| | |
+```bash
+deploy/secrets/fetch.sh signer_key \
+  | node tools/make-did.mjs --from-private - --also-key-name key-1
+```
+
+`web/natixar.pro/_headers` complète le service : `application/did+json`,
+`Access-Control-Allow-Origin: *` et `max-age=0, must-revalidate`. **CORS n'est
+pas décoratif** — `did-source.js` résout le DID depuis le navigateur, donc
+depuis `guyana.natixar.pro`, une autre origine. Sans cet en-tête la lecture
+échoue en silence et le vérificateur se rabat sur l'exemplaire embarqué : il
+croirait vérifier en ligne sans le faire.
+
+#### Deux fragments pour une seule clé
+
+Le document publie la même clé publique sous **deux identifiants**, et cette
+redondance est un choix, pas un accident.
+
+| Fragment | Pourquoi |
 |---|---|
-| type | `application/json` — Netlify le déduit de l'extension, et `_headers` le confirme |
-| origine | `Access-Control-Allow-Origin: *` — un vérificateur en navigateur lit ce document depuis une AUTRE origine, et sans cet en-tête la requête échoue chez lui, sur une page que nous ne voyons pas |
-| accès | aucune authentification : c'est une clé publique |
-| fragment | **`#key-1`**, et c'est le piège ci-dessous |
+| `#<empreinte RFC 7638>` | l'identifiant de référence. `site/assets/js/did.js` publie ainsi, et l'argumente : sous un nom logique, deux clés distinctes reçoivent le même identifiant et la fusion supprime l'ancienne à tous les coups — exactement la perte qu'elle existait pour empêcher. |
+| `#key-1` | ce que `services/signer/server.mjs` inscrit réellement dans ses preuves, par `${ISSUER_DID}#${KEY_NAME}`. |
 
-> **Le piège du fragment.** Le signataire inscrit dans chaque preuve
-> `${ISSUER_DID}#${KEY_NAME}`, soit `did:web:natixar.pro#key-1`. Or
-> `site/assets/js/did.js` construit ses documents avec un fragment qui est
-> **l'empreinte RFC 7638 de la clé**, jamais un nom — correction délibérée, pour
-> que deux clés distinctes cessent de recevoir le même identifiant. Les deux
-> conventions sont défendables ; elles ne sont pas compatibles, et `verify.js`
-> exige l'identifiant **exact**, sans correspondance approximative. Un document
-> engendré par `buildDidDocument()` pour la clé de Natixar ne correspondrait à
-> **aucune preuve émise**, et la vérification échouerait en « clé absente du
-> document » — un diagnostic exact et parfaitement déroutant.
->
-> C'est pourquoi `build.mjs` lit **les mêmes variables d'environnement que le
-> signataire, avec les mêmes défauts**. Les changer d'un côté sans l'autre reste
-> possible ; cela ne peut plus se faire par inadvertance de rédaction.
+Les deux conventions ne peuvent pas coexister dans un seul identifiant : une
+attestation du signeur serveur est orpheline dans un document construit par
+`did.js`, et `verify.js` exige l'identifiant **exact**, sans correspondance
+approximative — le cas est déjà testé par `selftest.js` sous `missingKey`.
+Publier les deux entrées ne ferme aucune porte et débloque la publication ; la
+convergence du signeur vers l'empreinte est une décision distincte, ouverte.
 
-**Le document est append-only.** Retirer une clé rend invérifiable toute
-attestation qu'elle a signée. `build.mjs` conserve donc les entrées existantes
-et **refuse** de republier un autre matériel sous un identifiant déjà utilisé —
-une rotation se fait en ajoutant, sous `SIGNER_KEY_NAME=key-2`, la même valeur
-devant être posée sur le signataire.
+Vérifié avec la clé réellement déployée : une attestation signée sous **chacun**
+des deux fragments se vérifie contre le document publié.
 
-`natixar.pro/build.test.mjs` éprouve tout cela en signant une attestation avec
-une paire jetable, puis en la vérifiant contre le document produit. Deux de ses
-cas relisent en outre le fichier **versionné** : la CI ne peut pas le
-régénérer — la clé du signataire n'y est pas — et rien n'empêcherait sinon qu'il
-soit édité à la main.
+#### Ce que les contrôles attrapent
+
+`tools/make-did.mjs --verify-file` établit la cohérence **interne** du document,
+sans aucun secret — c'est donc le seul contrôle exécutable en intégration
+continue. Il refuse un fragment qui a la *forme* d'une empreinte sans en être
+une, un `controller` qui ne désigne pas le document, un membre `d` — une clé
+privée publiée est brûlée —, un `assertionMethod` sans méthode correspondante,
+et un document où aucune clé n'est adressable par son empreinte.
+
+Ce qu'il n'attrape pas : un document parfaitement cohérent bâti sur une clé que
+personne ne détient. Seul `--check`, avec la clé privée, le dit — et il ne peut
+donc pas tourner en CI.
+
+`deploy/verify/verify-did.bats` prend le relais sur le document **en ligne** :
+publication, type, CORS, émetteur, absence de clé privée, et présence de
+l'identifiant sous lequel le signeur signe.
 
 ---
 

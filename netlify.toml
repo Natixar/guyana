@@ -1,0 +1,22 @@
+# Netlify — natixar.pro
+#
+# natixar.pro ne sert que deux choses : une redirection vers natixar.com et le
+# document DID de l'émetteur `did:web:natixar.pro`. Le site Hugo de guyana n'est
+# PAS publié ici : il vit sur kubb, derrière Traefik, sous guyana.natixar.pro.
+# Aucune commande de construction n'est donc exécutée — la charge utile est
+# statique et versionnée telle quelle.
+
+[build]
+  publish = "web/natixar.pro"
+  # Pas de génération : `true` est un no-op explicite, préférable à l'absence de
+  # commande qui laisserait la détection de framework de Netlify décider seule.
+  command  = "true"
+  # Ne reconstruire que si la charge utile ou cette configuration a bougé. Les
+  # 60+ tickets de guyana touchent services/, deploy/ et site/ ; les laisser
+  # déclencher une publication de natixar.pro serait du bruit et un risque.
+  #
+  # `git diff --quiet` sort 0 quand RIEN n'a changé, et Netlify annule la
+  # construction sur un code 0. Au premier build $CACHED_COMMIT_REF est vide,
+  # la commande échoue, le code est non nul : on construit. L'échec est donc
+  # du bon côté.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- web/natixar.pro netlify.toml"
