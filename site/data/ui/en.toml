@@ -139,6 +139,11 @@ vCommitmentsBad  = "a disclosed cell does not match its commitment — cell"
 vRecomputed      = "Total recomputed from the cells"
 vTotalBound      = "matches the signed total commitment"
 vTotalUnbound    = "does NOT match the signed total commitment"
+# Cette chaîne énonce TOTAL_QUANTUM en toutes lettres (commitments.js). Les deux
+# doivent bouger ensemble : un écran qui annonce une tolérance qu'il n'applique
+# pas est pire que pas d'annonce du tout. Le lien mène au paragraphe qui
+# l'explique, sur une page d'aide publique — le vérificateur n'a pas de compte.
+vTotalTolerance  = "Tolerance = 1 gCO₂e"
 vNoTotalSalt     = "the total commitment cannot be checked — its salt was not supplied"
 vCannotKnow      = "cannot be known"
 vWithheldCounted = "cell(s) that count towards the total were withheld"

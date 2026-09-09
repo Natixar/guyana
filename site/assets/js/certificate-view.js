@@ -96,8 +96,11 @@ function block(b, labels) {
     caracterisationLabel(labels, b.caracterisation),
   ].filter((x) => x && x !== "—").join(" · ");
 
+  // Le « 2 » en indice est de l'AFFICHAGE. Aucune de ces chaînes n'entre dans
+  // un engagement — celles qui y entrent restent en ASCII, dans commitments.js
+  // et engine.js, où les toucher invaliderait ce qui est déjà signé.
   const figures = [
-    [T.certBlockTotal, `${num(b.total)} kgCO2e`],
+    [T.certBlockTotal, `${num(b.total)} kgCO₂e`],
     [T.certBlockCells, String(b.cells)],
     [T.certBlockUnits, String((b.steps ?? new Set()).size)],
     // MIN ET MAX NE SONT PAS DE L'ORNEMENT : un total seul ne distingue pas
@@ -105,7 +108,7 @@ function block(b, labels) {
     // chose qu'un auditeur regarde.
     [T.certBlockRange, b.cells > 1 ? `${num(b.min)} … ${num(b.max)}` : "—"],
     [T.certBlockShare, b.share === null ? "—" : num(b.share, 4)],
-    [T.certBlockBorne, b.used ? `${num(b.borneTotal)} kgCO2e` : "0"],
+    [T.certBlockBorne, b.used ? `${num(b.borneTotal)} kgCO₂e` : "0"],
   ];
 
   return `<article class="block${b.used ? "" : " block--withheld"}">
