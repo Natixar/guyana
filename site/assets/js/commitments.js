@@ -29,6 +29,17 @@
  * cellules de même contenu reconnaissables l'une par l'autre, et un sel réutilisé
  * d'une attestation à l'autre permettrait de tester une hypothèse de montant sur
  * l'ensemble du pilote. 128 bits, tirés à l'émission, jamais dérivés du contenu.
+ *
+ * `commitTotal` VA QUANTIFIER SON TOTAL AVANT DE LE HACHER — pas encore fait
+ * ici, voir `commitments.test.mjs` et l'issue #104. Le signataire engage un
+ * total obtenu par une sommation agrégée, le vérificateur recalcule par somme
+ * directe cellule à cellule ; les deux sont mathématiquement égaux et
+ * numériquement différents de quelques ULP, ce qu'un condensat ne pardonne
+ * pas. La quantification rend les deux chemins comparables sans changer la
+ * granularité par cellule décrite ci-dessus, et sans exiger qu'ils calculent
+ * de la même façon — c'est un correctif d'engagement, pas un correctif de
+ * calcul. `checkTotalCommitment`, qui n'existe pas encore, essaiera le
+ * recalcul et ses deux voisins immédiats sur la grille.
  */
 import { canonicalBytes } from "./canonical.js";
 import { multibase58 } from "./multibase.js";
