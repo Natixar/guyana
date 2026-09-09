@@ -4,7 +4,7 @@ import T from "./labels.js";
 import { verifyCredential, didWebUrl } from "./verify.js";
 import { resolveDid } from "./did-source.js";
 import { esc } from "./escape.js";
-import { verifyMatrix, recomputeTotal, commitTotal } from "./commitments.js";
+import { verifyMatrix, recomputeTotal, checkTotalCommitment } from "./commitments.js";
 import { showLoaded } from "./loaded-text.js";
 import { renderBlocks } from "./certificate-view.js";
 import { fetchLabels, applyTo } from "./pivot-labels.js";
@@ -246,10 +246,18 @@ async function renderMatrix(doc) {
   if (sum.known) {
     // L'engagement sur le total lie le chiffre à la matrice : sans lui, on
     // pourrait divulguer un sous-ensemble et annoncer le total de son choix.
+    //
+    // LA COMPARAISON PASSE PAR checkTotalCommitment ET NON PAR UNE ÉGALITÉ
+    // D'EMPREINTES. C'était une égalité stricte jusqu'au 9 septembre 2026, et
+    // elle échouait sur trois attestations sur quatre : le signataire somme
+    // par ligne agrégée, cette page somme cellule par cellule, et deux
+    // sommations équivalentes ne rendent pas le même double. L'écart valait
+    // 10⁻¹⁰ kgCO2e là où le total en vaut 6 × 10⁵ — un ULP, qu'un condensat
+    // traite comme un mensonge. Voir #104.
     let bound = null;
     if (state.totalSalt) {
-      const again = await commitTotal(matrix, sum.total, "kgCO2e", state.totalSalt);
-      bound = again.commitment === doc.credentialSubject.totalCommitment;
+      bound = await checkTotalCommitment(matrix, sum.total, "kgCO2e", state.totalSalt,
+                                         doc.credentialSubject.totalCommitment);
     }
     rows.push(`<div><dt>${T.vRecomputed}</dt><dd>${sum.total.toLocaleString("fr-FR")} kgCO2e ` +
       (bound === null ? badge("info", T.vNoTotalSalt)

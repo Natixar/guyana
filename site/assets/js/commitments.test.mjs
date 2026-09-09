@@ -1,12 +1,8 @@
-// site/assets/js/commitments.test.mjs — étape 1 de #104, tests préliminaires.
+// site/assets/js/commitments.test.mjs — l'engagement sur le total, #104.
 //
-// ÉTAPE 4 DU PROCESSUS SCM : ce fichier illustre le comportement VOULU avant
-// qu'il n'existe. `checkTotalCommitment` n'est pas encore exporté par
-// `commitments.js`, et `commitTotal` ne quantifie pas encore son total avant
-// de le hacher. Ces tests DOIVENT échouer aujourd'hui — c'est le point : ils
-// disent précisément ce qui manque, et sous quelle forme, avant qu'une seule
-// ligne d'implémentation ne soit écrite. Rien ici n'est encore mergé dans le
-// code de signature ni de vérification.
+// Ces cas ont été écrits AVANT l'implémentation et ont d'abord échoué, six sur
+// sept : c'est ce qui établit qu'ils discriminent l'ancien comportement du
+// nouveau, et non qu'ils décrivent après coup ce que le code fait déjà.
 //
 // LE BUG, RAPPELÉ EN UNE PHRASE (#104). Le signataire engage un total obtenu
 // par une sommation agrégée par ligne de taxonomie ; le vérificateur recalcule
@@ -20,7 +16,8 @@
 // correctif en deux étapes indépendantes : ici, ÉTAPE 1 SEULE — assouplir le
 // contrôle du total, sans toucher à la façon dont chaque côté somme. L'étape 2
 // (harmoniser le calcul par une fonction partagée) est un lot séparé, dont ces
-// tests ne dépendent pas.
+// tests ne dépendent pas : ils resteront verts après elle, et n'auront alors
+// plus rien à rattraper — ce qui est le but.
 //
 // LE MÉCANISME QUANTIFIE, IL NE TOLÈRE PAS UN ÉCART CONTINU. Un engagement
 // est un condensat : on ne peut pas comparer « à combien la valeur signée
@@ -47,29 +44,13 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { commitTotal, newSalt } from "./commitments.js";
+import { commitTotal, checkTotalCommitment } from "./commitments.js";
 
 // Une matrice de cellules synthétique : ces tests portent sur le TOTAL, pas
 // sur la matrice elle-même — verifyMatrix() et recomputeTotal() ont leurs
 // propres tests, à écrire dans le même mouvement que l'étape 2.
 const CELLS = [{ commitment: "abc" }, { commitment: "def" }];
 const SALT = "0102030405060708090a0b0c0d0e0f10";
-
-/**
- * `checkTotalCommitment` n'existe pas encore. Cette fonction fait échouer
- * chaque test qui en a besoin avec un message qui nomme la cause — pas un
- * `TypeError: … is not a function` générique, pas un fichier entier qui
- * refuse de charger parce qu'un export est absent.
- */
-async function loadCheck() {
-  const mod = await import("./commitments.js");
-  if (typeof mod.checkTotalCommitment !== "function") {
-    throw new Error(
-      "checkTotalCommitment n'est pas encore exporté par commitments.js — " +
-      "implémentation à faire à l'étape 5 de #104, pas avant validation de l'étape 1");
-  }
-  return mod.checkTotalCommitment;
-}
 
 // --- commitTotal : le total doit se quantifier avant de se hacher ---------
 
@@ -111,7 +92,6 @@ test("commitTotal — le quantum par défaut vaut un gramme pour kgCO2e", async 
 // --- checkTotalCommitment : le filet à trois candidats ---------------------
 
 test("checkTotalCommitment — le désaccord réel de #104 (dérive de sommation, ≪ 1 g) se vérifie", async () => {
-  const checkTotalCommitment = await loadCheck();
   // Le total « signé » — obtenu ici par une sommation, comme l'agrégation par
   // ligne du signataire produirait la sienne.
   const { commitment } = await commitTotal(CELLS, 0.3, "kgCO2e", SALT);
@@ -122,7 +102,6 @@ test("checkTotalCommitment — le désaccord réel de #104 (dérive de sommation
 });
 
 test("checkTotalCommitment — un total franchement différent est toujours rejeté", async () => {
-  const checkTotalCommitment = await loadCheck();
   const { commitment } = await commitTotal(CELLS, 100, "kgCO2e", SALT);
   const ok = await checkTotalCommitment(CELLS, 250, "kgCO2e", SALT, commitment);
   assert.equal(ok, false,
@@ -130,7 +109,6 @@ test("checkTotalCommitment — un total franchement différent est toujours reje
 });
 
 test("checkTotalCommitment — LA FRONTIÈRE : sans les trois candidats, un total pourtant juste échouerait", async () => {
-  const checkTotalCommitment = await loadCheck();
   const Q = 1; // quantum explicite, pour construire une frontière exacte à zéro ambiguïté
 
   // Le total « signé » s'arrondit à 0 sur cette grille.
@@ -152,7 +130,6 @@ test("checkTotalCommitment — LA FRONTIÈRE : sans les trois candidats, un tota
 });
 
 test("checkTotalCommitment — la frontière ne devient pas non plus une porte ouverte", async () => {
-  const checkTotalCommitment = await loadCheck();
   const Q = 1;
   const { commitment } = await commitTotal(CELLS, 0.4999999999, "unit", SALT, Q); // grille sur 0
 
@@ -161,4 +138,53 @@ test("checkTotalCommitment — la frontière ne devient pas non plus une porte o
   const ok = await checkTotalCommitment(CELLS, 2.5, "unit", SALT, commitment, Q);
   assert.equal(ok, false,
     "un total à deux quanta de distance ne doit pas se vérifier — le filet est {n−1,n,n+1}, pas {n−k…n+k}");
+});
+
+// --- Cas limites (tâche 5) -------------------------------------------------
+//
+// Les six cas ci-dessus tiennent le mécanisme. Ceux-ci tiennent ses bords :
+// l'échelle réelle, le zéro, le signe négatif, et un quantum non par défaut.
+
+test("cas limite — à l'échelle réelle de #104, une dérive d'un ULP se vérifie", async () => {
+  // Le total mesuré sur l'attestation qui a révélé le bug, et un voisin à un
+  // ULP de distance. À cette magnitude l'ULP d'un double vaut 1,16 × 10⁻¹⁰ :
+  // les cas d'école à 0,3 ne prouvent rien de ce qui se passe à 6 × 10⁵.
+  const signed = 612284.41127249971032;
+  const drifted = signed + 1.16e-10;
+  assert.notEqual(signed, drifted, "le voisin choisi doit être un autre double");
+
+  const { commitment } = await commitTotal(CELLS, signed, "kgCO2e", SALT);
+  assert.equal(await checkTotalCommitment(CELLS, drifted, "kgCO2e", SALT, commitment), true);
+});
+
+test("cas limite — la case zéro est la même par en dessous et par au-dessus", async () => {
+  // `Math.round` rend -0 pour tout total dans la moitié négative de la case
+  // zéro. Un engagement qui dépendrait de la distinction entre -0 et +0
+  // dépendrait de la façon dont un langage sérialise le zéro signé — la
+  // faute #82, exactement. Ce cas l'interdit.
+  const below = await commitTotal(CELLS, -0.0004, "kgCO2e", SALT);
+  const above = await commitTotal(CELLS, 0.0004, "kgCO2e", SALT);
+  const exact = await commitTotal(CELLS, 0, "kgCO2e", SALT);
+  assert.equal(below.commitment, exact.commitment, "-0,4 g doit tomber dans la case zéro");
+  assert.equal(above.commitment, exact.commitment, "+0,4 g doit tomber dans la case zéro");
+});
+
+test("cas limite — un total négatif se vérifie comme un autre", async () => {
+  // Un bilan net peut être négatif par compensation. Ce n'est pas le cas d'un
+  // doré aujourd'hui, mais rien dans l'engagement ne doit le refuser — la
+  // question de la PRÉCISION près de zéro, elle, est ouverte en #108.
+  const { commitment } = await commitTotal(CELLS, -1234.567, "kgCO2e", SALT);
+  assert.equal(await checkTotalCommitment(CELLS, -1234.567 - 2e-10, "kgCO2e", SALT, commitment), true);
+  assert.equal(await checkTotalCommitment(CELLS, -1234.5, "kgCO2e", SALT, commitment), false,
+    "67 g d'écart doit rester un désaccord, même du côté négatif");
+});
+
+test("cas limite — un quantum explicite l'emporte sur le défaut", async () => {
+  // Au kilogramme, deux totaux distants de 400 g tombent dans la même case ;
+  // au gramme — le défaut — ils n'y tombent pas. Le paramètre doit donc
+  // réellement gouverner, et pas être ignoré silencieusement.
+  const { commitment } = await commitTotal(CELLS, 100, "kgCO2e", SALT, 1);
+  assert.equal(await checkTotalCommitment(CELLS, 100.4, "kgCO2e", SALT, commitment, 1), true);
+  assert.equal(await checkTotalCommitment(CELLS, 100.4, "kgCO2e", SALT, commitment), false,
+    "au quantum par défaut, 400 g d'écart ne doivent pas passer");
 });
