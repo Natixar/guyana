@@ -173,3 +173,25 @@ _refs() { # $1 = corps du document
     [ "$(http_code_anon "https://$DOM/register/")" = "401" ]
     [ "$(http_code_anon "https://$DOM/api/v1/counts")" = "401" ]
 }
+
+@test "l'aide du vérificateur est publique, et son ancre existe" {
+    # LE LIEN EST POSÉ PAR DU JAVASCRIPT, DONC LES CAS QUI SUIVENT LES
+    # SOUS-RESSOURCES NE PEUVENT PAS LE VOIR. `renderMatrix` construit
+    # « Tolerance = 1 gCO₂e » au moment d'afficher le total ; il n'est dans
+    # aucun HTML servi, et l'invariant qui suit les `src=`/`href=` de la page
+    # passerait donc sur une aide devenue inaccessible.
+    #
+    # CE QU'IL ATTRAPE. Un vérificateur n'a pas de compte. Si cette page
+    # repassait derrière l'authentification — un chemin déplacé, un routeur
+    # resserré — il recevrait 401 avec `WWW-Authenticate: Basic`, et son
+    # navigateur ouvrirait une fenêtre de mot de passe. C'est exactement la
+    # faute du 3 août 2026, sur la seule page qui existe pour démontrer qu'il
+    # n'a besoin de rien de nous.
+    [ "$(http_code_anon "https://$DOM/verify/help/")" = "200" ]
+
+    # L'ANCRE AUSSI, parce qu'un lien qui aboutit en haut d'une page de huit
+    # paragraphes n'a pas répondu à la question posée. Elle est engendrée par
+    # Hugo depuis le titre : le renommer la casse en silence.
+    curl -sS --max-time 15 "https://$DOM/verify/help/" \
+      | grep -q 'id="the-total-and-its-tolerance"'
+}

@@ -259,10 +259,26 @@ async function renderMatrix(doc) {
       bound = await checkTotalCommitment(matrix, sum.total, "kgCO2e", state.totalSalt,
                                          doc.credentialSubject.totalCommitment);
     }
-    rows.push(`<div><dt>${T.vRecomputed}</dt><dd>${sum.total.toLocaleString("fr-FR")} kgCO2e ` +
+    // LE « 2 » EN INDICE EST DE L'AFFICHAGE, ET RIEN D'AUTRE. L'unité qui part
+    // dans l'engagement reste `kgCO2e` en ASCII, quelques lignes plus haut :
+    // elle est HACHÉE, et la retoucher invaliderait toutes les attestations
+    // déjà signées. Les deux chaînes se ressemblent et ne jouent pas le même
+    // rôle — c'est pourquoi elles sont commentées ici plutôt que laissées à la
+    // sagacité du prochain lecteur.
+    //
+    // La tolérance est ANNONCÉE, jamais tue. Un vérificateur qui lit « le total
+    // correspond » a le droit de savoir à quoi près, et celui qui lit le
+    // contraire a le droit de savoir que ce n'est pas un arrondi. Le détail —
+    // pourquoi une tolérance existe, ce qu'elle concède — tient sur la page
+    // d'aide, qui est PUBLIQUE : la lier vers une page fermée ouvrirait une
+    // fenêtre de mot de passe au vérificateur, ce qui est la faute du 3 août.
+    const tolerance = bound === null ? "" :
+      ` <a class="muted" href="/verify/help/#the-total-and-its-tolerance">${T.vTotalTolerance}</a>`;
+
+    rows.push(`<div><dt>${T.vRecomputed}</dt><dd>${sum.total.toLocaleString("fr-FR")} kgCO₂e ` +
       (bound === null ? badge("info", T.vNoTotalSalt)
        : bound ? badge("verified", T.vTotalBound) : badge("warning", T.vTotalUnbound)) +
-      `</dd></div>`);
+      tolerance + `</dd></div>`);
   } else {
     rows.push(`<div><dt>${T.vRecomputed}</dt><dd>` +
       badge("info", `${T.vCannotKnow} — ${sum.withheld} ${T.vWithheldCounted}`) + `</dd></div>`);
