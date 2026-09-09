@@ -140,6 +140,21 @@ jobs:
       - name: outil de document DID — les cas que --verify-file doit trancher
         run: node --test tools/make-did.test.mjs
         
+      # L'ENGAGEMENT SUR LE TOTAL, ET SON FILET À TROIS CANDIDATS.
+      #
+      # Ce que ces cas tiennent ne se voit pas à la lecture. Le signataire
+      # somme par ligne agrégée, la page de vérification somme cellule par
+      # cellule : deux calculs équivalents, deux doubles différents, et un
+      # condensat n'a aucun voisinage. Trois attestations sur quatre étaient
+      # annoncées en désaccord alors que rien n'était faux (#104).
+      #
+      # Le cas « frontière » est celui qui justifie trois candidats plutôt
+      # qu'un arrondi : il construit deux flottants de part et d'autre d'une
+      # frontière de grille, à l'échelle exacte de la dérive mesurée. Le
+      # supprimer laisserait passer un correctif qui ne corrige qu'en moyenne.
+      - name: engagements — la grille du total et son filet à trois candidats
+        run: node --test site/assets/js/commitments.test.mjs
+
   codeql:
     name: codeql
     runs-on: ubuntu-latest
