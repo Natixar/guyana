@@ -130,6 +130,16 @@ jobs:
       - name: interopérabilité de signature — Python signe, JavaScript vérifie
         run: node services/verify-store-signature.mjs
 
+      # Vérification de la cohérence du fichier did.json s'il est publié
+      - name: cohérence du document DID publié
+        run: |
+          # Rien à vérifier tant que la clé de l'émetteur n'existe pas.
+          f=web/natixar.pro/.well-known/did.json
+          [ -f "$f" ] || { echo "::notice::$f absent — émetteur pas encore doté d'une clé"; exit 0; }
+          node tools/make-did.mjs --verify-file "$f"
+      - name: outil de document DID — les cas que --verify-file doit trancher
+        run: node --test tools/make-did.test.mjs
+        
   codeql:
     name: codeql
     runs-on: ubuntu-latest

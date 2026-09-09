@@ -24,16 +24,19 @@
  *
  * TROIS VOIES, DANS CET ORDRE, ET LE RÉSEAU TOUJOURS EN PREMIER.
  *
- * MAIS LA PREMIÈRE NE PEUT PAS ABOUTIR AUJOURD'HUI, et il faut le dire ici
- * plutôt que le laisser croire. La politique de sécurité du site est
- * `connect-src 'self'` : aucune requête ne sort vers un autre domaine, et le
- * domaine de l'émetteur devrait de toute façon autoriser explicitement la
- * lecture depuis le nôtre. Un navigateur ne lira donc pas le `.well-known` d'un
- * tiers, quel que soit l'état de publication d'AGM. La tentative est conservée
- * parce qu'elle ne coûte rien et redeviendra vraie le jour où la CSP sera
- * ouverte — mais la voie réelle, aujourd'hui, est celle où le VÉRIFICATEUR
- * ouvre le lien lui-même et dépose le document. C'est d'ailleurs la meilleure :
- * le document ne passe alors par aucune de nos mains.
+ * LA PREMIÈRE ABOUTIT DEPUIS LE 8 SEPTEMBRE 2026, et il faut le dire ici parce
+ * que ce commentaire a longtemps affirmé l'inverse. Deux conditions devaient
+ * être réunies, et elles le sont pour l'émetteur : `natixar.pro` sert son
+ * document avec `Access-Control-Allow-Origin: *`, et la politique de sécurité
+ * de ce site nomme désormais cette URL exacte dans `connect-src` — voir
+ * `layouts/_partials/head.html`. La résolution réelle est donc la voie
+ * ordinaire, ce qui est exactement ce que la démonstration doit montrer.
+ *
+ * ELLE N'ABOUTIT PAS POUR TOUT ÉMETTEUR, et le repli n'est pas décoratif. Le
+ * domaine de la mine ne publie rien, et il n'est pas nommé dans la politique :
+ * une attestation d'origine se vérifie donc encore en déposant le document à la
+ * main. Un vérificateur hors ligne est dans le même cas. Cette voie-là garde
+ * d'ailleurs sa vertu propre : le document ne passe par aucune de nos mains.
  *
  * Sur la page publique de vérification, `/engine/` n'est pas servi : l'exemplaire
  * embarqué n'y est donc pas joignable, et il ne reste que le dépôt manuel. C'est
