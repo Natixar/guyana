@@ -17,3 +17,11 @@ poc-data/
 # aurait toutes emportées. Depuis que le script de tournage contient les mots de
 # passe de la démonstration, l'habitude ne suffit plus.
 analyses/
+
+# LE FIXTURE ERP PORTE DES DONNÉES DU CLIENT, et il a été suivi par erreur jusqu'au
+# 11 septembre 2026 (issue #120) : les 34 catégories de consommateurs, et le
+# gazole mensuel par département — identique au classeur, au litre près. Il est
+# PRODUIT par services/store/make_fixture.py depuis le classeur de poc-data/, et
+# le déploiement le prend sur le poste de contrôle. Un .gitignore seul ne dé-suit
+# pas un fichier : il a fallu aussi `git rm --cached`.
+site/static/engine/erp-fixture.json
