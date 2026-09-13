@@ -84,7 +84,7 @@ Triangulate each organisational unit from its name, cost centre, equipment class
 | **transformation** | the product | the product |
 | **utility** — power, water | nothing; its output is an input | the consumers of its output |
 | **input logistics** — port, road, crossing, warehouse, fuel distribution | the inputs | the input carried, then its consumers |
-| **support** — camp, HSSE, IT, exploration, capital projects | nothing product-bound | unallocated, until an explicit rule says otherwise |
+| **support** — camp, health and safety, information systems, exploration, capital projects | nothing product-bound | unallocated, until an explicit rule says otherwise |
 
 **Flag intermediaries.** Fuel issued to a tanker, a fuel truck or a day tank is not burned there: large volumes against a few light vehicles are the signature of an issuing point.
 
