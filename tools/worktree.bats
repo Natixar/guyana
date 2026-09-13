@@ -29,6 +29,21 @@ teardown() {
   rm -rf "$TMP"
 }
 
+# --- contrat général -------------------------------------------------------
+#
+# Codes de sortie : 0 succès ; 1 contrôle échoué ou erreur git ; 2 usage ;
+# 3 refus de sécurité. Les refus sont testés sur le code 3, pour qu'un script
+# absent — qui sort en 127 — ne les fasse jamais passer.
+
+@test "le script existe et est exécutable" {
+  [ -x "$SCRIPT" ]
+}
+
+@test "une sous-commande inconnue sort avec le code d'usage" {
+  run "$SCRIPT" inconnue
+  [ "$status" -eq 2 ]
+}
+
 # --- new -------------------------------------------------------------------
 
 @test "new crée la branche et son worktree sous .worktrees, liens posés" {
@@ -68,7 +83,7 @@ teardown() {
 
 @test "link refuse l'arbre principal et n'y touche à rien" {
   run "$SCRIPT" link
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 3 ]
   [ -d data ]
   [ ! -L data ]
   [ "$(cat data/f)" = secret ]
@@ -78,7 +93,7 @@ teardown() {
   ln -s "$MAIN" "$TMP/alias-main"
   cd "$TMP/alias-main"
   run "$SCRIPT" link
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 3 ]
   [ ! -L "$MAIN/data" ]
 }
 
@@ -97,7 +112,7 @@ teardown() {
   mkdir data
   echo local > data/g
   run "$SCRIPT" link
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 3 ]
   [ ! -L data ]
   [ "$(cat data/g)" = local ]
 }
@@ -108,7 +123,7 @@ teardown() {
   printf 'data\nsuivi\n' > tools/worktree.links
   mkdir "$MAIN/suivi"
   run "$SCRIPT" link
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 3 ]
   [ ! -e suivi ]
 }
 
@@ -117,7 +132,7 @@ teardown() {
   git commit -qam "motif à barre finale"
   git push -q
   run "$SCRIPT" new feature 7 essai
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 3 ]
   [ ! -L .worktrees/7-essai/data ]
 }
 
@@ -131,7 +146,7 @@ teardown() {
   rm data
   ln -s "$TMP/nulle-part" data
   run "$SCRIPT" check
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 1 ]
 }
 
 @test "check ne modifie rien" {
@@ -139,7 +154,7 @@ teardown() {
   cd .worktrees/7-essai
   rm data
   run "$SCRIPT" check
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 1 ]
   [ ! -e data ]
 }
 
@@ -169,7 +184,7 @@ teardown() {
   git push -q origin --delete feature/8-fusionnee
   echo modification >> .gitignore
   run "$SCRIPT" reclaim
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 3 ]
   [ "$(git branch --show-current)" = feature/8-fusionnee ]
 }
 
@@ -177,7 +192,7 @@ teardown() {
   "$SCRIPT" new feature 7 essai
   cd .worktrees/7-essai
   run "$SCRIPT" reclaim
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 3 ]
 }
 
 # --- drop ------------------------------------------------------------------
@@ -194,7 +209,7 @@ teardown() {
   "$SCRIPT" new feature 7 essai
   echo x > .worktrees/7-essai/nouveau.txt
   run "$SCRIPT" drop 7-essai
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 3 ]
   [ -d .worktrees/7-essai ]
 }
 

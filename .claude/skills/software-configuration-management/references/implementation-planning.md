@@ -25,6 +25,7 @@ This segment covers branch creation and detailed planning.
   | `reclaim` | in the main worktree only: if the current branch has disappeared from `origin` and the tree is clean, switches back to `main` and fast-forwards it |
   | `drop {number}-{short-description}` | removes a clean worktree and prunes; never deletes a link target |
 
+  - **Exit status**: `0` success; `1` a check failed or git failed; `2` usage error; `3` refused for safety. Safety refusals are tested on code `3`, so that a missing script (exit `127`) can never pass them.
   - **Detection never trusts paths**, which symbolic links falsify. A worktree is linked when `git rev-parse --git-dir` differs from `--git-common-dir` (compared after `realpath`) **and** its `.git` is a file rather than a directory. If the two tests disagree, the script stops.
   - **`link` refuses the main worktree**, never overwrites a real directory, and refuses any path that git does not ignore *as a link*: the matching `.gitignore` entry must be anchored and have no trailing slash (`/poc-data`, not `poc-data/`), because git treats a symbolic link as a file.
 - **Validation**: The branch exists and is pushed, its worktree exists under `.worktrees/`, and `tools/worktree.sh check` passes inside it.
