@@ -44,6 +44,10 @@ These rules bind every step.
 
 7. **Never assume what exists at the client.** Do not write that a figure "is available" in a system you have not seen. Work with the data you were given.
 
+8. **Presume the data mostly correct — and fail when they are not.** A few entry errors are expected, and they must not change the process description. If the presumption is manifestly false — most blocks implausible, the profile contradicted, units impossible to establish — stop: propose neither a process model nor an ingestion configuration, and report why.
+
+9. **Write down what cannot be tested.** Some hypotheses cannot be checked against any data, and some flows never appear in it. Name each one and place it next to the results it carries. Example: fuel that travels in a leased machine's tank at the start and end of each rental is a hidden flow; "tank levels balance on average" is an untestable hypothesis.
+
 ## Workflow
 
 ### Step 1 — Recognise the template
@@ -99,6 +103,8 @@ Triangulate each organisational unit from its name, cost centre, equipment class
 
 ### Step 7 — Flows, balances and the preliminary process model
 
+**The process description rests on documentary research, not on the numbers.** What the organisation does, and how its sector works, come from public sources and from the metadata — sheet, row and column titles. The numbers corroborate the description; they do not define it. A handful of wrong values must not change the graph.
+
 **Close the balances the data allow**: mass (extracted minus processed gives a stock change), energy (fuel burned gives kWh, to compare with demand), internal consistency (metal = throughput × grade × recovery). A balance that fails is a finding; one that closes lets you drop a question.
 
 **Processes** are **continuous**, **batch**, or **unit**.
@@ -120,6 +126,8 @@ Triangulate each organisational unit from its name, cost centre, equipment class
 Draw the graph — stocks as nodes, processes as edges — and state plainly that it is a model, not a verified description.
 
 ### Step 8 — The ingestion configuration
+
+**No column is ingested until its unit is certain.** Establish the unit from the header, from the template, from correlation with another source — another sheet, an invoiced total, a physical order of magnitude — or from the magnitude of the values themselves. A column whose unit stays uncertain is not ingested; it is reported.
 
 For every source column, answer six questions, in this order:
 
@@ -217,9 +225,10 @@ Written in the language the project uses for analyses, untracked:
 5. the preliminary process model: graph, stock table, process table;
 6. the ingestion configuration, column by column;
 7. the astonishment report;
-8. questions (first rank, second rank, dropped) and the variance ranking;
-9. consequences for open issues, and issues to open — public wording only;
-10. sources, with URLs and sections.
+8. the untestable hypotheses and hidden flows, each next to the results it carries;
+9. questions (first rank, second rank, dropped) and the variance ranking;
+10. consequences for open issues, and issues to open — public wording only;
+11. sources, with URLs and sections.
 
 End the report to the maintainer with an explicit list of what you need from them.
 
@@ -233,6 +242,10 @@ End the report to the maintainer with an explicit list of what you need from the
 - Asking the client what a model can compute, or assuming data exists at the client.
 - Trusting a plausibility check that has never been calibrated, or reading a measurement into a commercial label.
 - Ingesting a template's totals.
+- Letting a few entry errors reshape the process model.
+- Ingesting a column whose unit is not certain.
+- Producing a process model from data that are manifestly wrong, instead of failing.
+- Leaving an untestable hypothesis unnamed.
 - Setting a per-item threshold instead of a global precision budget.
 - Assuming errors are independent because the items are many.
 - Presenting a chain of hypotheses as a value.
