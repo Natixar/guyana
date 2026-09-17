@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: readsyn
   security-events: write
 
 jobs:
@@ -73,6 +73,10 @@ jobs:
         run: |
           sudo apt-get install -y -qq bats
           for f in deploy/verify/*.bats; do bats --count "$f" >/dev/null; done
+
+      # Teste les worktrees permettant de faire travailler plusieurs agents en parallèle
+      - name: worktrees par branche
+        run: bats tools/worktree.bats
 
       # Hugo passe la table de libellés au module par « @params ». Rien ne relie
       # une clé demandée à une clé définie : renommer une entrée casse son
