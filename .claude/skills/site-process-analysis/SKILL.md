@@ -29,6 +29,7 @@ These rules bind every step.
 
 2. **Two filters, never one.**
    - **Bias** decides whether to ask. For each open point, state a plausible range of answers and compute the largest effect that range can have on the result. Ask only if the result can move; otherwise record the question as dropped, with the reason.
+   - **Look for the answer in a model before asking.** A question to the client is the last resort. List one only when the maintainer confirms that more data can come; otherwise every gap gets an explicit model and its bound.
    - **Variance** decides how precise a model must be. Item *i* contributes (*sᵢ·uᵢ*)² to the variance of the total, where *sᵢ* is its share and *uᵢ* its relative uncertainty. There is **no per-item threshold**: the **target precision is global**, fixed by the client's KPIs, and every item gets the least costly model that keeps the total within it — an estimated constant, an approximate metric times a factor, or another catalogued model.
 
    **Independence is a hypothesis to justify.** Two hundred items at 0.5 % each, each at ± 100 %, give about ± 7 % on the total if their errors are independent — and a ruined total if they share a model, a default factor or the same estimator, because correlated errors add linearly. Items sharing a model or a factor count as **one systematic item**. Rank items by their variance contribution: that list says where to spend the next effort.
@@ -39,12 +40,17 @@ These rules bind every step.
 
 5. **Verify your own numbers.** Run every calculation in a script; watch for unit slips (a factor of a thousand between kg and t is the usual one); grep the source text to confirm every section number you cite.
 
+6. **Know the business before the tables.** Before reading any table, write down what the organisation does, and who operates and supplies each asset. The business tells you which flows can be in the data at all. A lessor's leased assets are operated by its customers: their use-phase consumption is not in the lessor's purchases, and belongs to its *downstream leased assets*.
+
+7. **Never assume what exists at the client.** Do not write that a figure "is available" in a system you have not seen. Work with the data you were given.
+
 ## Workflow
 
 ### Step 1 — Recognise the template
 
 Before analysing anything, fingerprint the source: sheet names, header cells, named ranges, drop-down lists, presence of macros. Compare with the library of known templates — in particular the **standard data-collection workbooks of the Association Bilan Carbone** and their client derivatives, which are the rule rather than the exception.
 
+- **Fingerprint by content, not by sheet names.** Client derivatives rename, regroup and drop sheets. The markers that survive are the list sheet, the uncertainty scale, the per-block columns (source, level, justification) and the block footers. A dropped sheet is itself a finding: it says which flows the organisation never collects.
 - **A recognised template has a known ingestion configuration.** Produce only the **diff**: added sheets, renamed columns, client-specific rows. Do not re-analyse what is known.
 - These workbooks already carry, line by line, a **source**, an **uncertainty level** with its percentage, and a **justification**. Take them as they are: they are the inputs of the variance budget. Their list sheets hold controlled vocabularies — taxonomies to align with the model's.
 
@@ -60,6 +66,9 @@ For each table, establish **what it really is**, which is not always what its ti
 - Exclude template and example rows.
 - Look for tells. A column where every row holds the same status, with no asset data filled in, is not an asset register but a list of whatever drew a resource.
 - Note which tables existing code reads, and which it ignores.
+- **Check the profile's plausibility before computing.** Compare every block with the organisation's size, surfaces and activity. A block that fits another organisation is excluded, recorded as an astonishment, and flagged to the maintainer.
+- **Derived cells are not observations.** Totals, subtotals and a template's aggregate uncertainty are recomputed and used as cross-checks, never ingested. The Association Bilan Carbone templates, for one, aggregate uncertainty as an unweighted quadratic sum, which ignores both shares and correlations.
+- **Separate the organisation's own equipment from what it provides to others.** In a lessor's asset list, the company's vehicles and handling equipment consume its purchases; the leased fleet mostly does not.
 
 ### Step 4 — Build the gazetteer
 
@@ -106,6 +115,7 @@ Triangulate each organisational unit from its name, cost centre, equipment class
 - **A mixing stock must declare its fill measurement** — sensor or periodic inventory — and its period. Otherwise it is marked unverified, and its outflows carry an uncertainty that grows with time since the last measurement.
 - **Book minus measured is a residual, not a loss.** It mixes real losses, unrecorded flows, stock-measurement error, flow-meter drift and period cut-off. Attribute it to a flow when you can (`ESTIMATED`); absorb it into the remaining stock up to the loss the stock's model expects; write off the excess as unallocated, on a visible line.
 - **Without a sensor you only get bounds**: a negative book, a book above physical capacity, a flow above the installation's rate, a contradicting proxy. They prove a problem without measuring it, and two opposite errors stay invisible. **An unrecorded addition is the dangerous case**: it adds mass without impact and silently lowers the intensity of everything downstream.
+- **Bounds can come from the process structure.** A leased machine leaves full or empty and comes back full or empty. Each rental therefore shifts the lessor's apparent consumption by at most one tank either way. Compute two things: the systematic bound (every rental biased the same way) and the independent-error estimate. When the systematic bound swamps the quantity, the result rests on a hypothesis (here, symmetric tank levels): write the hypothesis next to the number.
 
 Draw the graph — stocks as nodes, processes as edges — and state plainly that it is a model, not a verified description.
 
@@ -123,6 +133,11 @@ For every source column, answer six questions, in this order:
 | **checked?** | the residual of that cross-check, and its threshold, derived from the instruments' precision |
 
 **Redundancy is a feature.** A cross-check yields a residual, hence a permanent control. A column with no second path is not less useful, but it can never be checked: say so.
+
+**A data model must be calibrated too.** A plausibility check that flags correct data is a wrong model, not a finding.
+
+- Compare an item with its real reference set. For an attachment, that is all the interchangeable attachments of the same carrier — a large excavator may carry a narrow trenching bucket as well as a full-capacity one — not one attachment type across carriers.
+- Never read a measurement into a commercial label such as a size class.
 
 ### Step 9 — Astonishment report
 
@@ -167,8 +182,8 @@ An append-only transport does not make facts append-only: a push stream can revi
 ### Rules
 
 1. **Never overwrite.** A correction is a new assertion with a later `asserted_at`; the current view is the latest assertion per key. The correction history stays, and it explains why two published figures differ.
-2. **Idempotence.** A record whose digest is already known is ignored: loading the same file twice changes nothing.
-3. **Revision.** Same key, different value — whether by overwrite, by explicit event or by collision — produces a revision event, surfaced and never applied silently. It carries both values and triggers the choice between a forward correction and a restatement of published figures.
+2. **Idempotence.** A record whose digest is already known is ignored: loading the same file twice changes nothing. The digest is that of the **normalised record, not of the file**: two files of different formats and identical content must add nothing.
+3. **Revision.** Same key, different value — whether by overwrite, by explicit event or by collision — produces a revision event, surfaced and never applied silently. It carries both values and triggers the choice between a forward correction and a restatement of published figures. Two versions of the same workbook form **one revision batch**: expect silent corrections of past values and late arrivals, and do not count a recomputed total as a revision.
 4. **Absence means nothing by default.** A row missing from a new file is a deletion only if its batch **declares its scope**: "this batch exhaustively covers these keys over this period".
 5. **Late arrival.** An old `valid_for` with a recent `asserted_at` is allowed and flagged: it touches published periods.
 6. **Order.** A stream gives a total order per partition; files give none, so order by `asserted_at`, then by ingestion order.
@@ -210,10 +225,14 @@ End the report to the maintainer with an explicit list of what you need from the
 
 ## Pitfalls
 
+- Reading the tables before knowing the business.
 - Classifying units from their names alone.
 - Taking a list of resource issues for an asset register.
-- Treating the fuel issued to a unit as the fuel it burns.
+- Treating the fuel issued to a unit as the fuel it burns — or an organisation's fuel purchases as the fuel its assets burn.
 - Asking a question without computing what its answer could change.
+- Asking the client what a model can compute, or assuming data exists at the client.
+- Trusting a plausibility check that has never been calibrated, or reading a measurement into a commercial label.
+- Ingesting a template's totals.
 - Setting a per-item threshold instead of a global precision budget.
 - Assuming errors are independent because the items are many.
 - Presenting a chain of hypotheses as a value.
