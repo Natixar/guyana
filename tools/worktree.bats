@@ -202,7 +202,7 @@ teardown() {
   run "$SCRIPT" drop 7-essai
   [ "$status" -eq 0 ]
   [ ! -e .worktrees/7-essai ]
-  ! git worktree list | grep -q 7-essai
+  [ -z "$(git worktree list | grep 7-essai)" ]
 }
 
 @test "drop refuse un worktree qui porte des modifications" {
@@ -217,4 +217,51 @@ teardown() {
   "$SCRIPT" new feature 7 essai
   "$SCRIPT" drop 7-essai
   [ "$(cat "$MAIN/data/f")" = secret ]
+}
+
+# --- cas limites -----------------------------------------------------------
+
+@test "link ignore une cible absente de l'arbre principal" {
+  printf '/data\n/absent\n/.worktrees/\n' > .gitignore
+  printf 'data\nabsent\n' > tools/worktree.links
+  git commit -qam "cible absente"
+  git push -q
+  run "$SCRIPT" new feature 7 essai
+  [ "$status" -eq 0 ]
+  [ ! -e .worktrees/7-essai/absent ]
+  [ -L .worktrees/7-essai/data ]
+}
+
+@test "link lie un chemin imbriqué sous un répertoire suivi" {
+  mkdir -p site
+  echo suivi > site/page
+  printf '/data\n/site/cache\n/.worktrees/\n' > .gitignore
+  printf 'data\nsite/cache\n' > tools/worktree.links
+  git add site/page .gitignore tools/worktree.links
+  git commit -qm "chemin imbriqué"
+  git push -q
+  mkdir site/cache
+  run "$SCRIPT" new feature 7 essai
+  [ "$status" -eq 0 ]
+  [ "$(readlink -f .worktrees/7-essai/site/cache)" = "$(readlink -f "$MAIN/site/cache")" ]
+  [ -z "$(git -C .worktrees/7-essai status --porcelain)" ]
+}
+
+@test "new refuse un worktree déjà présent" {
+  "$SCRIPT" new feature 7 essai
+  run "$SCRIPT" new bug 7 essai
+  [ "$status" -eq 3 ]
+}
+
+@test "new rejette un type ou une description invalides" {
+  run "$SCRIPT" new chantier 7 essai
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" new feature 7 "Essai Accentué"
+  [ "$status" -eq 2 ]
+}
+
+@test "new ne suit pas origin/main : la branche n'a pas d'amont avant son push" {
+  "$SCRIPT" new feature 7 essai
+  run git -C .worktrees/7-essai config --get branch.feature/7-essai.remote
+  [ "$status" -ne 0 ]
 }
