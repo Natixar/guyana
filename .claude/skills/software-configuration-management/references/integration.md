@@ -12,7 +12,11 @@ This segment covers final integration and post-implementation validation.
   - Confirm the PR satisfies branch protection requirements.
   - Allow GitHub to auto-merge once everything is ready (manual merging is not required). GitHub will squash all the commits in one.
   - Update dependent issues or TODOs if applicable.
-  - After GitHub merges, synchronize the local repository.
+  - After GitHub merges and deletes the remote branch, from the main worktree:
+    1. `git fetch --prune origin`;
+    2. `tools/worktree.sh reclaim` — brings the main worktree back to `main` if the maintainer had left it on the merged branch, and does nothing otherwise;
+    3. `tools/worktree.sh drop {number}-{short-description}` — removes the branch worktree;
+    4. delete the local branch (`git branch -D`), since a squash merge leaves it unmerged in git's eyes.
   - If the PR addressed multiple issues, manually close any additional referenced issues after confirming tests pass (GitHub closes at most one issue per PR).
 - **Validation**: The change merges automatically after meeting the protected branch checks, and local repo is synchronized.
 
@@ -22,6 +26,6 @@ This segment covers final integration and post-implementation validation.
   - Monitor for regressions or failures triggered by the merge.
   - Confirm that change history entries are present and accurate in all files modified by the PR, and that `history.md` files are present in all skill directories touched by the PR.
   - Update release notes or communication channels if required.
-  - Archive or delete the feature branch if the work is complete (GitHub may have already deleted it).
+  - Confirm that `git worktree list` no longer shows the branch worktree and that the main worktree is on `main`.
 - **Completion**: Issue is marked resolved and all follow-ups addressed.
-- **Note**: GitHub will automatically close the associated issue and may delete the branch upon successful merge. The only remaining action is to synchronize the local repository.
+- **Note**: GitHub will automatically close the associated issue and may delete the branch upon successful merge. The remaining actions are local: return the main worktree to `main` if needed, drop the branch worktree, and synchronize.

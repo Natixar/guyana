@@ -9,11 +9,19 @@ audit-*
 # Données AGM sous clause 9 de l'accord de collaboration : quantités physiques,
 # départements, registre d'équipements. Elles ne quittent pas ce poste. La
 # taxonomie pivot, elle, est publiée — c'est site/static/engine/taxonomy.json.
-poc-data/
+/poc-data
 
 # Les analyses portent toutes l'en-tête « Document local, non versionné », et
 # aucune n'a jamais été suivie. La règle n'était qu'une habitude : le répertoire
 # n'était pas ignoré, seulement jamais ajouté, si bien qu'un `git add -A` les
 # aurait toutes emportées. Depuis que le script de tournage contient les mots de
 # passe de la démonstration, l'habitude ne suffit plus.
-analyses/
+/analyses
+
+# Motifs ancrés et sans barre finale (#126) : un motif « x/ » ne vise que les
+# répertoires, or dans un worktree ces chemins sont des liens symboliques, que git
+# traite comme des fichiers. Avec la barre, le lien apparaîtrait « non suivi » et
+# un commit pourrait l'emporter.
+
+# Un worktree par branche (#126) : ils vivent ici, jamais dans un commit.
+/.worktrees/

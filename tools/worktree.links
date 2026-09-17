@@ -1,0 +1,10 @@
+# Chemins non suivis de l'arbre principal, liés dans chaque worktree (#126).
+#
+# Un chemin par ligne, relatif à la racine du dépôt ; lignes vides et
+# commentaires ignorés. tools/worktree.sh refuse de lier un chemin que git
+# n'ignore pas en tant que lien : chaque entrée doit figurer dans .gitignore
+# sous une forme ancrée et sans barre finale (« /poc-data », pas « poc-data/ »).
+#
+# site/static/engine/erp-fixture.json s'ajoutera quand #121 l'aura sorti du suivi.
+poc-data
+analyses

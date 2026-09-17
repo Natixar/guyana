@@ -18,3 +18,4 @@ from skill content and is not loaded into Claude's context.
 | #134 | #133  | implementation.md | add new-library checklist: skill command + history.md + structural tests |
 | #145 | #143  | SKILL.md, shared-issue-understanding.md | require posting the Task 2 assessment as an issue comment |
 | #145 | #143  | test-driven-development.md, implementation.md, integration.md | assert captured stderr; REVIEW PLACEHOLDER for replaced tests + integration cleanup |
+| #127 | #126  | SKILL.md, implementation-planning.md, integration.md | one worktree per branch under .worktrees/; the main worktree is the maintainer's; tools/worktree.sh links untracked data |

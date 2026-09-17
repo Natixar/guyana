@@ -8,7 +8,7 @@ description: Guide for software configuration management processes. Use this ski
 
 This skill keeps the surface area small: it helps you decide whether you are managing a GitHub issue (creating, updating, triaging, or tagging) or actually implementing an approved change. The detailed nine-step implementation workflow lives in the companion reference file so the top-level document can stay focused on task selection and guardrails.
 
-**Critical Rule: Never commit directly to the main branch.** All changes to git-tracked files, including .vscode configurations, must be developed on feature branches and merged via pull requests. Direct commits to main will fail on protected branches and violate the SCM process.
+**Critical Rule: Never commit directly to the main branch.** All changes to git-tracked files, including .vscode configurations, must be developed on feature branches and merged via pull requests. Direct commits to main will fail on protected branches and violate the SCM process. Each feature branch is developed in its own worktree — see *Worktrees and Parallel Sessions*.
 
 ## Task Selection
 
@@ -22,14 +22,17 @@ This skill keeps the surface area small: it helps you decide whether you are man
 ## Meta-task Guidance
 
 - Confirm you are operating on a clean baseline (`git fetch origin && git status`) before performing any meta-task.
-- Keep a separate read-only worktree that mirrors `main` for quick references:
-  ```
-  git fetch origin
-  git worktree remove ../repo-main  # if exists
-  git worktree add ../repo-main main
-  ```
-  Worktrees can be stored under `.github/worktrees`.
 - Route lightweight branch/tag housekeeping through this skill's meta-task guidance; only enter the implementation path when configuration work is both scoped and approved.
+
+## Worktrees and Parallel Sessions
+
+Several sessions may work on the same clone at the same time. A branch switch in a shared tree changes files under every other session, so branches never share a tree.
+
+- **The main worktree stays on `main`, and switching its branch is the maintainer's prerogative.** No session ever checks out another branch there. The maintainer may open a branch in the main worktree to look at it; Task 6 brings it back to `main` after the merge.
+- **Every branch lives in its own worktree**, under `.worktrees/{number}-{short-description}` at the root of the main worktree. The directory is ignored by git. Create it with `tools/worktree.sh new` (Task 3), never by hand.
+- **Untracked data does not follow a worktree.** Client data, local analyses and generated files exist only in the main worktree. `tools/worktree.sh` links the paths listed in `tools/worktree.links` into each worktree; never copy them. Run `tools/worktree.sh check` before any step that reads them.
+- **One session per worktree.** `git fetch` works from anywhere; commit, rebase and push only from your own worktree.
+- **In VS Code**, worktrees appear as separate repositories in the *Source Control Repositories* view (`git.detectWorktrees` is set in `.vscode/settings.json`). *Open Worktree in New Window* gives a simultaneous view of the project; *in Current Window* switches as a branch would.
 
 ## Issue Management Guidance
 
