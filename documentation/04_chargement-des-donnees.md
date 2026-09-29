@@ -1,257 +1,272 @@
-# 04 — Le chargement des données
+# 04 — Loading the data
 
-*État au 11 septembre 2026. Le code fait foi : `services/store/load_2025.py`,
-`services/store/make_fixture.py`.*
+*State as of 29 September 2026. The code is authoritative:
+`services/store/load_2025.py`, `services/store/make_fixture.py`.*
 
----
-
-## En une phrase
-
-Un classeur Excel fourni par le client devient, par **deux scripts** et **une
-affectation tenue à la main**, un fichier de données pour le site et un cube en
-base. Il n'y a pas d'ingestion à proprement parler : il y a un chargement
-ponctuel, et il le déclare lui-même.
-
-`load_2025.py` l'écrit dans son en-tête : *« un chargement ponctuel, autorisé
-explicitement pour FIDES, et non le début d'une chaîne d'ingestion »*. La
-cartographie source → modèle, et son taux de couverture calculé, sont l'objet de
-l'issue #47.
+*The names of the files under `poc-data/`, and the fact that the ERP fixture is no
+longer tracked, are those of #121 — the first step of #120.*
 
 ---
 
-## La chaîne
+## In one sentence
+
+An Excel workbook supplied by the client becomes, through **three scripts** — two of
+them in the repository — **and a hand-held assignment**, one data file for the site
+and one cube in the database. There is no ingestion pipeline to speak of: there is a
+one-off load, and it says so itself.
+
+`load_2025.py` states it in its header: *"a one-off load, explicitly authorised for
+FIDES, and not the beginning of an ingestion chain"*. The source → model mapping, and
+its computed coverage rate, are the subject of issue #47.
+
+---
+
+## The chain
 
 ```
-   POSTE DE CONTRÔLE                                                  kubb
-   ─────────────────                                                  ────
+   CONTROL POST                                                        kubb
+   ────────────                                                        ────
 
-   poc-data/                          (hors dépôt — clause 9)
-   ├─ AGM_PoC_Physical_Data_Pack_Completed.xlsx
+   poc-data/                          (outside the repository — clause 9)
+   ├─ client-physical-data-pack.xlsx
    │     │
-   │     ├──▶ build_assignment.py ──▶ agm-h1-subpost-assignment.json
+   │     ├──▶ build_assignment.py ──▶ client-h1-subpost-assignment.json
    │     │                                     │
    │     ├──▶ make_fixture.py ────────────────┼──▶ site/static/engine/erp-fixture.json
-   │     │     (onglets 3, 6, 7)               │          (versionné)
+   │     │     (sheets 3, 6, 7)                │       (not tracked — #120)
    │     │                                     │               │
    │     └──▶ load_2025.py ◀───────────────────┴───────────────┘
-   │           (onglets 3, 7)
+   │           (sheets 3, 7)
    │                │
-   │                │  --sql : SQL sur stdout, par ssh           ┌────────────┐
+   │                │  --sql: SQL on stdout, over ssh           ┌────────────┐
    │                └───────────────────────────────────────────▶│ PostgreSQL │
-   │                   ou connexion directe (STORE_DSN)           │ entity     │
+   │                   or a direct connection (STORE_DSN)         │ entity     │
    │                                                              │ cell       │
                                                                   └────────────┘
 ```
 
-**Trois scripts, et un ordre.** L'affectation d'abord, puisque les deux autres
-la lisent ; le fixture ensuite, puisque le chargeur y lit la numérotation des
-départements ; le chargeur en dernier.
+**Three scripts, and an order.** The assignment first, since the other two read it;
+the fixture next, since the loader reads the department numbering from it; the loader
+last. Only two of the three are in the repository: `build_assignment.py` lives beside
+the workbook, for the reason given below.
 
 ---
 
-## Ce qui ne quitte pas le poste de contrôle
+## What never leaves the control post
 
-**Le classeur du client est confidentiel au titre de la clause 9 de l'accord de
-collaboration.** Il vit dans `poc-data/`, que `.gitignore` exclut ; aucun script
-ne recopie son contenu dans un fichier suivi.
+**The client's workbook is confidential under clause 9 of the collaboration
+agreement.** It lives in `poc-data/`, which `.gitignore` excludes; no script copies
+its content into a tracked file.
 
-L'affectation `agm-h1-subpost-assignment.json` et le script qui la produit
-vivent au même endroit, pour la même raison : ils nomment les départements du
-client.
+The assignment `client-h1-subpost-assignment.json` and the script that produces it
+live in the same place, for the same reason: they name the client's departments. So
+does `client-head-organisation.json`, which carries the head organisation's identity —
+it was written into the loader until 11 September 2026, and #120 took it out.
 
-Quand le chargeur écrit vers la base de kubb, **le classeur reste sur le poste
-de contrôle** : seul le SQL qu'on en tire traverse, par stdin, et rien ne s'écrit
-sur le système de fichiers de la cible. C'est la doctrine de `deploy/`, appliquée
-ici.
+The ERP fixture is in the same situation since #121: **it is no longer tracked**, it
+is produced locally, and the deployment takes it from the control post.
+
+When the loader writes to kubb's database, **the workbook stays on the control
+post**: only the SQL derived from it crosses, over stdin, and nothing is written to
+the target's filesystem. That is the doctrine of `deploy/`, applied here.
 
 ---
 
-## Le classeur
+## The workbook
 
-Douze onglets, remplis par le client sur les gabarits de la demande de données.
-Chaque gabarit porte en tête son identifiant — `D-01`, `E-01/E-03`, `G-01` —, sa
-priorité, une ligne d'exemple, et une colonne de commentaire où le client dit
-**comment la valeur a été obtenue**.
+Twelve sheets, filled in by the client on the data-request templates. Each template
+carries its identifier at the top — `D-01`, `E-01/E-03`, `G-01` — its priority, an
+example row, and a comment column in which the client says **how the value was
+obtained**.
 
-| Onglet | Contenu | Lu par |
+| Sheet | Content | Read by |
 |---|---|---|
 | 0 — Read me | notice | — |
-| 1 — Use case list | cas d'usage UC-01 à UC-04 | — |
-| 2 — Data request tracker | suivi des demandes de données | — |
-| 3 — Fuel by consumer | gazole sorti, par mois et par catégorie de consommateur | `make_fixture.py`, `load_2025.py` |
-| 4 — Equipment register | registre des engins et installations | consulté pour établir l'affectation |
-| 5 — Power generation | groupes électrogènes et solaire | — |
-| 6 — Production | or produit, par mois | `make_fixture.py` |
-| 7 — Explosives | explosifs consommés, par mois et par produit | `make_fixture.py`, `load_2025.py` |
-| 8 — Other sources | autres sources | — |
-| 9 — Emission factors | facteurs d'émission, et leur statut | recopiés dans `load_2025.py` |
-| 10 — KPI tracker | suivi des indicateurs de l'Annexe 2 | — |
-| 11 — Plan | calendrier | — |
+| 1 — Use case list | use cases UC-01 to UC-04 | — |
+| 2 — Data request tracker | tracking of the data requests | — |
+| 3 — Fuel by consumer | diesel issued, by month and consumer category | `make_fixture.py`, `load_2025.py` |
+| 4 — Equipment register | register of plant and installations | consulted to establish the assignment |
+| 5 — Power generation | generator sets and solar | — |
+| 6 — Production | gold produced, by month | `make_fixture.py` |
+| 7 — Explosives | explosives consumed, by month and product | `make_fixture.py`, `load_2025.py` |
+| 8 — Other sources | other sources | — |
+| 9 — Emission factors | emission factors, and their status | copied by hand into `load_2025.py` |
+| 10 — KPI tracker | tracking of the Annex 2 indicators | — |
+| 11 — Plan | schedule | — |
 
-Les colonnes lues sont, dans l'onglet 3 : le mois, la catégorie de consommateur,
-la quantité ; dans l'onglet 7 : le mois, le produit, la quantité ; dans
-l'onglet 6 : le mois et les onces produites.
-
----
-
-## L'affectation — `build_assignment.py`
-
-**Ce que le classeur ne dit pas, et qu'il faut pourtant savoir.** L'onglet 3
-range le gazole par *catégorie de consommateur* — un nom de département ou de
-sous-traitant. La taxonomie, elle, attend un **sous-poste** : combustion fixe
-(`CombustiblesFossiles`, un groupe électrogène) ou fret interne (`FretInterne`,
-un engin qui roule). Le passage de l'un à l'autre est une **décision**, et ce
-script la porte.
-
-Il associe à chaque catégorie :
-
-- un sous-poste et une caractérisation ;
-- un **degré de confiance** — `confirmed`, ou `needs AGM confirmation` ;
-- une **justification** : le nom du département, et ce que le registre
-  d'équipements de l'onglet 4 dit de sa flotte.
-
-Il déclare en outre les sources que le classeur mentionne sans les mesurer,
-et les décisions ouvertes. Son statut est écrit dans le fichier produit :
-*« PROPOSED — assigned by Natixar from department names and the equipment
-register, pending AGM verification »*.
-
-La correspondance elle-même est un dictionnaire Python, écrit à la main : c'est
-un jugement, pas un calcul.
+The columns actually read are, in sheet 3: the month, the consumer category, the
+quantity; in sheet 7: the month, the product, the quantity; in sheet 6: the month and
+the ounces produced.
 
 ---
 
-## Le fixture — `make_fixture.py`
+## The assignment — `build_assignment.py`
 
-Il fabrique les données « ERP » dont le site a besoin pour montrer une barre :
-la taxonomie d'organisation, le procédé, les lots et les barres. Il est
-**versionné** dans `site/static/engine/erp-fixture.json`, et le site le lit.
+**What the workbook does not say, and which must nonetheless be known.** Sheet 3 files
+diesel by *consumer category* — the name of a department or of a subcontractor. The
+taxonomy, for its part, expects a **sub-post**: stationary combustion
+(`CombustiblesFossiles`, a generator set) or internal freight (`FretInterne`, a
+machine that drives). Going from one to the other is a **decision**, and this script
+carries it.
 
-**Ce qui vient du classeur** : les onces produites par mois, les départements,
-le gazole et les explosifs.
+To each category it attaches:
 
-**Ce qui est simulé** — et le fichier le déclare, `simulated: true`, avec la liste
-des champs concernés : le registre de coulée du client (gabarit `G-01`) est
-encore partiel, donc la date de coulée, l'identifiant de barre, le poids et le
-titre sont fabriqués.
+- a sub-post and a caracterisation;
+- a **degree of confidence** — confirmed, or awaiting the client's confirmation;
+- a **justification**: the department's name, and what the equipment register of sheet
+  4 says about its fleet.
 
-**La numérotation des départements vient d'ici.** Les identifiants entiers
-suivent l'ordre du fichier d'affectation, lui-même par part décroissante. Le
-chargeur les **lit** dans le fixture au lieu de les attribuer à son tour : deux
-numérotations coïncideraient jusqu'au jour où un département serait ajouté, et
-la divergence serait silencieuse.
+It also declares the sources the workbook mentions without measuring, and the open
+decisions. Its status is written into the file it produces: *proposed — assigned by
+Natixar from department names and the equipment register, pending the client's
+verification*.
 
-**Les mois manquants sont déclarés ici.** La fenêtre de production commence en
-février, parce que janvier puiserait dans un décembre 2024 que le classeur ne
-contient pas. Le fixture écrit la liste des mois synthétiques dans
-`model.syntheticMonths` ; le chargeur la lit plutôt que de la recalculer.
+The correspondence itself is a Python dictionary, written by hand: it is a judgement,
+not a computation.
 
 ---
 
-## Le chargeur — `load_2025.py`
+## The fixture — `make_fixture.py`
 
-### Ce qu'il écrit
+It builds the "ERP" data the site needs in order to show a bar: the organisation
+taxonomy, the process, the lots and the bars. It is written to
+`site/static/engine/erp-fixture.json`, which the site reads. **That file is not
+tracked** (#120): it carries the client's data, and the deployment takes it from the
+control post.
 
-**La table `entity`** : l'organisation de tête du client — identifiant 100, son
-identité légale et son DID —, puis ses départements, rattachés à elle, avec les
-identifiants du fixture. La tête est insérée **avant** les départements : la
-clé étrangère `parent` ferait sinon avorter tout le chargement.
+**What comes from the workbook**: the ounces produced per month, the departments, the
+diesel and the explosives.
 
-**La table `cell`** :
+**What is simulated** — and the file declares it, `simulated: true`, with the list of
+the fields concerned: the client's pour register (template `G-01`) is still partial,
+so the pour date, the bar identifier, the weight and the assay are fabricated.
 
-- **deux cellules par ligne de gazole** — la combustion, et la part amont de
-  chaque litre, le terme qu'un modèle naïf perd entièrement ;
-- **une cellule par ligne d'explosifs**, rattachée au département de minage : le
-  classeur les donne par produit et par mois, jamais par département, et les
-  répartir inventerait une ventilation que personne n'a.
+**The department numbering comes from here.** The integer identifiers follow the order
+of the assignment file, which is itself by decreasing share. The loader **reads** them
+from the fixture rather than assigning its own: two numberings would agree until the
+day a department was added, and the divergence would be silent.
 
-La correspondance catégorie → sous-poste est **lue** dans l'affectation ; une
-catégorie qui n'y figure pas, ou qui n'a pas de département dans le fixture, est
-écartée avec un message sur la sortie d'erreur.
+**The missing months are declared here.** The production window starts in February,
+because January would draw on a December 2024 the workbook does not contain. The
+fixture writes the list of synthetic months into `model.syntheticMonths`; the loader
+reads it rather than recomputing it.
 
-### Ce qu'il transforme, et où
+---
 
-**Toutes les transformations ont lieu ici, à la frontière**, parce que c'est le
-dernier point où la donnée existe encore telle que le client l'a écrite.
-Au-delà, il n'y a qu'un débit sur un intervalle.
+## The loader — `load_2025.py`
 
-| Transformation | Règle |
+### What it writes
+
+**The `entity` table**: the client's head organisation — identifier 100, its legal
+identity and its DID — then its departments, attached to it, with the identifiers from
+the fixture. The head is inserted **before** the departments: otherwise the `parent`
+foreign key would abort the whole load.
+
+The identifier 100 is structural and lives in the code; **the identity is not, and
+lives outside the repository**, in `client-head-organisation.json` (#120). The loader
+reads it when it runs, never at import time — `test_units.py` imports this module in
+continuous integration, where `poc-data/` does not exist. A missing field stops the
+load: a head without a DID would produce an organisation the front end could not
+designate as an issuer, and the failure would surface only at signing time.
+
+**The `cell` table**:
+
+- **two cells per diesel row** — combustion, and the upstream share of every litre,
+  the term a naive model loses entirely;
+- **one cell per explosives row**, attached to the mining department: the workbook
+  gives them by product and by month, never by department, and splitting them would
+  invent a breakdown nobody has.
+
+The category → sub-post correspondence is **read** from the assignment; a category
+absent from it, or with no department in the fixture, is set aside with a message on
+standard error.
+
+### What it transforms, and where
+
+**Every transformation happens here, at the boundary**, because this is the last point
+at which the data still exists as the client wrote it. Beyond it, there is nothing but
+a flow over an interval.
+
+| Transformation | Rule |
 |---|---|
-| **période** | le mois `AAAA-MM` devient un intervalle `[début, fin)` de minuit **local** — UTC−4, sans heure d'été — à minuit local, stocké en UTC |
-| **débit** | quantité ÷ durée de la période en secondes |
-| **unité d'activité** | le litre devient le mètre cube ; le kilogramme reste le kilogramme |
-| **facteur** | le facteur par litre devient un facteur par mètre cube, multiplié par mille |
-| **affichage** | l'unité de la source — le litre — et son facteur depuis le SI sont conservés, pour relire la donnée brute |
+| **period** | the month `YYYY-MM` becomes an interval `[start, end)` from **local** midnight — UTC−4, no daylight saving — to local midnight, stored in UTC |
+| **flow** | quantity ÷ duration of the period in seconds |
+| **activity unit** | the litre becomes the cubic metre; the kilogram stays the kilogram |
+| **factor** | the per-litre factor becomes a per-cubic-metre factor, multiplied by a thousand |
+| **display** | the source's unit — the litre — and its factor from SI are kept, so the raw data can be read back |
 
-**Le sens de la conversion est vérifié par un test**, `test_units.py`, et non
-relu : un litre est un millième de mètre cube, donc la valeur se divise par mille
-et le facteur se multiplie par mille. C'est le produit qui est physique, pas les
-deux nombres pris séparément.
+**The direction of the conversion is checked by a test**, `test_units.py`, rather than
+proof-read: a litre is a thousandth of a cubic metre, so the value is divided by a
+thousand and the factor multiplied by a thousand. It is the product that is physical,
+not either number taken alone.
 
-**Les facteurs** sont ceux de l'onglet 9, recopiés dans `SOURCE_FACTORS` :
-combustion du gazole, amont du gazole, explosifs. Une unité de facteur que
-`TO_SI` ne sait pas ramener au SI est **refusée** : convertir au jugé produirait
-un nombre plausible et faux, que la signature figerait.
+**The factors** are those of sheet 9, copied into `SOURCE_FACTORS`: diesel combustion,
+diesel upstream, explosives. A factor unit that `TO_SI` cannot bring back to SI is
+**refused**: converting by guesswork would produce a plausible, wrong number, which
+the signature would then freeze.
 
-### Les mois reconstitués
+### The reconstructed months
 
-Pour chaque mois déclaré manquant par le fixture, le chargeur recopie les lignes
-du **même mois de l'année suivante** — décembre 2024 depuis décembre 2025, la
-seule saisonnalité que douze mois de données permettent d'invoquer — et les
-marque `coverage = MISSING`. La cellule existe, et elle dit d'où elle vient.
+For every month the fixture declares missing, the loader copies the rows of the **same
+month of the following year** — December 2024 from December 2025, the only seasonality
+twelve months of data allow one to invoke — and marks them `coverage = MISSING`. The
+cell exists, and it says where it comes from.
 
-### L'origine
+### Origin
 
-Le chargeur écrit `origin = MEASURED` sur chaque cellule, par un littéral. La
-colonne de méthode des onglets 3 et 7 n'est pas lue.
+The loader writes `origin = MEASURED` on every cell, as a literal. The method column of
+sheets 3 and 7 is not read. That is issue #116, and
+[03](03_schema-et-qualite-des-donnees.md) says what origin ought to mean.
 
 ### Idempotence
 
-Les identifiants de cellule sont **dérivés de la source** — `d/` et le mois, le
-département et la part pour le gazole, `x/` et le mois et le produit pour les
-explosifs. Relancer remplace au lieu d'empiler : chaque insertion porte
-`ON CONFLICT (id) DO UPDATE`, **sur toutes les colonnes** — un rechargement qui
-change de dimension doit changer la dimension, et en omettre une laisserait une
-valeur neuve sous une étiquette ancienne.
+Cell identifiers are **derived from the source** — `d/` plus the month, the department
+and the part for diesel, `x/` plus the month and the product for explosives. Rerunning
+replaces rather than piling up: every insert carries `ON CONFLICT (id) DO UPDATE`, **on
+all columns** — a reload that changes a dimension must change the dimension, and
+omitting one would leave a new value under an old label.
 
-### Le schéma
+This is an ad hoc method, and [03](03_schema-et-qualite-des-donnees.md) explains why the
+target model replaces it with addition and a generation counter.
 
-**En connexion directe**, le chargeur appelle `db.apply_schema` avant d'écrire.
-**En mode `--sql`, il ne le fait pas** : le SQL émis ne contient que la
-transaction d'insertion. Il suppose donc un schéma déjà en place — ce que
-garantit le magasin, qui l'applique à chacun de ses démarrages ; voir
-[03](03_schema-et-qualite-des-donnees.md). Le schéma étant idempotent,
-l'appliquer deux fois ne change rien.
+### The schema
+
+**On a direct connection**, the loader calls `db.apply_schema` before writing. **In
+`--sql` mode it does not**: the SQL emitted contains only the insert transaction. It
+therefore assumes a schema already in place — which the store guarantees, applying it at
+every start-up; see [03](03_schema-et-qualite-des-donnees.md). The schema being
+idempotent, applying it twice changes nothing.
 
 ---
 
-## L'exécuter
+## Running it
 
 ```bash
-python3 services/store/load_2025.py --dry-run               # compte et résume, n'écrit rien
-STORE_DSN=… python3 services/store/load_2025.py             # écrit, par connexion directe
+python3 services/store/load_2025.py --dry-run               # counts and summarises, writes nothing
+STORE_DSN=… python3 services/store/load_2025.py             # writes, over a direct connection
 
-# vers la base de kubb : le SQL part par stdin, rien ne s'écrit sur la cible
+# to kubb's database: the SQL leaves over stdin, nothing is written on the target
 python3 services/store/load_2025.py --sql \
   | ssh claude-ia@kubb docker exec -i guyana-db psql -U aurora -d aurora
 ```
 
-Le conteneur, l'utilisateur et la base sont ceux du descripteur
-`deploy/inventory/hosts.d/kubb.env` — `DB_CONTAINER`, `DB_USER`, `DB_NAME`. La
-commande n'est écrite dans aucun script : c'est l'usage que l'option `--sql`
-annonce dans son aide et dans son commentaire, rendu explicite ici.
+The container, the user and the database are those of the descriptor
+`deploy/inventory/hosts.d/kubb.env` — `DB_CONTAINER`, `DB_USER`, `DB_NAME`. The command
+is written in no script: it is the usage the `--sql` option announces in its help text
+and in its comment, made explicit here.
 
-`--dry-run` est un mode explicite plutôt qu'un défaut : l'aide le dit, *« le
-défaut serait dangereux dans l'autre sens »*.
+`--dry-run` is an explicit mode rather than a default: the help says why, *"the default
+would be dangerous in the other direction"*.
 
-**Le mode `--sql` est celui de kubb.** La base n'y publie aucun port ; le
-chargeur ne s'y connecte donc pas, il émet le SQL sur stdout, et le SQL voyage
-par ssh. Une seule transaction, `BEGIN` … `COMMIT` : un chargement à moitié
-appliqué laisserait un cube dont personne ne saurait dire s'il est complet.
+**`--sql` mode is kubb's.** The database publishes no port there; the loader therefore
+does not connect to it, it emits the SQL on stdout, and the SQL travels over ssh. A
+single transaction, `BEGIN` … `COMMIT`: a half-applied load would leave a cube nobody
+could call complete.
 
-**Le résumé part sur la sortie d'erreur**, jamais sur stdout, pour ne pas se
-mêler au SQL quand celui-ci part dans un tuyau. Il reparle en quantités — mètres
-cubes de gazole, tonnes de CO2e — parce qu'un débit en m³/s ne se relit pas.
+**The summary goes to standard error**, never to stdout, so as not to mix with the SQL
+when that goes down a pipe. It speaks in quantities again — cubic metres of diesel,
+tonnes of CO2e — because a flow in m³/s does not read back.
 
-**Dépendances Python** : `openpyxl` pour le classeur, `psycopg` pour la base. Le
-classeur doit être présent dans `poc-data/` ; son absence arrête le script avec un
-message qui rappelle pourquoi il n'est pas dans le dépôt.
+**Python dependencies**: `openpyxl` for the workbook, `psycopg` for the database. The
+workbook must be present in `poc-data/`; its absence stops the script with a message
+recalling why it is not in the repository.
