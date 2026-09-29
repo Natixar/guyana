@@ -216,7 +216,7 @@ cell exists, and it says where it comes from.
 
 The loader writes `origin = MEASURED` on every cell, as a literal. The method column of
 sheets 3 and 7 is not read. That is issue #116, and
-[03](03_schema-et-qualite-des-donnees.md) says what origin ought to mean.
+[03](03_ontology-and-schema.md) says what origin ought to mean.
 
 ### Idempotence
 
@@ -226,7 +226,7 @@ replaces rather than piling up: every insert carries `ON CONFLICT (id) DO UPDATE
 all columns** — a reload that changes a dimension must change the dimension, and
 omitting one would leave a new value under an old label.
 
-This is an ad hoc method, and [03](03_schema-et-qualite-des-donnees.md) explains why the
+This is an ad hoc method, and [03](03_ontology-and-schema.md) explains why the
 target model replaces it with addition and a generation counter.
 
 ### The schema
@@ -234,7 +234,7 @@ target model replaces it with addition and a generation counter.
 **On a direct connection**, the loader calls `db.apply_schema` before writing. **In
 `--sql` mode it does not**: the SQL emitted contains only the insert transaction. It
 therefore assumes a schema already in place — which the store guarantees, applying it at
-every start-up; see [03](03_schema-et-qualite-des-donnees.md). The schema being
+every start-up; see [03](03_ontology-and-schema.md). The schema being
 idempotent, applying it twice changes nothing.
 
 ---
