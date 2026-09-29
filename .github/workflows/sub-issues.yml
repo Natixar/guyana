@@ -1,0 +1,68 @@
+name: sous-issues
+
+# Une issue parente se ferme d'elle-même quand sa dernière sous-issue se ferme,
+# et se rouvre si l'une d'elles est rouverte. GitHub tient le compte
+# (subIssuesSummary) mais n'en tire aucune conséquence : c'est ce job qui la tire.
+#
+# Un seul niveau à la fois. Une action faite avec GITHUB_TOKEN ne déclenche
+# aucun workflow : fermer une parente ne fermera pas SA parente. Voulu — une
+# cascade silencieuse sur plusieurs niveaux fermerait un cadre sans que
+# personne l'ait vu se vider.
+
+on:
+  issues:
+    types: [closed, reopened]
+
+permissions:
+  issues: write
+
+# Deux sous-issues fermées dans la même seconde : les deux exécutions liraient
+# le même compte. En file, la seconde voit la parente déjà fermée.
+concurrency:
+  group: sous-issues
+  cancel-in-progress: false
+
+jobs:
+  parente:
+    name: parente
+    runs-on: ubuntu-latest
+    steps:
+      - name: fermer ou rouvrir la parente
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          CHILD: ${{ github.event.issue.number }}
+          ACTION: ${{ github.event.action }}
+        run: |
+          set -euo pipefail
+          # Relu à l'exécution, pas tiré de l'événement : l'événement date de
+          # la fermeture, la file d'attente peut avoir changé l'état depuis.
+          # $o, $r, $n sont des variables GraphQL : le shell ne doit pas les voir.
+          # shellcheck disable=SC2016
+          line=$(gh api graphql \
+            -F o="$OWNER" -F r="$REPO" -F n="$CHILD" \
+            -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){parent{number state subIssuesSummary{total completed}}}}}' \
+            --jq '.data.repository.issue.parent // empty
+                  | "\(.number) \(.state) \(.subIssuesSummary.total) \(.subIssuesSummary.completed)"')
+          if [ -z "$line" ]; then
+            echo "#$CHILD n'a pas de parente."
+            exit 0
+          fi
+          read -r parent state total completed <<<"$line"
+          echo "#$CHILD → parente #$parent ($state), $completed/$total sous-issues fermées."
+
+          case "$ACTION" in
+            closed)
+              if [ "$state" = OPEN ] && [ "$total" -gt 0 ] && [ "$completed" -eq "$total" ]; then
+                gh issue close "$parent" --repo "$OWNER/$REPO" --reason completed \
+                  --comment "Fermée automatiquement : ses $total sous-issues sont fermées, la dernière étant #$CHILD."
+              fi
+              ;;
+            reopened)
+              if [ "$state" = CLOSED ]; then
+                gh issue reopen "$parent" --repo "$OWNER/$REPO" \
+                  --comment "Rouverte automatiquement : sa sous-issue #$CHILD a été rouverte."
+              fi
+              ;;
+          esac
