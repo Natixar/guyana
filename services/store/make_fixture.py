@@ -25,7 +25,7 @@ gazole facturé (jeu D-05, mouvement 109) ne porte que de l'amont tant qu'il dor
 dans une cuve, et cet amont-là est hors périmètre. D-05 ne sert qu'au bilan
 matière.
 
-CE QUI EST SIMULÉ. Le registre de coulée d'AGM — G-01 — est encore partiel : la
+CE QUI EST SIMULÉ. Le registre de coulée du client — G-01 — est encore partiel : la
 date de coulée, l'identifiant de barre, le poids et le titre sont fabriqués. Les
 onces par mois, les départements, le gazole et les explosifs viennent du paquet
 réel. Décembre 2024, qu'aucun paquet ne couvre, est une copie de décembre 2025 :
@@ -41,13 +41,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-PACK = ROOT / "poc-data" / "AGM_PoC_Physical_Data_Pack_Completed.xlsx"
-ASSIGNMENT = ROOT / "poc-data" / "agm-h1-subpost-assignment.json"
+PACK = ROOT / "poc-data" / "client-physical-data-pack.xlsx"
+ASSIGNMENT = ROOT / "poc-data" / "client-h1-subpost-assignment.json"
 OUT = ROOT / "site" / "static" / "engine" / "erp-fixture.json"
 
 TOTAL_BARS = 378
 
-#: TOUT EST EN SI. Le paquet AGM rapporte en onces troy, parce que c'est ainsi
+#: TOUT EST EN SI. Le paquet du client rapporte en onces troy, parce que c'est ainsi
 #: que l'or se vend ; le modèle, lui, ne connaît que le kilogramme. Convertir
 #: une fois, ici, à l'entrée, vaut mieux que de porter deux unités jusqu'au
 #: bout et de laisser quelqu'un se tromper de facteur trente et un.
@@ -87,7 +87,7 @@ STEPS = [
 def month_bounds(label: str) -> tuple[str, str]:
     """« 2025-03 » -> ses deux instants LOCAUX, exprimés en UTC.
 
-    Minuit à Georgetown, pas minuit à Greenwich.
+    Minuit local, pas minuit à Greenwich.
     """
     year, month = (int(x) for x in label.split("-"))
     start = datetime(year, month, 1, tzinfo=GUYANA)

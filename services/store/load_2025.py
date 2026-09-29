@@ -1,4 +1,4 @@
-"""Chargeur unique des données AGM 2025 dans le cube.
+"""Chargeur unique des données 2025 du client dans le cube.
 
     STORE_DSN=... python3 services/store/load_2025.py [--dry-run]
 
@@ -8,7 +8,7 @@ Rien ici ne doit être réutilisé pour H2 : la cartographie source → modèle 
 et son taux de couverture calculé sont un tout autre sujet. Le marquer plutôt
 que le sous-entendre évite qu'il devienne l'ingestion par accident.
 
-CE QU'IL LIT. Le paquet physique AGM, qui est **confidentiel au titre de la
+CE QU'IL LIT. Le paquet physique du client, **confidentiel au titre de la
 clause 9** et n'entre jamais dans le dépôt. Le script le lit depuis le disque
 local et écrit dans la base ; il ne recopie rien dans un fichier suivi.
 
@@ -35,11 +35,11 @@ from psycopg.types.range import Range
 import db
 
 ROOT = Path(__file__).resolve().parents[2]
-PACK = ROOT / "poc-data" / "AGM_PoC_Physical_Data_Pack_Completed.xlsx"
-ASSIGNMENT = ROOT / "poc-data" / "agm-h1-subpost-assignment.json"
+PACK = ROOT / "poc-data" / "client-physical-data-pack.xlsx"
+ASSIGNMENT = ROOT / "poc-data" / "client-h1-subpost-assignment.json"
 FIXTURE = ROOT / "site" / "static" / "engine" / "erp-fixture.json"
 
-#: Feuille 9 du paquet. Cinq des six sont marqués « provisional » par AGM ;
+#: Feuille 9 du paquet. Cinq des six sont marqués « provisional » par le client ;
 #: seul le facteur de combustion du gazole est accepté, et seulement parce que
 #: janvier réconcilie à −0,16 % contre leur propre classeur.
 # LA CONVERSION A LIEU ICI, ET NULLE PART AILLEURS.
@@ -106,7 +106,7 @@ def cell_metrology(name: str) -> tuple[str, str, float]:
     """La dimension, l'unité d'affichage, et le facteur qui va du SI vers elle.
 
     L'unité d'affichage est celle de la SOURCE — le litre des bons de sortie
-    d'AGM — et elle ne sert qu'à relire la donnée brute sans compter les zéros.
+    du client — et elle ne sert qu'à relire la donnée brute sans compter les zéros.
     Aucun calcul ne la lit : la seule unité qui compte est celle du SI, et elle
     se déduit de la dimension.
 
@@ -131,7 +131,7 @@ EXPLOSIVE, _ = si_factor("explosive")
 DIESEL_DIMENSION, DIESEL_DISPLAY, DIESEL_SCALE = cell_metrology("diesel-combustion")
 EXPLOSIVE_DIMENSION, EXPLOSIVE_DISPLAY, EXPLOSIVE_SCALE = cell_metrology("explosive")
 
-#: Identifiants de la taxonomie servie, agm-h1-v2.
+#: Identifiants de la taxonomie servie ; sa version est dans taxonomy.json.
 PART_COMBUSTION, PART_AMONT = 1, 2
 CARAC_OPERATED, CARAC_PROCEDEED = 1, 2
 SUBPOST_EXPLOSIVES = 1005
@@ -156,7 +156,7 @@ HEAD_ID = 100
 #: recherches : elle relève de la même règle que le classeur, et le script la
 #: lit au moment de s'exécuter, jamais à l'import — `test_units.py` importe ce
 #: module en intégration continue, où `poc-data/` n'existe pas.
-IDENTITY = ROOT / "poc-data" / "agm-head-organisation.json"
+IDENTITY = ROOT / "poc-data" / "client-head-organisation.json"
 IDENTITY_FIELDS = ("key", "legal_name", "jurisdiction", "registered_office", "did")
 
 
@@ -185,8 +185,7 @@ GUYANA = timezone(timedelta(hours=-4))
 def month_range(label: str) -> Range:
     """« 2025-01 » -> le mois LOCAL, en bornes semi-ouvertes.
 
-    Minuit à Georgetown, pas minuit à Greenwich. Une mine rapporte en jours
-    guyaniens : découper sur des minuits Zulu décalerait chaque frontière de
+    Minuit local, pas minuit à Greenwich. Une mine rapporte en jours locaux : découper sur des minuits Zulu décalerait chaque frontière de
     quatre heures et rangerait une nuit de production dans le mois suivant. À
     l'échelle d'un mois l'erreur est petite ; à la frontière d'un lot elle met
     du gazole dans la mauvaise barre, ce que le modèle prétend justement éviter.
@@ -281,8 +280,9 @@ def period_seconds(period: Range) -> float:
 
 def build_cells(fuel, explosives, assignment, org):
     """La correspondance département → sous-poste vient du fichier d'affectation,
-    relu et non redeviné : c'est lui qui porte les 14 départements marqués
-    « needs AGM confirmation », et il a été vérifié séparément."""
+    relu et non redeviné : c'est lui qui porte les 14 départements dont
+    l'affectation attend la confirmation du client, et il a été vérifié
+    séparément."""
     by_department = {e["department"]: e for e in assignment["emissionBearing"]["fuel"]}
     cells = []
 
@@ -463,11 +463,11 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true",
                     help="compte et résume sans écrire — le défaut serait dangereux dans l'autre sens")
     ap.add_argument("--sql", action="store_true",
-                    help="émet le SQL sur stdout au lieu de se connecter ; le paquet AGM reste ici")
+                    help="émet le SQL sur stdout au lieu de se connecter ; le paquet du client reste ici")
     args = ap.parse_args()
 
     if not PACK.exists():
-        print(f"paquet AGM introuvable : {PACK}", file=sys.stderr)
+        print(f"paquet du client introuvable : {PACK}", file=sys.stderr)
         print("il est confidentiel (clause 9) et n'est pas dans le dépôt.", file=sys.stderr)
         return 1
 
@@ -509,7 +509,7 @@ def main() -> int:
         return 0
 
     if args.sql:
-        # Le classeur AGM est confidentiel au titre de la clause 9 : il ne quitte
+        # Le classeur du client est confidentiel (clause 9) : il ne quitte
         # pas ce poste. Seules les données dérivées traversent, par stdin, et
         # rien ne s'écrit sur le système de fichiers de la cible — c'est la
         # doctrine de deploy/, elle vaut ici aussi.
