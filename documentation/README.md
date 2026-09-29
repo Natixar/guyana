@@ -32,9 +32,11 @@ NN_subject.md
 Numbering is stable, increasing, never reassigned. A cross-reference is made through
 a relative link, never by spelling out "note 2".
 
-**Version-controlled documents are written in English.** Decision of the maintainer,
-29 September 2026. It applies to this directory as a whole; the notes below that are
-still in French are marked as such, and their translation is pending.
+**Version-controlled documents are written in English, file names included.**
+Decision of the maintainer, 29 September 2026. It applies to this directory as a
+whole; the notes below that are still in French are marked as such, and their
+translation is #142. A rename breaks every link already shared outside the
+repository, so it happens before a note is merged whenever that is still possible.
 
 ## The notes
 
@@ -42,4 +44,4 @@ still in French are marked as such, and their translation is pending.
 |---|---|
 | [01 — Hosting and routing of the static site](01_hebergement-et-routage.md) | The full chain: Hugo → image → container → Traefik → domain. Who serves what, and what is not ours. **Still in French.** |
 | [02 — static-web-server](02_static-web-server.md) | The server chosen: what it can do, what we use of it, how its container is built and deployed. **Still in French.** |
-| [03 — The ontology, and what H1 implements of it](03_schema-et-qualite-des-donnees.md) | In two parts: the target ontology — metrics, coefficients, rules, official taxonomies, five axes — then what the code implements today, every collapse named with the issue that lifts it. |
+| [03 — The ontology, and what H1 implements of it](03_ontology-and-schema.md) | In two parts: the target ontology — metrics, coefficients, rules, official taxonomies, five axes — then what the code implements today, every collapse named with the issue that lifts it. |
