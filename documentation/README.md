@@ -39,4 +39,4 @@ relatif, jamais par « la note 2 » en toutes lettres.
 |---|---|
 | [01 — Hébergement et routage du site statique](01_hebergement-et-routage.md) | La chaîne complète : Hugo → image → conteneur → Traefik → domaine. Qui sert quoi, et qui ne nous appartient pas. |
 | [02 — static-web-server](02_static-web-server.md) | Le serveur retenu : ce qu'il sait faire, ce que nous en utilisons, comment son conteneur est bâti et déployé. |
-| [03 — Le schéma, et la vue qualité des données](03_schema-et-qualite-des-donnees.md) | Ce que la base stocke — des débits sur des intervalles, sur trois axes —, les deux axes de qualité, et ce que la vue de l'exploitant calcule et pour qui. |
+| [03 — L'ontologie, et ce que H1 en implémente](03_schema-et-qualite-des-donnees.md) | En deux parties : l'ontologie cible — métriques, coefficients, règles, taxonomies officielles, cinq axes —, puis ce que le code implémente aujourd'hui, chaque effondrement nommé avec l'issue qui le lève. |
