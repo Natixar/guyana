@@ -11,7 +11,7 @@
   "cases": [
     {
       "name": "combustion fixe — le gazole des groupes va en 1.1",
-      "why": "Cas nominal. 59,19 % du gazole d'Aurora est brûlé par Power Generation et UG-Power Gen.",
+      "why": "Cas nominal : la combustion du gazole, le terme le plus lourd du cube.",
       "cells": [
         {
           "subPost": 1000,
