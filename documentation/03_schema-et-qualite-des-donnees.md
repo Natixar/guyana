@@ -1,761 +1,711 @@
-# 03 — L'ontologie, et ce que H1 en implémente
+# 03 — The ontology, and what H1 implements of it
 
-*État au 29 septembre 2026.*
+*State as of 29 September 2026.*
 
 ---
 
-## Comment lire cette note
+## How to read this note
 
-Elle est en **deux parties, et l'ordre porte une intention**.
+It comes in **two parts, and the order carries an intent**.
 
-**La partie I décrit l'ontologie** — les objets, leurs relations, et les règles
-qui les lient. Elle ne décrit aucun code. Elle vient des décisions du mainteneur
-des 18, 21 et 29 septembre 2026, portées par les issues #47 et #129 à #137.
+**Part I describes the ontology** — the objects, their relations, and the rules
+that bind them. It describes no code. It comes from the maintainer's decisions of
+18, 21 and 29 September 2026, carried by issues #47 and #129 to #137.
 
-**La partie II décrit H1** — ce que le code fait aujourd'hui, qui est une
-ontologie **effondrée** : plusieurs objets distincts y partagent une colonne,
-plusieurs relations y sont implicites, et une fonction y est stockée comme un
-nombre. Chaque effondrement est nommé, sa conséquence écrite, et l'issue qui le
-lève citée.
+**Part II describes H1** — what the code does today, which is a **collapsed**
+ontology: several distinct objects share one column, several relations are
+implicit, and a function is stored as a number. Every collapse is named, its
+consequence written down, and the issue that lifts it cited.
 
-**Quand les deux se contredisent, les deux ont raison, à des dates
-différentes** : le code fait foi pour ce que la plateforme calcule aujourd'hui —
+**When the two contradict each other, both are right, at different dates**: the
+code is authoritative for what the platform computes today —
 `services/store/schema.sql`, `services/store/app.py`,
-`site/assets/js/quality.js` —, l'ontologie fait foi pour ce vers quoi tout
-changement doit aller. Un écart qui n'est pas dans le tableau de la partie II est
-un défaut de cette note.
+`site/assets/js/quality.js` — and the ontology is authoritative for where any
+change must head. A discrepancy missing from the table in Part II is a defect of
+this note.
 
-**Ce que cette note n'est pas.** Une ontologie a aussi une représentation
-formelle, lisible par machine, et des diagrammes ; le mainteneur les préfère à la
-prose. Cette note porte un diagramme de classes et des notes ; la forme formelle
-reste à produire, et elle n'a pas encore d'issue.
+**What this note is not.** An ontology also has a formal, machine-readable
+representation, and diagrams; the maintainer prefers those to prose. This note
+carries a class diagram and notes; the formal form remains to be produced, and it
+has no issue yet.
 
 ---
 
-# Partie I — L'ontologie
+# Part I — The ontology
 
-## En une phrase
+## In one sentence
 
-La chaîne **acquiert des métriques**, les combine avec des **coefficients** dans
-des **règles** typées, et en tire des **impacts** rangés dans des **taxonomies
-officielles** — chaque impact restant rattachable à la provenance de chacun de
-ses termes.
+The chain **acquires metrics**, combines them with **coefficients** inside typed
+**rules**, and derives **impacts** filed under **official taxonomies** — every
+impact remaining traceable back to the provenance of each of its terms.
 
-## I.1 Le vocabulaire, et deux mots qui ont changé
+## I.1 The vocabulary, and two words that changed
 
-| Terme | Ce qu'il désigne |
+| Term | What it denotes |
 |---|---|
-| **métrique** | une grandeur acquise, située dans le temps, dans l'espace et dans une organisation |
-| **coefficient** | une **fonction** de la nature, du temps, du lieu et — facultativement — de l'entité, dont on lit une valeur |
-| **règle** | ce qui combine des métriques et des coefficients pour produire un impact, et le range dans une sous-catégorie |
-| **impact** | le résultat, au sens CSRD : contenu carbone d'un produit, émissions d'une période, eau prélevée |
-| **source fixe** | le couple **(étape de processus × unité géographique)** — le point où tous les axes se croisent |
-| **unité** | la feuille de la taxonomie géographique : où c'est, et **ce qui mesure** |
-| **étape** | ce que la matière traverse ; vit sous une division, à côté des **stocks** |
-| **tag** | ce qui identifie une **série** de métriques, et par quoi une règle la désigne |
-| **anomalie** | un état que le modèle déclare invalide et qui produit du travail pour un humain |
+| **metric** | an acquired quantity, situated in time, in space and in an organisation |
+| **coefficient** | a **function** of nature, time, place and — optionally — entity, from which a value is read |
+| **rule** | what combines metrics and coefficients to produce an impact, and files it under a subcategory |
+| **impact** | the result, in the CSRD sense: the carbon content of a product, a period's emissions, water withdrawn |
+| **fixed source** | the couple **(process step × geographic unit)** — the point where every axis meets |
+| **unit** | the leaf of the geographic taxonomy: where it is, and **what measures** |
+| **step** | what the material passes through; lives under a division, beside the **stocks** |
+| **tag** | what identifies a **series** of metrics, and by which a rule designates it |
+| **anomaly** | a state the model declares invalid, and which creates work for a human |
 
-**Deux mots ont changé, partout** (#131) : « facteur » devient **coefficient**,
-parce qu'un facteur ne dit pas qu'il s'agit d'une fonction ; « variable » devient
-**métrique**, parce que « variable » ne dit rien.
+**Two words changed, everywhere** (#131): "factor" becomes **coefficient**,
+because a factor does not say it is a function; "variable" becomes **metric**,
+because "variable" says nothing at all.
 
-## I.2 Le diagramme
-
-Les noms de classes sont sans accents : c'est une contrainte du rendu, pas une
-graphie.
+## I.2 The diagram
 
 ```mermaid
 classDiagram
-  class Entite {
-    niveau Political_State_Company_Division_Unit
-    controle financier
-    controle operationnel
+  class Entity {
+    level Political_State_Company_Division_Unit
+    financial_control
+    operational_control
     capital
   }
-  class Lieu {
-    niveau Continent_Region_Pays_Ville_Lieu_Unite
+  class Area {
+    level Continent_Region_Country_City_Location_Unit
     latitude
     longitude
   }
-  class Etape
+  class Step
   class Stock {
-    inventaire_jamais_impact
-    mesure_de_remplissage
+    inventory_never_impact
+    fill_measurement
   }
-  class SourceFixe {
-    validite_debut
-    validite_fin
+  class FixedSource {
+    validity_start
+    validity_end
   }
-  class Metrique {
+  class Metric {
     tag
-    forme scalaire_vecteur_table_multidimensionnel
+    shape scalar_vector_table_multidimensional
     dimension
-    incertitude
-    origine
+    uncertainty
+    origin
   }
-  class Regle {
+  class Rule {
     type
-    entrees_ordonnees
-    contrainte_lieu
-    contrainte_entite
-    contrainte_periode
+    ordered_inputs
+    place_constraint
+    entity_constraint
+    period_constraint
   }
   class Coefficient {
-    forme scalaire_table_carte
-    valeur
-    incertitude
-    journalise
+    shape scalar_table_map
+    value
+    uncertainty
+    journalized
   }
-  class SousCategorie
+  class Subcategory
   class Standard
-  class CategorieImpact
+  class ImpactCategory
   class Impact
-  class Anomalie
-  class Tache
+  class Anomaly
+  class Task
 
-  Entite "1" --> "*" Entite : parent
-  Lieu "1" --> "*" Lieu : parent
-  Lieu --> Entite : proprietaire
-  Lieu --> Entite : exploitant
-  Entite --> Etape : la division porte
-  Entite --> Stock : la division porte
-  Etape "1" --> "*" SourceFixe
-  Lieu "1" --> "*" SourceFixe : unite
-  SourceFixe "1" --> "*" Metrique
-  Metrique "*" -- "*" Regle : tag, table dediee
-  Regle "1" --> "*" Coefficient
-  Regle "1" --> "1" SousCategorie
-  CategorieImpact "1" --> "*" Standard
-  Standard "1" --> "*" SousCategorie
-  Regle --> Impact : produit
-  Metrique --> Anomalie : sans regle
-  Regle --> Anomalie : sans contrainte
-  Anomalie --> Tache
+  Entity "1" --> "*" Entity : parent
+  Area "1" --> "*" Area : parent
+  Area --> Entity : owner
+  Area --> Entity : operator
+  Entity --> Step : the division holds
+  Entity --> Stock : the division holds
+  Step "1" --> "*" FixedSource
+  Area "1" --> "*" FixedSource : unit
+  FixedSource "1" --> "*" Metric
+  Metric "*" -- "*" Rule : tag, dedicated table
+  Rule "1" --> "*" Coefficient
+  Rule "1" --> "1" Subcategory
+  ImpactCategory "1" --> "*" Standard
+  Standard "1" --> "*" Subcategory
+  Rule --> Impact : produces
+  Metric --> Anomaly : without a rule
+  Rule --> Anomaly : without a constraint
+  Anomaly --> Task
 ```
 
-Deux arêtes portent l'essentiel, et ce sont les deux que H1 n'a pas :
-**métrique — règle** est une relation **N-à-M explicite**, dans sa propre table ;
-et **règle — sous-catégorie** est le seul chemin par lequel un impact se range
-dans une taxonomie. Une métrique ne connaît aucune taxonomie.
+Two edges carry most of the weight, and they are the two H1 does not have:
+**metric — rule** is an **explicit N-to-M relation**, in its own table; and
+**rule — subcategory** is the only path by which an impact is filed under a
+taxonomy. A metric knows no taxonomy at all.
 
-## I.3 Les axes
+## I.3 The axes
 
-**L'entité** — qui possède, qui exploite, qui répond :
-
-```
-Political (un ou plusieurs niveaux : l'UE)
-  └─ State (« République française » — l'État, pas le territoire)
-       └─ Company (un ou plusieurs niveaux)
-            └─ Division (un ou plusieurs niveaux)
-                 └─ Unit (feuille)
-```
-
-**L'État est un niveau à part entière, et il n'est pas le pays.** « République
-française » est un État ; « France métropolitaine » est un lieu. Ils peuvent
-porter le même nom et ne sont pas le même objet. **L'État fixe le cadre
-réglementaire applicable.** Et le jour où assez d'organisations d'un même État
-seront suivies, il donnera l'assiette d'un échantillon : des estimations
-nationales, sous des poids calculés avec soin.
-
-**Le niveau `Political` porte les coefficients qui ne sont propres à aucune
-entreprise.** L'UE définit des sociétés européennes sans être un territoire, et,
-au titre du MACF, des coefficients applicables à des entreprises installées
-ailleurs. L'entité politique est donc un porteur légitime de coefficient.
-
-**Le lieu** — où c'est, et ce qui mesure :
+**The entity** — who owns, who operates, who answers:
 
 ```
-Continent → (Région, facultative) → Pays → Ville → Lieu (un SIRET en France) → Unité
+Political (one or more levels: the EU)
+  └─ State ("République française" — the State, not the territory)
+       └─ Company (one or more levels)
+            └─ Division (one or more levels)
+                 └─ Unit (leaf)
 ```
 
-Chaque lieu porte latitude et longitude ; un lieu porte aussi un
-**propriétaire** et un **exploitant**, qui sont des arêtes directes vers la
-taxonomie des entités. Ce sont ces arêtes, avec les drapeaux de contrôle
-financier, de contrôle opérationnel, de capital et d'exploitation propre, qui
-**décident de la ligne d'attribution** : un actif exploité et non détenu part en
-leasing amont, détenu et exploité par autrui en leasing aval, et le contrôle
-opérationnel décide du périmètre de consolidation. Sans elles, l'attribution est
-une affirmation et non un calcul.
+**The State is a level of its own, and it is not the country.** "République
+française" is a State; "France métropolitaine" is a place. They may carry the same
+name and are not the same object. **The State sets the applicable regulatory
+framework.** And the day enough organisations of one State are tracked, it gives
+the frame for a sample: national estimates, under carefully computed weights.
 
-**La source fixe est le couple (étape × unité)**, et c'est là que les axes se
-croisent. Ce n'est pas un champ : c'est un croisement. Une colonne « litres de
-gazole » sans unité géographique ne manque pas d'un champ facultatif — elle ne
-désigne aucune source fixe, et il n'y a rien à quoi appliquer une règle.
+**The `Political` level carries the coefficients that belong to no company.** The
+EU defines European companies without being a territory, and, under CBAM,
+coefficients applicable to companies established elsewhere. A political entity is
+therefore a legitimate holder of a coefficient.
 
-**Une unité est un objet temporel.** Elle référence une règle et porte un
-intervalle de validité : un capteur remplacé **termine** l'unité ancienne et
-**ouvre** une unité nouvelle, qui peut estimer son impact par une autre règle. Une
-unité n'est jamais modifiée en place — une modification qui écrase la précédente
-rend tout recalcul du passé faux sans laisser de trace.
+**The area** — where it is, and what measures:
 
-**Un stock n'est pas un lieu.** Le stock de processus est abstrait, il vit sous la
-division, à côté des étapes ; un entrepôt est un bâtiment, et peut n'être jamais
-utilisé comme stock. Un stock garde **l'inventaire, jamais l'impact**, et accumule
-par catégories de contexte d'impact ; un stock de mélange suit la **moyenne
-pondérée imposée**. Un stock déclare sa mesure de remplissage, et cette mesure
-peut être portée par un tiers, dans un autre lieu que le prélèvement, à une
-cadence sans rapport avec celle des flux — l'eau fossile en est le cas limite, et
-une seule mine peut en compter des centaines.
+```
+Continent → (Region, optional) → Country → City → Location (a SIRET in France) → Unit
+```
 
-**Le temps** est le quatrième axe, et **les attributs exigés par la règle** sont le
-cinquième : ce ne sont pas des champs libres, c'est ce dont la règle a besoin pour
-produire son impact.
+Every area carries a latitude and a longitude; an area also carries an **owner**
+and an **operator**, which are direct edges into the entity taxonomy. Those edges,
+together with the flags for financial control, operational control, capital and
+own operation, are what **decide the attribution line**: an asset operated and not
+held goes to upstream leasing, held and operated by a third party to downstream
+leasing, and operational control decides the consolidation perimeter. Without
+them, attribution is an assertion rather than a computation.
 
-## I.4 Les métriques
+**The fixed source is the couple (step × unit)**, and that is where the axes meet.
+It is not a field: it is a crossing. A "litres of diesel" column with no geographic
+unit is not missing an optional field — it designates no fixed source, and there is
+nothing for a rule to apply to.
 
-**Une cellule porte une métrique.** Mais **une métrique n'est pas forcément un
-scalaire**, et la supposer scalaire est un mauvais choix :
+**A unit is a temporal object.** It references a rule and carries a validity
+interval: a replaced sensor **terminates** the old unit and **opens** a new one,
+which may estimate its impact through a different rule. A unit is never modified in
+place — an edit that overwrites the previous one makes every recomputation of the
+past wrong without leaving a trace.
 
-| Forme | Exemple |
+**A stock is not a place.** The process stock is abstract, it lives under the
+division beside the steps; a warehouse is a building, and may never be used as a
+stock. A stock keeps **the inventory, never the impact**, and accumulates by
+impact-context classes; a mixing stock follows the **imposed weighted average**. A
+stock declares its fill measurement, and that measurement may be held by a third
+party, in a different place from the withdrawal, at a cadence unrelated to that of
+the flows — fossil water is the limiting case, and a single mine may count them in
+the hundreds.
+
+**Time** is the fourth axis, and **the attributes required by the rule** are the
+fifth: these are not free-form fields, they are what the rule needs in order to
+produce its impact.
+
+## I.4 Metrics
+
+**A cell carries one metric.** But **a metric is not necessarily a scalar**, and
+assuming it is makes for a poor design:
+
+| Shape | Example |
 |---|---|
-| scalaire | un volume de carburant |
-| vecteur homogène | latitude / longitude ; les coordonnées R, G, B d'une couleur |
-| table de longueur variable | un son |
-| multidimensionnel | une image — le cadran d'un instrument analogique |
+| scalar | a volume of fuel |
+| homogeneous vector | latitude / longitude; the R, G, B coordinates of a colour |
+| variable-length table | a sound |
+| multidimensional | an image — the bezel of an analogue instrument |
 
-Un vecteur homogène n'est pas une table : ses composantes ont des domaines et des
-significations distincts. La latitude et la longitude sont deux angles, et ne sont
-pas interchangeables ; R, G et B le sont encore moins.
+A homogeneous vector is not a table: its components have distinct ranges and
+distinct meanings. Latitude and longitude are both angles, and are not
+interchangeable; R, G and B even less so.
 
-**D'où la relation explicite.** Si toutes les métriques étaient des scalaires,
-trouver la règle qui s'applique demanderait d'essayer toutes les combinaisons
-d'entrées disponibles à un instant donné. Et trier les entrées par dimension —
-par le nom de l'unité SI, en ordre alphabétique — échoue dès qu'une règle a deux
-entrées de même dimension qui ne forment pas une table. La seule solution
-satisfaisante : **taguer les séries**, et porter une relation N-à-M explicite
-entre métriques et règles, dans une table dédiée. **Une métrique stockée dont le
-tag n'est lié à aucune règle est une anomalie**, à afficher au tableau de bord du
-back-office.
+**Hence the explicit relation.** If every metric were a scalar, finding the rule
+that applies would mean trying every combination of inputs available at a given
+time. And sorting inputs by dimension — by the name of the SI unit, in alphabetical
+order — fails as soon as a rule has two inputs of the same dimension that do not
+form a table. The only satisfactory solution: **tag the series**, and carry an
+explicit N-to-M relation between metrics and rules, in a dedicated table. **A
+stored metric whose tag is linked to no rule is an anomaly**, to be shown on the
+back-office dashboard.
 
-**Les unités de mesure.** Une conversion a lieu **à l'ingestion**, une fois, et
-elle dépend de la classe de la métrique (#132) : le physique va au **SI** ; le
-financier va à une **masse d'or fin**, au cours de l'once, à partir d'une table
-des cours tenue quotidiennement dans les monnaies des clients ; le social — un
-effectif — ne se convertit pas. Toute métrique peut porter un pourcentage
-d'incertitude.
+**Units of measure.** A conversion happens **at ingestion**, once, and it depends
+on the metric's class (#132): physical goes to **SI**; financial goes to a **mass
+of fine gold**, at the price of the ounce, from a daily price table held in the
+clients' currencies; social — a headcount — is not converted. Any metric may carry
+an uncertainty percentage.
 
-**Une feuille de la taxonomie des entités porte une seule métrique par nature à
-un instant donné.** Un département qui contrôle plusieurs véhicules a donc deux
-formes possibles, et pas trois : soit la métrique est une **somme `DERIVED`** pour
-l'ensemble des véhicules, soit chaque véhicule est déclaré comme une `Unit`.
-`DERIVED` marque alors le fait qu'un traitement a eu lieu **hors de l'outil**.
+**A leaf of the entity taxonomy carries a single metric per nature at a given
+time.** A department that controls several vehicles therefore has two possible
+shapes, not three: either the metric is a **`DERIVED` sum** over the vehicles, or
+each vehicle is declared as a `Unit`. `DERIVED` then marks the fact that processing
+happened **outside the tool**.
 
-## I.5 Les règles
+## I.5 Rules
 
-**Une règle convertit des métriques et des coefficients en un impact, et le range
-dans une sous-catégorie.** Elle n'est pas du code : elle a un **type**, et c'est le
-type qui porte le code. Le premier type est la proportionnalité, `y = k · x`
-(#118) ; l'identité en est un autre, et il est fréquent.
+**A rule converts metrics and coefficients into an impact, and files it under a
+subcategory.** It is not code: it has a **type**, and the type carries the code.
+The first type is proportionality, `y = k · x` (#118); identity is another, and a
+frequent one.
 
-**L'exemple qui montre le cas identité.** Pour un transport sous-traité, le
-transporteur énonce lui-même une valeur en kgCO2e. La règle est l'identité :
-utiliser la valeur telle quelle. La métrique enregistrée **égale** l'impact
-calculé. Ce que le standard ne dit presque pas, c'est comment qualifier cette
-valeur quand elle arrive sans qualification — et la distinction est nette : une
-valeur fondée sur la consommation réelle d'un camion complet est une métrique
-**mesurée** ; une moyenne de parc fondée sur une masse et une distance, sans même
-tenir compte du taux de remplissage, est une métrique **estimée**.
+**The example that shows the identity case.** For subcontracted transport, the
+carrier states a value in kgCO2e itself. The rule is identity: use the value as it
+stands. The recorded metric **equals** the computed impact. What the standard barely
+says is how to qualify that value when it arrives unqualified — and the distinction
+is sharp: a value based on a full truckload's actual consumption is a **measured**
+metric; a fleet average based on mass and distance, not even accounting for the fill
+factor, is an **estimated** one.
 
-**Les entrées d'une règle sont ordonnées canoniquement** — ce sont des paramètres
-de fonction. L'ordre ne se déduit pas des dimensions, pour la raison donnée
-plus haut ; il est déclaré, et le lien vers les séries passe par les tags.
+**A rule's inputs are canonically ordered** — they are function parameters. The
+order does not follow from the dimensions, for the reason given above; it is
+declared, and the link to the series runs through the tags.
 
-**Les coefficients d'une règle sont des scalaires ou des tables.** Une table est
-un coefficient comme un autre, et la règle s'adapte à une plage de tailles de
-table : **le nombre de coefficients n'est donc pas constant** pour un type donné.
+**A rule's coefficients are scalars or tables.** A table is a coefficient like any
+other, and the rule adapts to a range of table sizes: **the number of coefficients
+is therefore not constant** for a given type.
 
-**Les contraintes d'applicabilité** d'une règle : une période de validité qui doit
-recouvrir celle des émissions, un lieu, une entité (pour un coefficient propre à
-une entreprise), la concordance des dimensions des entrées, et l'impact produit,
-qui doit être celui qu'on cherche.
+**A rule's applicability constraints**: a validity period that must overlap the
+emissions', a place, an entity (for a coefficient specific to a company), agreement
+between the dimensions of the inputs, and the impact produced, which must be the one
+being sought.
 
-**L'indexation, dans cet ordre.** Classer d'abord par **nombre d'entrées scalaires
-et tabulaires** et **nombre de coefficients scalaires et tabulaires**, puis par
-dimensions des entrées et impact produit : une recherche par ces critères est
-rapide en base. Les contraintes viennent ensuite, parce qu'elles sont plus
-complexes — des aires géographiques —, et pour que leur expression reste locale et
-simple, elles sont départagées par des **règles de précédence : d'abord les règles
-propres à une entité**.
+**Indexing, in this order.** Classify first by **number of scalar and tabular
+inputs** and **number of scalar and tabular coefficients**, then by the dimensions
+of the inputs and the impact produced: a search on those criteria is fast in a
+database. Constraints come next, because they are more complex — geographic areas —
+and so that their expression stays local and simple, they are settled by
+**precedence rules: entity-specific rules first**.
 
-**Deux anomalies au niveau de la règle** : une règle **sans contrainte
-géographique**, et une règle **sans période de validité**. Toutes deux remontent
-au back-office Natixar.
+**Two anomalies at the rule level**: a rule with **no geographic constraint**, and a
+rule with **no validity period**. Both are reported to the Natixar back office.
 
-**Le sous-poste appartient à la règle, jamais à la métrique.** Une règle non
-rattachée à un sous-poste est illégale. Et le sous-poste n'est pas un lien direct
-vers une taxonomie : les règles sont **universelles**, et le sous-poste d'une règle
-est **l'ensemble des informations nécessaires pour ranger son impact dans la bonne
-sous-catégorie de n'importe quelle taxonomie**. Conséquence directe : **une
-métrique qui n'est liée à aucune règle n'est pas « non allouée »** — aucun impact
-n'est calculable à partir d'elle, c'est une anomalie.
+**The sub-post belongs to the rule, never to the metric.** A rule not attached to a
+sub-post is illegal. And the sub-post is not a direct link into a taxonomy: rules
+are **universal**, and a rule's sub-post is **the set of information required to
+file its impact under the right subcategory of any taxonomy**. A direct consequence:
+**a metric linked to no rule is not "unallocated"** — no impact is computable from
+it, and that is an anomaly.
 
-**Une question de performance, à mesurer et non à trancher d'avance.** Une simple
-règle `métrique × coefficient` peut se décliner en un nombre écrasant de règles,
-et la recherche géographique peut coûter cher en PostgreSQL. D'où une option :
-porter des **cartes géographiques comme paramètres de premier rang** d'une règle —
-des cartes lues au moment du calcul, qui associent un lieu à un coefficient. Le
-calcul des recouvrements d'intervalles est meilleur marché, mais le même
-arbitrage se pose entre **cartes temporelles** et règles distinctes. En croisant
-les deux, un paramètre de règle complexe serait une **carte géographique de cartes
-temporelles** — un jeu de coefficients sur une grande aire et une longue période,
-ce qu'est exactement l'électricité.
+**A performance question, to be measured rather than settled in advance.** A plain
+`metric × coefficient` rule can multiply into an overwhelming number of rules, and
+geographic search may be expensive in PostgreSQL. Hence an option: carry
+**geographic maps as first-order parameters** of a rule — maps read at compute time,
+mapping a place to a coefficient. Computing interval overlaps is cheaper, but the
+same trade-off arises between **temporal maps** and distinct rules. Crossing the
+two, a complex rule parameter would be a **geographic map of temporal maps** — a set
+of coefficients over a large area and a long period, which is exactly what
+electricity is.
 
-## I.6 Les coefficients
+## I.6 Coefficients
 
-**Un coefficient est une fonction** de la nature (un élément de taxonomie), du
-temps, du lieu, et facultativement de l'entité. Sa description complète compte
-beaucoup d'enregistrements.
+**A coefficient is a function** of nature (a taxonomy element), time, place, and
+optionally entity. Its complete description runs to many records.
 
-**Journalisés, pas versionnés élément par élément.** Une mise à jour touche une
-partie des enregistrements et doit être cohérente : **aucune intersection deux à
-deux** entre ses lieux. Pour mettre à jour un pays en gardant une particularité
-régionale, soit deux mises à jour successives, soit un lieu « le pays sauf cette
-région ». On rejoue ainsi un calcul avec la base telle qu'elle était à une date
-passée, en **ignorant les écritures postérieures à la coupure**.
+**Journalized, not versioned record by record.** An update touches some of the
+records and must be coherent: **no pairwise intersection** between its places. To
+update a country while keeping a regional particularity, either two successive
+updates, or a place "the country except that region". A computation is thus replayed
+against the database as it stood at a past date, by **ignoring entries after the
+cut-off**.
 
-**La résolution.** Ne garder que la part qui intersecte la période et le lieu
-demandés — y compris ce qui vaut pour la Terre entière —, puis parcourir les mises
-à jour **de la plus récente à la plus ancienne**. Sur l'axe des entités, la requête
-vise la feuille, et **remonte l'arbre** si rien n'y est défini. Les valeurs propres
-à une entité sont prioritaires ; leur **annulation se journalise** par un drapeau
-qui renvoie à la valeur indépendante de l'entité — un parc photovoltaïque
-décommissionné.
+**Resolution.** Keep only the part that intersects the requested period and place —
+including whatever holds for the whole Earth — then walk the updates **from the most
+recent to the oldest**. On the entity axis, the query targets the leaf, and **climbs
+the tree** if nothing is defined there. Entity-specific values take precedence;
+**their cancellation is journalized** through a flag that refers back to the
+entity-independent value — a decommissioned solar array.
 
-**L'impact est l'intégrale de la règle, pas la règle de l'intégrale.** Si un
-coefficient change dans la période, `débit × durée × coefficient` est faux. Un pas
-de 30 jours, un débit de 1 kg/s, un coefficient qui passe de 0,5 à 0,8 au dixième
-jour : l'exact vaut **1 814 400** kgCO2e, le coefficient de fin de mois seul donne
-+14,29 %, celui de début de mois −28,57 %. Le coefficient unique qui redonne
-l'exact vaut 0,700, soit la **moyenne pondérée par le temps** — la même moyenne
-pondérée imposée que pour un stock de mélange, appliquée à l'axe du temps. La
-période se découpe donc aux révisions, ou le moteur intègre par morceaux.
+**Impact is the integral of the rule, not the rule of the integral.** If a
+coefficient changes within the period, `flow × duration × coefficient` is wrong. A
+30-day step, a flow of 1 kg/s, a coefficient going from 0.5 to 0.8 on the tenth day:
+the exact value is **1,814,400** kgCO2e, the end-of-month coefficient alone gives
++14.29 %, the start-of-month one −28.57 %. The single coefficient that reproduces the
+exact value is 0.700, which is the **time-weighted mean** — the same imposed weighted
+average as for a mixing stock, applied to the time axis. So either the period is cut
+at the revisions, or the engine integrates piecewise.
 
-**La propriété et l'engagement.** Natixar tient une **base de référence** de tous
-les coefficients utilisés par ses clients, à l'exception de ceux qui sont propres à
-une entreprise — qu'elle vérifie néanmoins —, et en conserve un **engagement**. Le
-logiciel client a la charge de les **présenter** au moment de faire signer un
-calcul. **Tous les coefficients utilisés pour un calcul entrent dans le VC signé**,
-avec les références des règles, les métriques, et les éléments du calcul
-d'incertitude.
+**Ownership and commitment.** Natixar keeps a **reference database** of every
+coefficient used by its clients, except those specific to one company — which it
+verifies nonetheless — and keeps a **commitment** to those values. The client
+software is responsible for **presenting** them when a computation is signed. **Every
+coefficient used in a computation enters the signed VC**, together with the rule
+references, the metrics, and the elements of the uncertainty computation.
 
-## I.7 Les taxonomies maîtresses
+## I.7 Master taxonomies
 
-**Il n'y a pas de taxonomie propre à un client.** Il existe des taxonomies
-maîtresses — BEGES, GHG Protocol — qui visent à s'appliquer à n'importe quelle
-organisation, ou à n'importe quel produit quand le but est une empreinte
-environnementale de produit. Une organisation donnée n'a pas besoin de toutes les
-catégories définies ; **ce n'est pas une raison pour définir des identifiants
-propres au client**. La seule raison de le faire serait de brouiller la donnée par
-une indirection secrète — et le brouillage ne tient pas : il suffit de grouper les
-cellules par indice de catégorie pour retrouver, sans grande difficulté, les
-principales catégories d'émission d'un métier.
+**There is no client-specific taxonomy.** There are master taxonomies — BEGES, the
+GHG Protocol — which aim to apply to any organisation, or to any product when a
+Product Environmental Footprint is the goal. A given organisation does not need every
+category defined; **that is no reason to define client-specific identifiers**. The
+only reason to do so would be to blur the data behind a secret indirection — and the
+blur does not hold: grouping cells by category index is enough to recover, without
+much difficulty, the main emission categories of a line of business.
 
-**La hiérarchie a une forme, et elle est imposée :**
+**The hierarchy has a shape, and it is imposed:**
 
 ```
-Catégorie d'impact   GES, usage de l'eau, SVHC, gouvernance, …
-  └─ Standard        BEGES v4, BEGES v5, GHG Protocol, ISO …, conforme MACF
-       └─ …          la logique de groupement propre à ce standard
-            └─ Sous-catégorie   « Combustion dans les sources mobiles »
+Impact category   GHG, water use, SVHC, governance, …
+  └─ Standard     BEGES v4, BEGES v5, GHG Protocol, ISO …, CBAM-compliant
+       └─ …       the grouping logic proper to that standard
+            └─ Subcategory   "Combustion in mobile sources"
 ```
 
-Le premier niveau est la **catégorie d'impact** ; elle s'ajoute quand un client
-veut et peut la suivre. Le deuxième est le **standard**, parce qu'il y a souvent
-plusieurs façons de comptabiliser le même impact. En dessous, chaque taxonomie a
-sa propre logique de groupement, jusqu'aux sous-catégories.
+The first level is the **impact category**; it is added when a client wants to, and
+is able to, track it. The second is the **standard**, because there is often more
+than one way to account for the same impact. Below that, each taxonomy has its own
+grouping logic, down to the subcategories.
 
-**Les tables maîtresses sont mémorisées à jamais** — données officielles,
-actuelles **et obsolètes** —, parce qu'il faut pouvoir recalculer une publication
-passée. Leur **désignation est celle du standard, version comprise** : le fait que
-la donnée soit téléchargée depuis nos serveurs n'empêche pas une vérification
-indépendante depuis une autre source.
+**Master tables are memorised forever** — official data, current **and obsolete** —
+because past publications must remain recomputable. **Their designation is the
+standard's own, version included**: the fact that the data is downloaded from our
+servers does not stand in the way of independent verification from another source.
 
-**Ce que le front reçoit.** Le logiciel client ne reçoit **que ce dont il a
-besoin** : un collaborateur a besoin des catégories GHG Protocol de son entreprise,
-un comptable des catégories BEGES de plusieurs entreprises. Il garde en stockage
-local les éléments de taxonomie et les règles qu'il a rencontrés ; quand une
-nouvelle cellule référence une règle inconnue, qui référence un élément de
-taxonomie inconnu, il les **demande au serveur et les stocke**. **Les têtes de
-toutes les taxonomies sont toujours envoyées et affichées** — les scopes de BEGES,
-par exemple — pour qu'on distingue une organisation **sans** émissions de scope 3
-d'une organisation qui **ne les a pas évaluées**.
+**What the front end receives.** The client software receives **only what it needs**:
+one worker needs the GHG Protocol categories of his company, an accountant the BEGES
+categories of several companies. It keeps in local storage the taxonomy elements and
+rules it has met; when a new cell references an unknown rule, which references an
+unknown taxonomy element, it **requests them from the server and stores them**. **The
+head lines of every taxonomy are always sent and displayed** — the scopes in BEGES,
+for instance — so that an organisation **with no** scope 3 emissions is
+distinguishable from one that **has not assessed** them.
 
-**Un JSON téléchargeable ne convient donc pas** à une donnée qui croît
-indéfiniment et change souvent : il faudra de toute façon un chargement
-incrémental. Ce qui est en table et ce qui est téléchargeable est secondaire ; ce
-qui compte est la désignation officielle et le chargement incrémental.
+**A downloadable JSON therefore does not fit** data that grows indefinitely and
+changes often: an incremental load mechanism will be needed in any case. What sits in
+a table and what is downloadable is secondary; what matters is the official
+designation and the incremental load.
 
-**Une piste commerciale, enregistrée ici pour ne pas être reperdue** : ces données
-publiques pourraient être offertes en *freemium* — service bridé et lisible par
-machine pour tous, service payant pour les gros volumes. Il faut un processus qui
-les tienne à jour, mais cela ressemble à une activité viable sur des serveurs peu
-coûteux.
+**A commercial lead, recorded here so it is not lost again**: this public data could
+be offered as *freemium* — a throttled, machine-readable service for everyone, a paid
+one for high-volume users. It needs a process that keeps it up to date, but it looks
+like a viable business on relatively cheap servers.
 
-## I.8 La qualité : d'où vient la valeur, et jusqu'où elle est juste
+## I.8 Quality: where the value comes from, and how far it is right
 
-**`origin` dit d'où vient LA VALEUR. `coverage` dit si la SÉRIE a une date que
-personne n'a fournie.** Une cellule peut être mesurée et combler un trou de
-calendrier : un seul axe ne pourrait pas le dire.
+**`origin` says where THE VALUE comes from. `coverage` says whether the SERIES has a
+date nobody supplied.** A cell can be measured and fill a calendar hole at the same
+time: one axis could not say both.
 
-| Valeur | Sens |
+| Value | Meaning |
 |---|---|
-| `MEASURED` | la grandeur a été lue sur un instrument, pour cet intervalle |
-| `DERIVED` | elle se déduit d'une grandeur mesurée par une opération **exacte**, dont **tous les coefficients sont exacts** |
-| `ESTIMATED` | l'opération ou l'un de ses coefficients est incertain, ou la valeur est empruntée |
-| `NOT_MEASURED` | aucune mesure n'existe, et la cellule le déclare |
+| `MEASURED` | the quantity was read off an instrument, for this interval |
+| `DERIVED` | it follows from a measured quantity through an **exact** operation, all of whose **coefficients are exact** |
+| `ESTIMATED` | the operation or one of its coefficients is uncertain, or the value is borrowed |
+| `NOT_MEASURED` | no measurement exists, and the cell says so |
 
-**`DERIVED` exige l'exactitude, pas seulement l'explicitation.** Le nombre de
-secondes d'un mois donné est exact ; une moyenne l'est aussi. Un débit reconstitué
-en divisant un total mensuel par la durée du mois est donc `DERIVED` — la grandeur
-mesurée est le total, et la répartition à l'intérieur de la période est modélisée.
-Mais **dès que la loi elle-même est incertaine** — un coefficient d'émission
-approché —, le résultat est `ESTIMATED`, et **l'exactitude se dégrade**. Une valeur
-`DERIVED` ne prétend pas que l'émission a été un flux constant.
+**`DERIVED` demands exactness, not merely explicitness.** The number of seconds in a
+given month is exact; so is an average. A flow reconstructed by dividing a monthly
+total by the month's duration is therefore `DERIVED` — the measured quantity is the
+total, and the distribution inside the period is modelled. But **as soon as the law
+itself is uncertain** — an approximate emission coefficient — the result is
+`ESTIMATED`, and **accuracy degrades**. A `DERIVED` value does not claim the emission
+was a constant stream.
 
-**L'exactitude se calcule, elle ne se déclare pas.** Les feuilles BEGES de
-référence associent une exactitude à des règles précises — coefficients compris —
-et la combinent avec les incertitudes portées par les données collectées
-elles-mêmes, c'est-à-dire par les métriques.
+**Accuracy is computed, not declared.** The reference BEGES worksheets associate an
+accuracy with specific rules — coefficients included — and combine it with the
+uncertainties carried by the collected data itself, that is, by the metrics.
 
-**`NOT_MEASURED` couvre aussi la métrique qui ne peut pas changer.** Un impact
-calculé depuis la puissance nominale inscrite sur la plaque d'un groupe froid n'est
-pas une mesure et ne le deviendra jamais : la seule voie d'amélioration est de
-changer de méthode — suivre réellement les fuites — ou de changer l'équipement.
-**Cette lecture attend une source nommée**, et tant qu'elle n'en a pas, elle ne
-vaut pas mieux que l'interprétation qu'elle remplace.
+**`NOT_MEASURED` also covers the metric that cannot change.** An impact computed from
+the nominal power printed on a cooling unit's plate is not a measurement and never
+will be: the only route to improvement is to change the method — actually track the
+leaks — or to change the equipment. **This reading awaits a named source**, and until
+it has one, it is worth no more than the interpretation it replaces.
 
-**Un agrégat déclare l'ENSEMBLE de ses origines, pas la plus faible.** Provenance
-et exactitude sont deux questions : *puis-je remonter à la source* d'un côté, *de
-combien est-ce faux* de l'autre. Un agrégat porte `{MEASURED, ESTIMATED}`, ce qui
-conserve l'information utile — **quelle part** est estimée, et non seulement
-qu'une part l'est. L'exactitude, elle, se propage numériquement : somme
-quadratique pour des sources dont l'indépendance est établie, linéaire pour des
-sources corrélées.
+**An aggregate declares the SET of its origins, not the weakest one.** Provenance and
+accuracy are two questions: *can I trace this value back to its source* on one side,
+*how wrong is it* on the other. An aggregate carries `{MEASURED, ESTIMATED}`, which
+preserves the useful information — **which share** is estimated, and not merely that
+some share is. Accuracy, in turn, propagates numerically: in quadrature for sources
+whose independence is established, linearly for correlated ones.
 
-**Un détail estimé sous un agrégat mesuré** — un compteur couvrant plusieurs
-machines, réparti par temps de marche — fait de l'origine une **relation** : cet
-ensemble de valeurs dérivées se somme à ce total mesuré. C'est ce contrôle de
-cohérence interne qui rend la répartition défendable.
+**An estimated detail under a measured aggregate** — one meter covering several
+machines, split by running hours — turns origin into a **relation**: this set of
+derived values sums to that measured total. It is that internal consistency check
+which makes the split defensible.
 
-**Les anomalies sont des objets de plein droit** : une métrique sans règle, une
-règle sans contrainte de lieu ou de période, un jeu de coefficients devenu invalide
-sur sa plage. Chacune produit une **tâche** dans le back-office, avec un correctif
-proposé ; un agent peut créer la tâche, **jamais appliquer le correctif** (#134).
+**Anomalies are first-class objects**: a metric with no rule, a rule with no place or
+period constraint, a coefficient set that has become invalid over its range. Each
+produces a **task** in the back office, with a proposed patch; an agent may create the
+task, **never apply the patch** (#134).
 
-## I.9 Le temps, les rechargements, le rejeu
+## I.9 Time, reloads, replay
 
-**Un rechargement AJOUTE.** La donnée de remplacement s'ajoute à l'ancienne,
-devient la valeur par défaut, et **n'effface pas ce qui a servi à un VC**. Il faut
-pouvoir refaire un calcul ancien, **même faux**, aussi longtemps que la faute est
-du côté du client. Un identifiant de cellule dérivé de la source ne suffit donc
-pas : il se généralise mal — un premier chargement qui donne un agrégat annuel,
-puis un second qui donne le détail mensuel, le mettent en échec.
+**A reload ADDS.** Replacement data adds to the old, becomes the default, and **does
+not erase what was used for a VC**. An old computation must remain repeatable, **even
+a wrong one**, for as long as the fault lies with the client. A cell identifier
+derived from the source is therefore not enough: it generalises badly — a first load
+giving a yearly aggregate, then a second giving monthly detail, defeat it.
 
-**Un compteur de génération par cellule**, initialisé à `max(génération) + 1` au
-début de chaque chargement, dit à quel chargement une cellule appartient.
+**A generation counter per cell**, initialised to `max(generation) + 1` at the start
+of each load, says which load a cell belongs to.
 
-**L'identifiant peut porter une empreinte** d'une sérialisation fiable de
-l'intervalle de temps, ce qui rend l'identité d'une cellule vérifiable sans
-convention de nommage.
+**The identifier may carry a digest** of a reliable serialisation of the time
+interval, which makes a cell's identity verifiable without a naming convention.
 
-## I.10 Ce qui reste à trancher
+## I.10 What remains to be settled
 
-| | Question | Où |
+| | Question | Where |
 |---|---|---|
-| 1 | exploité / non exploité, détenu / non détenu : un **paramètre des entités feuilles**, dont la représentation reste à discuter | — |
-| 2 | cartes géographiques et temporelles comme paramètres de règle, **ou** règles distinctes : arbitrage de performance à mesurer | — |
-| 3 | `NOT_MEASURED` pour une métrique qui ne peut pas changer : il manque une **source nommée** | — |
-| 4 | la représentation **formelle et lisible par machine** de cette ontologie, et ses diagrammes | — |
-| 5 | où vivent les tables maîtresses, et comment une base client déclare son édition | #135 |
-| 6 | le chargement **incrémental** des taxonomies et des règles vers le front | — |
+| 1 | operated / not operated, owned / not owned: a **parameter on leaf entities**, whose representation remains to be discussed | — |
+| 2 | geographic and temporal maps as rule parameters, **or** distinct rules: a performance trade-off to be measured | — |
+| 3 | `NOT_MEASURED` for a metric that cannot change: a **named source** is missing | — |
+| 4 | the **formal, machine-readable** representation of this ontology, and its diagrams | — |
+| 5 | where the master tables live, and how a client database declares its edition | #135 |
+| 6 | the **incremental** load of taxonomies and rules towards the front end | — |
 
-Aucune de ces questions n'a d'issue à elle, sauf la cinquième. **Une question sans
-issue n'a pas de propriétaire** : c'est un défaut de suivi, pas une propriété du
-modèle.
+None of these questions has an issue of its own, except the fifth. **A question
+without an issue has no owner**: that is a tracking defect, not a property of the
+model.
 
 ---
 
-# Partie II — H1 : ce que le code implémente
+# Part II — H1: what the code implements
 
-*Le code fait foi : `services/store/schema.sql`, `services/store/app.py`,
+*The code is authoritative: `services/store/schema.sql`, `services/store/app.py`,
 `site/assets/js/quality.js`.*
 
-## II.1 Le tableau des effondrements
+## II.1 The table of collapses
 
-| L'ontologie dit | H1 fait | Conséquence | Ce qui la lève |
+| The ontology says | H1 does | Consequence | What lifts it |
 |---|---|---|---|
-| cinq axes, la source fixe est le couple (étape × unité) | `cell.entity_id` porte **à la fois** l'entité, l'unité et l'étape — les deux bijections du 2 août : un département *est* une unité, une unité *fait* une opération | confondre un bâtiment et un stock de processus est le comportement **par défaut** ; l'électricité, qui n'est pas comptée par département, n'a aucun axe qui puisse porter son compteur | aucune issue — l'axe « lieu » n'existe dans aucune table |
-| des taxonomies maîtresses, catégorie → standard → sous-catégorie, mémorisées à jamais | **un** fichier JSON publié, versionné, à identifiants entiers propres au client | une seule ligne de standard est calculable ; les identifiants n'ont pas de désignation officielle ; rien ne conserve les éditions obsolètes | #131, #135 |
-| une règle typée, indexée, contrainte, rattachée à une sous-catégorie | **aucune table de règles** ; la cellule porte directement `sub_post`, `part_type`, `caracterisation` et un coefficient constant | le sous-poste est rattaché à la métrique et non à la règle — l'inverse de l'ontologie ; aucune contrainte d'applicabilité n'est vérifiable | #125, #129 |
-| un coefficient est une fonction journalisée | `cell.factor`, un `double precision` **recopié dans chaque cellule** au chargement | une révision scientifique impose un rechargement, et deux chiffres publiés à deux dates deviennent incomparables | #131, #133 |
-| une métrique taguée, de forme quelconque, liée aux règles par une table N-à-M | **un scalaire** par cellule, rattaché par ses propres colonnes | ni vecteur, ni table, ni image ; aucune métrique ne peut être déclarée orpheline de règle | aucune issue |
-| une métrique sans règle est une **anomalie** | `sub_post` nul signifie « non alloué », et l'allocation le répartit | une donnée dont aucun impact n'est calculable est présentée comme un reste à répartir | #129 |
-| l'origine se déduit de la règle et de l'unité qui a produit la valeur | `origin = 'MEASURED'`, **écrit en dur** par le chargeur, sur chaque cellule | la vue qualité annonce 100 % de mesuré et rapporte fidèlement une étiquette fausse | #116 |
-| un rechargement ajoute, et n'efface jamais ce qui a servi à un VC ; une génération par cellule | `ON CONFLICT (id) DO UPDATE`, **toutes colonnes** : le rechargement remplace | un agrégat annuel puis un détail mensuel se marchent dessus ; aucun compteur de génération | aucune issue |
-| les anomalies produisent des tâches pour un humain | **aucune** table, aucune route, aucun écran | un écart constaté n'a pas de propriétaire dans l'outil | #134 |
-| une base de référence Natixar, des bases clients alimentées dans un seul sens | **une** base, où un client est le sous-arbre suspendu à sa racine | la partition par propriétaire de la donnée n'existe pas ; aucune édition de référence n'est déclarable | #135 |
-| l'impact est l'intégrale de la règle | `débit × durée × coefficient`, coefficient constant | une révision intramensuelle est masquée sans trace | #133 |
-| l'entité va de `Political` à `Unit`, l'État est un niveau | deux niveaux : une organisation de tête, ses départements | aucun cadre réglementaire n'est rattachable, aucun échantillon national | #131 |
+| five axes; the fixed source is the couple (step × unit) | `cell.entity_id` carries the entity, the unit **and** the step at once — the two bijections of 2 August: a department *is* a unit, a unit *performs* one operation | confusing a building with a process stock is the **default** behaviour; electricity, which is not metered by department, has no axis that can carry its meter | no issue — the area axis exists in no table |
+| master taxonomies, category → standard → subcategory, memorised forever | **one** published, versioned JSON file, with integer identifiers specific to the client | only one standard's line is computable; the identifiers have no official designation; nothing keeps obsolete editions | #131, #135 |
+| a typed rule, indexed, constrained, attached to a subcategory | **no rule table**; the cell directly carries `sub_post`, `part_type`, `caracterisation` and a constant coefficient | the sub-post hangs off the metric rather than the rule — the reverse of the ontology; no applicability constraint is checkable | #125, #129 |
+| a coefficient is a journalized function | `cell.factor`, a `double precision` **copied into every cell** at load time | a scientific revision forces a reload, and two figures published at two dates become incomparable | #131, #133 |
+| a tagged metric of any shape, linked to rules through an N-to-M table | **one scalar** per cell, attached through its own columns | no vector, no table, no image; no metric can be declared orphaned of a rule | no issue |
+| a metric with no rule is an **anomaly** | a null `sub_post` means "unallocated", and allocation spreads it | data from which no impact is computable is presented as a remainder to spread | #129 |
+| origin follows from the rule and from the unit that produced the value | `origin = 'MEASURED'`, **hard-coded** by the loader, on every cell | the quality view reports 100 % measured, faithfully reporting a false label | #116 |
+| a reload adds, and never erases what a VC used; one generation per cell | `ON CONFLICT (id) DO UPDATE`, **all columns**: a reload replaces | a yearly aggregate then a monthly detail overwrite each other; no generation counter | no issue |
+| anomalies create tasks for a human | **no** table, no route, no screen | a discrepancy that has been observed has no owner inside the tool | #134 |
+| a Natixar reference database, client databases fed one way | **one** database, where a client is the subtree hanging from its root | the partition by data owner does not exist; no reference edition is declarable | #135 |
+| impact is the integral of the rule | `flow × duration × coefficient`, with a constant coefficient | an intra-month revision is masked without a trace | #133 |
+| entities run from `Political` to `Unit`, and the State is a level | two levels: a head organisation and its departments | no regulatory framework is attachable, no national sample | #131 |
 
-**Ce tableau est le contrat de cette note.** Tout changement du schéma doit y
-ajouter une ligne, en retirer une, ou expliquer pourquoi il n'en touche aucune.
+**This table is the contract of this note.** Any schema change must add a row to it,
+remove one, or explain why it touches none.
 
-## II.2 Les trois tables
+## II.2 The three tables
 
-### `entity` — qui émet
+### `entity` — who emits
 
-Un arbre à deux niveaux. La racine est l'**organisation de tête** — le client,
-personne morale — et ses enfants sont ses départements.
+A two-level tree. The root is the **head organisation** — the client, a legal person
+— and its children are its departments.
 
-| Colonne | Rôle |
+| Column | Role |
 |---|---|
-| `id` | entier ; c'est lui, et lui seul, que voient les attestations |
-| `label` | le nom, en clair — voir plus bas |
-| `parent` | l'entité mère ; `NULL` pour une organisation de tête |
-| `industrial` | la matière traverse-t-elle ce département, ou le soutient-il ? |
-| `legal_name`, `jurisdiction`, `registered_office` | l'identité légale — **renseignées sur la tête seule** |
-| `did` | l'identifiant décentralisé de l'organisation, d'où le front tire l'émetteur qu'il signe |
+| `id` | integer; it, and it alone, is what credentials see |
+| `label` | the name, in the clear — see below |
+| `parent` | the parent entity; `NULL` for a head organisation |
+| `industrial` | does the material pass through this department, or does the department support it? |
+| `legal_name`, `jurisdiction`, `registered_office` | the legal identity — **filled on the head only** |
+| `did` | the organisation's decentralised identifier, from which the front end takes the issuer it signs |
 
-**Le cloisonnement multi-client est la racine de l'arbre, pas une colonne.**
-Compter par client se dit « remonter les parents jusqu'à la racine, puis
-grouper ». Une colonne `tenant_id` sur chaque cellule dupliquerait ce que `parent`
-sait déjà, et le jour où les deux divergeraient, c'est la colonne qu'on croirait.
+**Multi-client separation is the root of the tree, not a column.** Counting per
+client reads as "walk the parents up to the root, then group". A `tenant_id` column
+on every cell would duplicate what `parent` already knows, and the day the two
+diverged, the column is the one that would be believed.
 
-**La forme dit laquelle des entités est une personne morale** : les colonnes
-d'identité légale ne sont remplies que sur la tête, puisque les départements n'en
-ont pas.
+**The shape says which entity is a legal person**: the legal identity columns are
+filled on the head only, since departments have none.
 
-**`industrial` décide de l'allocation.** Un département de soutien émet réellement
-et n'appartient à aucun lot : ses émissions deviennent le **non alloué**, que la
-règle d'allocation répartit entre les barres coulées le mois même. *L'ontologie
-nomme ce reste autrement : une métrique sans règle est une anomalie. Ici, c'est un
-seau à répartir.*
+**`industrial` decides allocation.** A support department really does emit and belongs
+to no lot: its emissions become the **unallocated** bucket, which the allocation rule
+spreads across the bars poured that same month. *The ontology names that remainder
+differently: a metric with no rule is an anomaly. Here, it is a bucket to spread.*
 
-**Les noms sont en clair, provisoirement.** Ce sont eux qui révèlent
-l'organigramme du client, et c'est cette table que le chiffrement des dimensions
-couvrira — décision D1 de l'issue #6, non tranchée. Le client, lui, ne connaît
-déjà que les entiers : rien du front ne changera ce jour-là.
+**Names are in the clear, for now.** They are what reveals the client's
+organisational chart, and this is the table that dimension encryption will cover —
+decision D1 of issue #6, unsettled. The client, for its part, already knows nothing
+but the integers: nothing in the front end will change that day.
 
-### `cell` — la table de faits
+### `cell` — the fact table
 
-Rien que des nombres et un intervalle.
+Nothing but numbers and an interval.
 
-| Colonne | Rôle |
+| Column | Role |
 |---|---|
-| `id` | texte, **déterministe**, dérivé de la source — voir « Idempotence » |
-| `period` | `tstzrange`, semi-ouvert `[début, fin)` |
-| `entity_id` | l'entité émettrice — **et**, en H1, l'unité de production et l'étape du procédé |
-| `sub_post`, `part_type`, `caracterisation` | la position dans la taxonomie, en entiers ; `sub_post` nul = non alloué |
-| `flux` | le **débit**, en unité SI **par seconde** |
-| `dimension` | ce que le débit mesure — `volume`, `mass`, `energy` |
-| `display_unit`, `display_scale` | l'unité où la donnée brute se relit, et le facteur qui y mène depuis le SI |
-| `factor` | le coefficient d'émission, en **kgCO2e par unité SI** d'activité — un nombre, pas une fonction |
-| `origin` | d'où vient la valeur — premier axe de qualité |
-| `coverage` | la série a-t-elle ses dates — second axe de qualité |
+| `id` | text, **deterministic**, derived from the source — see "Idempotence" |
+| `period` | `tstzrange`, half-open `[start, end)` |
+| `entity_id` | the emitting entity — **and**, in H1, the production unit and the process step |
+| `sub_post`, `part_type`, `caracterisation` | the position in the taxonomy, as integers; a null `sub_post` means unallocated |
+| `flux` | the **flow**, in SI units **per second** |
+| `dimension` | what the flow measures — `volume`, `mass`, `energy` |
+| `display_unit`, `display_scale` | the unit in which the raw data reads back, and the factor that leads there from SI |
+| `factor` | the emission coefficient, in **kgCO2e per SI unit** of activity — a number, not a function |
+| `origin` | where the value comes from — the first quality axis |
+| `coverage` | does the series have its dates — the second quality axis |
 
-Un index GiST porte sur `period`. Contraintes : un intervalle ne peut pas être
-vide (`period_not_empty`) ; `origin` et `coverage` sont restreints à leurs valeurs.
+A GiST index covers `period`. Constraints: an interval cannot be empty
+(`period_not_empty`); `origin` and `coverage` are restricted to their values.
 
-### `credential` — les attestations reçues
+### `credential` — the credentials received
 
-| Colonne | Rôle |
+| Column | Role |
 |---|---|
-| `digest` | SHA-256 de la forme canonique — **la clé** |
-| `subject` | `credentialSubject.id`, un URN opaque |
-| `type` | le type W3C significatif, hors `VerifiableCredential` |
-| `received_at`, `received_by` | quand, et par quel compte |
-| `document` | l'attestation, **telle quelle**, en `jsonb` |
+| `digest` | SHA-256 of the canonical form — **the key** |
+| `subject` | `credentialSubject.id`, an opaque URN |
+| `type` | the meaningful W3C type, excluding `VerifiableCredential` |
+| `received_at`, `received_by` | when, and through which account |
+| `document` | the credential, **as it stands**, as `jsonb` |
 
-**La clé est l'empreinte du document, pas le sujet.** Une barre porte deux
-attestations — l'origine, signée par la mine, et l'intensité carbone, signée par
-Natixar — et toutes deux portent le même sujet, puisque c'est ce que `derivedFrom`
-relie. Clé sur le sujet, la seconde arrivée était silencieusement jetée. Clé sur
-l'empreinte : renvoyer deux fois le même fichier ne crée rien, une réémission pour
-le même sujet est une ligne de plus, et le registre prend la plus récente par
-(sujet, type).
+**The key is the document's digest, not the subject.** A bar carries two credentials
+— origin, signed by the mine, and carbon intensity, signed by Natixar — and both
+carry the same subject, since that is what `derivedFrom` links. Keyed on the subject,
+the second to arrive was silently dropped. Keyed on the digest: sending the same file
+twice creates nothing, a reissue for the same subject is one more row, and the
+register takes the most recent per (subject, type).
 
-**Stockées telles quelles**, parce qu'elles sont signées : les reformater les
-invaliderait.
+**Stored as they stand**, because they are signed: reformatting them would invalidate
+them.
 
-## II.3 Le modèle de flux
+## II.3 The flow model
 
-### Pourquoi un débit, et non une quantité
+### Why a flow, and not a quantity
 
-Une cellule porte un flux moyen sur une période, jamais une valeur à un instant.
-Toutes les interrogations sont donc des **recouvrements** : intégrer sur un
-intervalle quelconque se dit `&&`. Deux colonnes début/fin indexées séparément
-donneraient un B-tree qui se dégrade précisément sur cette requête-là ;
-`tstzrange` et GiST y répondent en une passe.
+A cell carries a mean flow over a period, never a value at an instant. Every query is
+therefore an **overlap**: integrating over an arbitrary interval reads as `&&`. Two
+separately indexed start/end columns would give a B-tree that degrades on precisely
+that query; `tstzrange` and GiST answer it in one pass.
 
-La métrique est stockée **divisée par la durée de sa période** — unité SI par
-seconde — et la quantité se retrouve en multipliant par la durée voulue. Intégrer
-sur une fenêtre qui recouvre à moitié une cellule mensuelle rend donc la moitié.
+The metric is stored **divided by the duration of its period** — SI units per second
+— and the quantity comes back by multiplying by the duration wanted. Integrating over
+a window that half-overlaps a monthly cell therefore returns half.
 
-### La seule hypothèse du modèle
+### The model's only assumption
 
-**Le débit est supposé uniforme sur l'intervalle.** Entre deux relevés mensuels,
-rien ne dit comment la consommation s'est répartie, et un débit constant est la
-seule répartition qui n'invente pas de structure.
+**The flow is assumed uniform over the interval.** Between two monthly readings,
+nothing says how consumption was distributed, and a constant flow is the only
+distribution that invents no structure.
 
-Cette hypothèse a une conséquence qui gouverne l'API : **le choix des bornes est
-libre.** Sur une fenêtre plus courte, les émissions diminuent au prorata du temps,
-mais la production aussi — trente barres dans le mois en font quinze en quinze
-jours. Numérateur et dénominateur diminuent ensemble, et l'intensité par barre ne
-bouge pas. Aucune borne de requête n'est donc contrainte, et rien n'est aligné sur
-des mois.
+That assumption has a consequence which governs the API: **the choice of bounds is
+free.** Over a shorter window, emissions fall in proportion to time, but so does
+production — thirty bars in the month make fifteen in a fortnight. Numerator and
+denominator fall together, and intensity per bar does not move. No query bound is
+therefore constrained, and nothing is aligned to months.
 
-Elle dégrade proprement : des données plus fines donnent des intervalles plus
-courts, donc une meilleure approximation, **sans changer de modèle**.
+It degrades gracefully: finer data gives shorter intervals, hence a better
+approximation, **without changing model**.
 
-**Ce que cette invariance ne couvre pas** : un coefficient qui varie dans la
-période. H1 n'en porte qu'un, constant ; l'ontologie intègre par morceaux (I.6), et
-c'est là que l'invariance des bornes se paie.
+**What that invariance does not cover**: a coefficient that varies within the period.
+H1 carries only one, constant; the ontology integrates piecewise (I.6), and that is
+where the invariance of the bounds is paid for.
 
-### Le fuseau
+## II.4 Units of measure
 
-Les bornes sont des minuits **locaux** — le pays d'exploitation est à UTC−4 toute
-l'année —, stockés en UTC. Découper sur des minuits Zulu décalerait chaque
-frontière de quatre heures, et rangerait une nuit de production dans le mois
-suivant.
+**Everything is in SI, and it is the dimension that is stored, not the unit.**
+"Volume" reads m³, "mass" kg; divided by the duration, m³/s or kg/s. Naming the unit
+on top of the dimension would add a choice where there is none, hence an opportunity
+to diverge. *H1 knows physical metrics only: neither the financial one converted to
+fine gold nor the unconverted social one of I.4 has any place.*
 
-## II.4 Les unités de mesure
+**The emission coefficient is a number**, always in kgCO2e per SI unit of activity.
+The unit follows from `dimension`; carrying "kgCO2e/m³" alongside would be a second
+source of truth. Conversion from the source's unit happens **once, at ingestion**.
 
-**Tout est en SI, et c'est la dimension qui est stockée, pas l'unité.** « Volume »
-se lit m³, « mass » kg ; divisé par la durée, m³/s ou kg/s. Nommer l'unité
-par-dessus la dimension ajouterait un choix là où il n'y en a pas, donc une
-occasion de divergence. *H1 ne connaît que des métriques physiques : ni le
-financier converti en or fin, ni le social non converti de I.4 n'ont de place.*
+**`display_scale` avoids writing a unit system.** `display = SI × display_scale`: a
+cubic metre is a thousand litres, hence 1000. Knowing that a datum "is in litres" is
+useless without a table of symbols, their prefixes and their multiples; the factor
+says everything display needs, in one double. It enters no computation.
 
-**Le coefficient d'émission est un nombre**, toujours en kgCO2e par unité SI
-d'activité. L'unité se déduit de `dimension` ; porter « kgCO2e/m³ » à côté serait
-une seconde source de vérité. La conversion depuis l'unité de la source a lieu
-**une fois, à l'ingestion**.
+The computation returns kgCO2e (`RESULT_UNIT`, in `engine.js`).
 
-**`display_scale` évite d'écrire un système d'unités.** `affichage = SI ×
-display_scale` : un mètre cube vaut mille litres, donc 1000. Savoir qu'une donnée
-« est en litres » ne sert à rien sans une table des symboles, de leurs préfixes et
-de leurs multiples ; le facteur dit tout ce dont l'affichage a besoin, en un
-double. Il n'entre dans aucun calcul.
+## II.5 The two quality axes, as stored
 
-Le calcul rend des kgCO2e (`RESULT_UNIT`, dans `engine.js`).
+`origin` takes its four values from I.8, and `coverage` the two below:
 
-## II.5 Les deux axes de qualité, tels qu'ils sont stockés
-
-`origin` prend ses quatre valeurs de I.8, et `coverage` les deux suivantes :
-
-| Valeur | Sens |
+| Value | Meaning |
 |---|---|
-| `COMPLETE` | la date est couverte par la source |
-| `MISSING` | la série est périodique, une date manque, et la cellule la comble |
+| `COMPLETE` | the date is covered by the source |
+| `MISSING` | the series is periodic, a date is absent, and the cell fills it |
 
-**La cellule existe, et elle le dit.** Ne rien charger pour un mois absent
-laisserait un trou qu'aucun dénombrement ne verrait : une couverture calculée sur
-les cellules présentes vaudrait 100 % en ignorant le mois manquant. Reconstituer
-sans marquer serait pire — le trou deviendrait invisible tout en pesant sur les
-chiffres publiés. Le seul choix honnête porte la valeur et l'aveu ensemble.
+**The cell exists, and it says so.** Loading nothing for an absent month would leave
+a hole no count would see: coverage computed over the cells present would read 100 %
+while ignoring the missing month. Reconstructing without marking would be worse — the
+hole would become invisible while still weighing on published figures. The only
+honest choice carries the value and the admission together.
 
-**Il n'y a pas de valeur `INCOMPLETE` en H1.** Juger qu'une émission attend une
-grandeur absente suppose de connaître l'**intention de calcul**, qui n'est pas
-stockée. Dans l'ontologie, cette intention existe : c'est la **règle**, avec ses
-entrées déclarées et ses contraintes. `INCOMPLETE` y devient déductible — une
-règle dont une entrée manque —, et cesse d'être une règle codée en dur.
+**There is no `INCOMPLETE` value in H1.** Judging that an emission awaits an absent
+quantity supposes knowing the **computational intent**, which is not stored. In the
+ontology that intent exists: it is the **rule**, with its declared inputs and its
+constraints. `INCOMPLETE` becomes derivable there — a rule with a missing input — and
+stops being a hard-coded rule.
 
-**Deux écarts avec I.8, à ne pas oublier** : `schema.sql` porte aujourd'hui le
-commentaire *« une cellule `MEASURED` peut être `MISSING` — le mois d'où on la
-recopie était bien mesuré »*, alors que I.8 classe une grandeur empruntée en
-`ESTIMATED` ; et le chargeur écrit `MEASURED` en dur. Les deux sont l'objet de
-#116.
+**Two discrepancies with I.8, not to be forgotten**: `schema.sql` currently carries
+the comment *"a `MEASURED` cell can be `MISSING` — the month it is copied from was
+indeed measured"*, whereas I.8 classes a borrowed quantity as `ESTIMATED`; and the
+loader writes `MEASURED` as a literal. Both are the subject of #116.
 
 ## II.6 Idempotence
 
-Les identifiants de cellule sont **déterministes, dérivés de la source** : un
-préfixe de nature, le mois, le département ou le produit, et la part —
-`d/2025-03/<département>/comb`, `x/2025-03/<produit>`. Recharger remplace au lieu
-d'empiler (`ON CONFLICT (id) DO UPDATE`, toutes colonnes comprises). Un chargement
-joué deux fois par mégarde doublerait sinon l'inventaire, et cela ne se verrait
-pas.
+Cell identifiers are **deterministic, derived from the source**: a nature prefix, the
+month, the department or the product, and the part —
+`d/2025-03/<department>/comb`, `x/2025-03/<product>`. Reloading replaces rather than
+piling up (`ON CONFLICT (id) DO UPDATE`, all columns included). A load run twice by
+mistake would otherwise double the inventory, and that would not show.
 
-**C'est une méthode ad hoc, ajustée au jeu d'essai.** Elle ne se généralise pas :
-un agrégat annuel puis un détail mensuel s'écrasent l'un l'autre, et rien ne
-survit du chargement précédent. L'ontologie l'écarte au profit de l'ajout et du
-compteur de génération (I.9).
+**It is an ad hoc method, fitted to the sample data.** It does not generalise: a
+yearly aggregate then a monthly detail overwrite one another, and nothing survives
+from the previous load. The ontology discards it in favour of addition and the
+generation counter (I.9).
 
-## II.7 Qui applique le schéma
+## II.7 Who applies the schema
 
-**Le magasin, à son démarrage** — `lifespan` dans `services/store/app.py`, avant
-la première requête. `schema.sql` voyage dans l'image, à côté des requêtes qui en
-dépendent : une image déployée trouve toujours la base que ses requêtes attendent.
+**The store, at start-up** — `lifespan` in `services/store/app.py`, before the first
+request. `schema.sql` travels inside the image, beside the queries that depend on it:
+a deployed image always finds the database its queries expect.
 
-C'est possible sans privilège supplémentaire parce que `schema.sql` est
-**idempotent par construction** — `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT
-EXISTS` —, et que les migrations y figurent **après** les `CREATE` : un `ALTER` sur
-une table que le même fichier n'a pas encore créée ferait avorter toute la
-transaction. Le schéma d'une base migrée finit ainsi identique à celui d'une base
-neuve.
+That is possible without extra privilege because `schema.sql` is **idempotent by
+construction** — `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS` — and
+because the migrations sit **after** the `CREATE`s: an `ALTER` on a table the same
+file has not yet created would abort the whole transaction. The schema of a migrated
+database thus ends up identical to that of a fresh one.
 
-## II.8 La vue qualité des données
+## II.8 The data quality view
 
-*Page `/quality/`, réservée ; données servies par `GET /api/v1/counts`.*
+*Page `/quality/`, restricted; data served by `GET /api/v1/counts`.*
 
-### Intention
+### Intent
 
-Permettre à Natixar, qui exploite la plateforme, de **surveiller la qualité des
-données de ses clients sans lire leurs affaires**. L'énoncé de confidentialité de
-la plateforme se tient ou tombe ici : c'est le seul écran où l'exploitant voit
-plusieurs clients à la fois.
+To let Natixar, which operates the platform, **monitor the quality of its clients'
+data without reading their business**. The platform's confidentiality claim stands or
+falls here: this is the only screen where the operator sees several clients at once.
 
-### Exigences
+### Requirements
 
-| | Exigence | D'où elle vient |
+| | Requirement | Where it comes from |
 |---|---|---|
-| E1 | **Des dénombrements, jamais un lingot.** Aucun identifiant de barre, aucun nom de département. | la confidentialité client |
-| E2 | **Une répartition par client**, et pas seulement un total. | une moyenne ne bouge pas quand un client sur vingt se dégrade, et l'on n'intervient pas auprès d'une moyenne |
-| E3 | **Les deux axes séparés.** Les origines se partagent 100 % d'une ligne ; la couverture est un autre axe. | additionner les cinq colonnes n'aurait aucun sens |
-| E4 | **Zéro n'est pas absence.** « 0,0 % » et « — » se distinguent. | un client sans aucune donnée ne doit pas passer pour irréprochable |
-| E5 | **Les noms de clients réservés à l'exploitant.** | apprendre à un client qui d'autre est sur la plateforme n'est pas une fonctionnalité |
-| E6 | **Une erreur de routage ne ressemble pas à une plateforme vide.** | le site rend 200 pour tout chemin inconnu |
+| E1 | **Counts, never a bar.** No bar identifier, no department name. | client confidentiality |
+| E2 | **A breakdown per client**, not only a total. | an average does not move when one client in twenty degrades, and one does not intervene with an average |
+| E3 | **The two axes kept apart.** Origins share 100 % of a row; coverage is another axis. | adding the five columns would mean nothing |
+| E4 | **Zero is not absence.** "0.0 %" and "—" are distinguishable. | a client with no data at all must not pass for spotless |
+| E5 | **Client names reserved to the operator.** | teaching a client who else is on the platform is not a feature |
+| E6 | **A routing error does not look like an empty platform.** | the site returns 200 for any unknown path |
 
-### Spécification
+### Specification
 
-**Accès — E5.** Deux droits distincts, portés par le compte. `counts` ouvre la
-vue ; `tenants` y ajoute la répartition nominative par client. L'exploitant a les
-deux, un client n'a ni l'un ni l'autre — la vue porte sur la *plateforme*, donc sur
-les autres clients aussi. **Le refus vient du service**, pas de l'écran : un compte
-sans droit reçoit `403` même en tapant l'adresse, et la page se contente de le dire
-lisiblement.
+**Access — E5.** Two distinct rights, carried by the account. `counts` opens the view;
+`tenants` adds the per-client named breakdown. The operator has both, a client has
+neither — the view is about the *platform*, hence about other clients too. **The
+refusal comes from the service**, not from the screen: an account without the right
+gets `403` even by typing the address, and the page merely says so legibly.
 
-**Ce que calcule `/api/v1/counts` — E1, E2.**
+**What `/api/v1/counts` computes — E1, E2.**
 
-- `totals` — le nombre de cellules, d'entités et d'attestations ;
-- `byOrigin` — le nombre de cellules par valeur d'`origin`, sur toute la
-  plateforme ;
-- `byOrganisation`, **seulement avec le droit `tenants`** — pour chaque
-  organisation de tête : le nombre de cellules, leur répartition sur les quatre
-  origines, et le nombre de cellules `MISSING`.
+- `totals` — the number of cells, entities and credentials;
+- `byOrigin` — the number of cells per `origin` value, across the whole platform;
+- `byOrganisation`, **only with the `tenants` right** — for each head organisation:
+  the number of cells, their spread over the four origins, and the number of
+  `MISSING` cells.
 
-Le client d'une cellule est **la racine de son entité**, obtenue par une requête
-récursive qui remonte l'arbre — conformément à la règle de `entity` : aucun
-`tenant_id` n'est stocké.
+A cell's client is **the root of its entity**, obtained by a recursive query that
+climbs the tree — in keeping with the rule of `entity`: no `tenant_id` is stored.
 
-**Ce qu'affiche la page — E3, E4, E6.**
+**What the page displays — E3, E4, E6.**
 
-- trois vignettes : cellules, entités, attestations ;
-- un tableau des origines, en nombre et en part ;
-- le tableau par client, dont l'en-tête **sépare** les quatre colonnes d'origine de
-  la colonne de couverture ;
-- une part vaut « — » quand le dénominateur est nul, et « 0,0 % » quand il ne l'est
-  pas ;
-- `NOT_MEASURED` et `MISSING` passent en couleur d'alerte **à partir de 10 %** de
-  la ligne ; les trois autres origines ne sont jamais colorées ;
-- avant de lire la réponse, la page vérifie qu'elle est du JSON : une page
-  d'accueil rendue par erreur ne s'affiche pas comme une plateforme sans données.
+- three tiles: cells, entities, credentials;
+- a table of origins, in counts and in shares;
+- the per-client table, whose header **separates** the four origin columns from the
+  coverage column;
+- a share reads "—" when the denominator is zero, and "0.0 %" when it is not;
+- `NOT_MEASURED` and `MISSING` turn to an alert colour **from 10 %** of the row; the
+  other three origins are never coloured;
+- before reading the response, the page checks that it is JSON: a home page rendered
+  by mistake does not display as a platform without data.
 
-**L'unité de compte est la cellule.** Chaque part est un rapport de nombres de
-cellules ; une cellule y pèse un, quelle que soit l'émission qu'elle porte.
+**The unit of account is the cell.** Every share is a ratio of cell counts; a cell
+weighs one, whatever emission it carries.
 
-### Ce que la vue ne montre pas
+### What the view does not show
 
-Aucune colonne `INCOMPLETE`, pour la raison donnée en II.5. Et aucune anomalie :
-une métrique sans règle, une règle sans contrainte, un jeu de coefficients invalide
-n'existent pas en H1, donc ne s'affichent nulle part. C'est l'écran que #134 aura à
-créer.
+No `INCOMPLETE` column, for the reason given in II.5. And no anomaly: a metric with
+no rule, a rule with no constraint, an invalid coefficient set do not exist in H1, so
+they are displayed nowhere. That is the screen #134 will have to create.
