@@ -1,41 +1,47 @@
-# documentation/ — comment ce système est bâti
+# documentation/ — how this system is built
 
-Ce répertoire est né le 8 septembre 2026 (issue #96). Jusque-là, le projet ne
-documentait son architecture nulle part ailleurs que dans les issues, les PR et
-les commentaires du code — trois endroits où l'on trouve *pourquoi une décision
-a été prise*, jamais *comment l'ensemble tient debout*.
+This directory was created on 8 September 2026 (issue #96). Until then, the project
+documented its architecture nowhere but in issues, pull requests and code comments —
+three places where one finds *why a decision was taken*, never *how the whole thing
+holds together*.
 
-## Ce que ce répertoire est, et ce qu'il n'est pas
+## What this directory is, and what it is not
 
-**Il n'est pas la source de vérité.** Le code l'est. `deploy/steps/60-app.sh`
-décide du routage ; cette documentation l'explique. Quand les deux divergent,
-c'est la documentation qui a tort, et c'est une anomalie à corriger comme une
-autre.
+**It is not the source of truth.** The code is. `deploy/steps/60-app.sh` decides
+routing; this documentation explains it. When the two diverge, the documentation is
+the one that is wrong, and that is a defect to be fixed like any other.
 
-**Il n'est pas non plus `deploy/README.md`.** Celui-là énonce les *invariants*
-du déploiement — des affirmations que `deploy/verify/*.bats` peut faire échouer.
-Ici on explique des mécanismes, on compare des options, on garde la trace de ce
-qui a été mesuré. Un document d'ici ne casse aucun test ; c'est précisément
-pourquoi il doit porter une date et dire ce qui a été constaté ce jour-là.
+**Nor is it `deploy/README.md`.** That one states the deployment *invariants* —
+assertions that `deploy/verify/*.bats` can make fail. Here we explain mechanisms,
+compare options, and keep a record of what was measured. A document here breaks no
+test; that is precisely why it must carry a date and say what was observed on that
+day.
 
-**Il n'est pas `analyses/`.** Ce répertoire-là est ignoré par git : il porte des
-documents de travail, des courriers, et des données qui ne peuvent pas sortir du
-poste. `documentation/` est versionné, **et le dépôt est public** : rien de ce
-qui relève de la clause 9 de l'accord de collaboration n'y entre, aucun
-identifiant, aucun secret, aucun nom de personne extérieure.
+**It is not `analyses/`.** That directory is ignored by git: it holds working
+documents, correspondence, and data that cannot leave the control post.
+`documentation/` is version-controlled, **and the repository is public**: nothing
+covered by clause 9 of the collaboration agreement goes in, no identifier, no secret,
+no outside person's name.
 
-## Convention
+## Conventions
 
 ```
-NN_sujet.md
+NN_subject.md
 ```
 
-Numérotation stable, croissante, jamais réattribuée. Un renvoi se fait par lien
-relatif, jamais par « la note 2 » en toutes lettres.
+Numbering is stable, increasing, never reassigned. A cross-reference is made through
+a relative link, never by spelling out "note 2".
 
-## Les notes
+**Version-controlled documents are written in English, file names included.**
+Decision of the maintainer, 29 September 2026. It applies to this directory as a
+whole; the notes below that are still in French are marked as such, and their
+translation is #142. A rename breaks every link already shared outside the
+repository, so it happens before a note is merged whenever that is still possible.
+
+## The notes
 
 | | |
 |---|---|
-| [01 — Hébergement et routage du site statique](01_hebergement-et-routage.md) | La chaîne complète : Hugo → image → conteneur → Traefik → domaine. Qui sert quoi, et qui ne nous appartient pas. |
-| [02 — static-web-server](02_static-web-server.md) | Le serveur retenu : ce qu'il sait faire, ce que nous en utilisons, comment son conteneur est bâti et déployé. |
+| [01 — Hosting and routing of the static site](01_hebergement-et-routage.md) | The full chain: Hugo → image → container → Traefik → domain. Who serves what, and what is not ours. **Still in French.** |
+| [02 — static-web-server](02_static-web-server.md) | The server chosen: what it can do, what we use of it, how its container is built and deployed. **Still in French.** |
+| [03 — The ontology, and what H1 implements of it](03_ontology-and-schema.md) | In two parts: the target ontology — metrics, coefficients, rules, official taxonomies, five axes — then what the code implements today, every collapse named with the issue that lifts it. |
