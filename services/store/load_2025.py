@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -148,15 +149,15 @@ SUBPOST_EXPLOSIVES = 1005
 HEAD_ID = 100
 
 #: L'identité de l'organisation de tête — nom, dénomination légale, juridiction,
-#: siège, DID — vit HORS DU DÉPÔT, à côté du classeur. Issue #120.
+#: siège, DID — vit HORS DU DÉPÔT, à côté du classeur : c'est une donnée du
+#: client, et elle relève de la même règle que le classeur.
 #:
-#: Elle était écrite ici jusqu'au 11 septembre 2026, adresse du siège comprise,
-#: dans un dépôt public — alors que `NOTICE` affirme que l'identité du client
-#: n'y est pas enregistrée. C'est une donnée du client et le produit de
-#: recherches : elle relève de la même règle que le classeur, et le script la
-#: lit au moment de s'exécuter, jamais à l'import — `test_units.py` importe ce
-#: module en intégration continue, où `poc-data/` n'existe pas.
-IDENTITY = ROOT / "poc-data" / "client-head-organisation.json"
+#: Le script la lit au moment de s'exécuter, JAMAIS À L'IMPORT :
+#: `test_units.py` importe ce module en intégration continue, où `poc-data/`
+#: n'existe pas. `CLIENT_IDENTITY` déplace le fichier sans toucher au code,
+#: pour qu'un secret restitué ailleurs se charge sans patch.
+IDENTITY = Path(os.environ.get("CLIENT_IDENTITY")
+                or ROOT / "poc-data" / "client-head-organisation.json")
 IDENTITY_FIELDS = ("key", "legal_name", "jurisdiction", "registered_office", "did")
 
 
