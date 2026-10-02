@@ -1,4 +1,4 @@
-"""Chargeur unique des données AGM 2025 dans le cube.
+"""Chargeur unique des données 2025 du client dans le cube.
 
     STORE_DSN=... python3 services/store/load_2025.py [--dry-run]
 
@@ -8,7 +8,7 @@ Rien ici ne doit être réutilisé pour H2 : la cartographie source → modèle 
 et son taux de couverture calculé sont un tout autre sujet. Le marquer plutôt
 que le sous-entendre évite qu'il devienne l'ingestion par accident.
 
-CE QU'IL LIT. Le paquet physique AGM, qui est **confidentiel au titre de la
+CE QU'IL LIT. Le paquet physique du client, **confidentiel au titre de la
 clause 9** et n'entre jamais dans le dépôt. Le script le lit depuis le disque
 local et écrit dans la base ; il ne recopie rien dans un fichier suivi.
 
@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -35,11 +36,11 @@ from psycopg.types.range import Range
 import db
 
 ROOT = Path(__file__).resolve().parents[2]
-PACK = ROOT / "poc-data" / "AGM_PoC_Physical_Data_Pack_Completed.xlsx"
-ASSIGNMENT = ROOT / "poc-data" / "agm-h1-subpost-assignment.json"
+PACK = ROOT / "poc-data" / "client-physical-data-pack.xlsx"
+ASSIGNMENT = ROOT / "poc-data" / "client-h1-subpost-assignment.json"
 FIXTURE = ROOT / "site" / "static" / "engine" / "erp-fixture.json"
 
-#: Feuille 9 du paquet. Cinq des six sont marqués « provisional » par AGM ;
+#: Feuille 9 du paquet. Cinq des six sont marqués « provisional » par le client ;
 #: seul le facteur de combustion du gazole est accepté, et seulement parce que
 #: janvier réconcilie à −0,16 % contre leur propre classeur.
 # LA CONVERSION A LIEU ICI, ET NULLE PART AILLEURS.
@@ -106,7 +107,7 @@ def cell_metrology(name: str) -> tuple[str, str, float]:
     """La dimension, l'unité d'affichage, et le facteur qui va du SI vers elle.
 
     L'unité d'affichage est celle de la SOURCE — le litre des bons de sortie
-    d'AGM — et elle ne sert qu'à relire la donnée brute sans compter les zéros.
+    du client — et elle ne sert qu'à relire la donnée brute sans compter les zéros.
     Aucun calcul ne la lit : la seule unité qui compte est celle du SI, et elle
     se déduit de la dimension.
 
@@ -131,7 +132,7 @@ EXPLOSIVE, _ = si_factor("explosive")
 DIESEL_DIMENSION, DIESEL_DISPLAY, DIESEL_SCALE = cell_metrology("diesel-combustion")
 EXPLOSIVE_DIMENSION, EXPLOSIVE_DISPLAY, EXPLOSIVE_SCALE = cell_metrology("explosive")
 
-#: Identifiants de la taxonomie servie, agm-h1-v2.
+#: Identifiants de la taxonomie servie ; sa version est dans taxonomy.json.
 PART_COMBUSTION, PART_AMONT = 1, 2
 CARAC_OPERATED, CARAC_PROCEDEED = 1, 2
 SUBPOST_EXPLOSIVES = 1005
@@ -140,27 +141,43 @@ SUBPOST_EXPLOSIVES = 1005
 #:
 #: C'est elle qui rend le cube multi-client lisible : un client est le sous-arbre
 #: suspendu à sa tête, et « compter par client » se dit « remonter les parents
-#: jusqu'à la racine ». Les départements d'AGM portent les identifiants 1 à 34,
-#: qui viennent du fixture ; la tête prend 100 pour qu'ajouter un département
+#: jusqu'à la racine ». Les départements portent les identifiants 1 à 34, qui
+#: viennent du fixture ; la tête prend 100 pour qu'ajouter un département
 #: n'entre jamais en collision avec elle.
 #:
-#: L'identité légale est ici et non dans le dépôt côté front : c'est une donnée
-#: du client, elle vit dans SA taxonomie — celle-là même que le chiffrement des
-#: dimensions couvrira le jour où D1 de l'issue #6 sera tranchée. En clair
-#: aujourd'hui, comme les noms de départements, et pour la même raison.
-HEAD = {
-    "id": 100,
-    "key": "AGM Inc.",
-    "industrial": False,
-    "legal_name": "AGM Inc",
-    "jurisdiction": "Co-operative Republic of Guyana",
-    "registered_office": ("3rd Floor R & S Mall Apartment District Track "
-                          "JW Mandela Avenue, Durban Backlands, Georgetown, Guyana"),
-    # Le domaine est celui de la mine, et elle le contrôle — décision 4 du
-    # script de tournage, tranchée le 1er août. C'est ce DID que le front
-    # inscrit comme émetteur des attestations d'origine.
-    "did": "did:web:guygold.com",
-}
+#: L'IDENTIFIANT EST STRUCTUREL, DONC ICI. L'IDENTITÉ NE L'EST PAS, DONC AILLEURS.
+HEAD_ID = 100
+
+#: L'identité de l'organisation de tête — nom, dénomination légale, juridiction,
+#: siège, DID — vit HORS DU DÉPÔT, à côté du classeur : c'est une donnée du
+#: client, et elle relève de la même règle que le classeur.
+#:
+#: Le script la lit au moment de s'exécuter, JAMAIS À L'IMPORT :
+#: `test_units.py` importe ce module en intégration continue, où `poc-data/`
+#: n'existe pas. `CLIENT_IDENTITY` déplace le fichier sans toucher au code,
+#: pour qu'un secret restitué ailleurs se charge sans patch.
+IDENTITY = Path(os.environ.get("CLIENT_IDENTITY")
+                or ROOT / "poc-data" / "client-head-organisation.json")
+IDENTITY_FIELDS = ("key", "legal_name", "jurisdiction", "registered_office", "did")
+
+
+def head_organisation() -> dict:
+    """L'organisation de tête : l'identifiant du code, l'identité du fichier.
+
+    Un champ manquant ARRÊTE le chargement. Charger une tête sans DID, par
+    exemple, produirait une organisation que le front ne saurait pas désigner
+    comme émettrice, et la panne n'apparaîtrait qu'au moment de signer.
+    """
+    if not IDENTITY.exists():
+        raise SystemExit(
+            f"identité de l'organisation de tête introuvable : {IDENTITY}\n"
+            "elle est hors du dépôt (issue #120) ; la restaurer depuis sa sauvegarde.")
+    data = json.loads(IDENTITY.read_text("utf-8"))
+    missing = [f for f in IDENTITY_FIELDS if not data.get(f)]
+    if missing:
+        raise SystemExit(f"{IDENTITY.name} : champs manquants — {', '.join(missing)}")
+    return {"id": HEAD_ID, "industrial": False, **{f: data[f] for f in IDENTITY_FIELDS}}
+
 
 #: Le Guyana est à UTC−4 toute l'année, sans heure d'été.
 GUYANA = timezone(timedelta(hours=-4))
@@ -169,8 +186,7 @@ GUYANA = timezone(timedelta(hours=-4))
 def month_range(label: str) -> Range:
     """« 2025-01 » -> le mois LOCAL, en bornes semi-ouvertes.
 
-    Minuit à Georgetown, pas minuit à Greenwich. Une mine rapporte en jours
-    guyaniens : découper sur des minuits Zulu décalerait chaque frontière de
+    Minuit local, pas minuit à Greenwich. Une mine rapporte en jours locaux : découper sur des minuits Zulu décalerait chaque frontière de
     quatre heures et rangerait une nuit de production dans le mois suivant. À
     l'échelle d'un mois l'erreur est petite ; à la frontière d'un lot elle met
     du gazole dans la mauvaise barre, ce que le modèle prétend justement éviter.
@@ -209,7 +225,7 @@ def organisation() -> dict[str, dict]:
     seul, qui permet de compter par client.
     """
     fx = json.loads(FIXTURE.read_text("utf-8"))
-    return {d["key"]: {**d, "parent": HEAD["id"]} for d in fx["organisation"]}
+    return {d["key"]: {**d, "parent": HEAD_ID} for d in fx["organisation"]}
 
 
 def synthetic_months() -> dict[str, str]:
@@ -265,8 +281,9 @@ def period_seconds(period: Range) -> float:
 
 def build_cells(fuel, explosives, assignment, org):
     """La correspondance département → sous-poste vient du fichier d'affectation,
-    relu et non redeviné : c'est lui qui porte les 14 départements marqués
-    « needs AGM confirmation », et il a été vérifié séparément."""
+    relu et non redeviné : c'est lui qui porte les 14 départements dont
+    l'affectation attend la confirmation du client, et il a été vérifié
+    séparément."""
     by_department = {e["department"]: e for e in assignment["emissionBearing"]["fuel"]}
     cells = []
 
@@ -328,7 +345,7 @@ def build_cells(fuel, explosives, assignment, org):
     return cells
 
 
-def load(conn, cells, org) -> None:
+def load(conn, cells, org, head) -> None:
     db.apply_schema(conn)
     # La taxonomie d'organisation. Les noms sont en clair PROVISOIREMENT : ce
     # sont eux que le chiffrement des dimensions couvrira. Le client n'en connaît
@@ -347,7 +364,7 @@ def load(conn, cells, org) -> None:
                 jurisdiction = EXCLUDED.jurisdiction,
                 registered_office = EXCLUDED.registered_office,
                 did = EXCLUDED.did""",
-        HEAD,
+        head,
     )
     with conn.cursor() as cur:
         cur.executemany(
@@ -392,7 +409,7 @@ def sql_literal(value) -> str:
     return "'" + str(value).replace("'", "''") + "'"
 
 
-def emit_sql(cells, org) -> None:
+def emit_sql(cells, org, head) -> None:
     """Le chargement, en SQL, sur stdout.
 
     Une seule transaction : un chargement à moitié appliqué laisserait un cube
@@ -402,9 +419,9 @@ def emit_sql(cells, org) -> None:
     # La tête d'abord : `parent` la référence.
     print("INSERT INTO entity (id, label, industrial, legal_name, jurisdiction, "
           "registered_office, did) VALUES "
-          f"({HEAD['id']}, {sql_literal(HEAD['key'])}, {sql_literal(HEAD['industrial'])}, "
-          f"{sql_literal(HEAD['legal_name'])}, {sql_literal(HEAD['jurisdiction'])}, "
-          f"{sql_literal(HEAD['registered_office'])}, {sql_literal(HEAD['did'])}) "
+          f"({head['id']}, {sql_literal(head['key'])}, {sql_literal(head['industrial'])}, "
+          f"{sql_literal(head['legal_name'])}, {sql_literal(head['jurisdiction'])}, "
+          f"{sql_literal(head['registered_office'])}, {sql_literal(head['did'])}) "
           "ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label, "
           "industrial = EXCLUDED.industrial, legal_name = EXCLUDED.legal_name, "
           "jurisdiction = EXCLUDED.jurisdiction, "
@@ -447,17 +464,19 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true",
                     help="compte et résume sans écrire — le défaut serait dangereux dans l'autre sens")
     ap.add_argument("--sql", action="store_true",
-                    help="émet le SQL sur stdout au lieu de se connecter ; le paquet AGM reste ici")
+                    help="émet le SQL sur stdout au lieu de se connecter ; le paquet du client reste ici")
     args = ap.parse_args()
 
     if not PACK.exists():
-        print(f"paquet AGM introuvable : {PACK}", file=sys.stderr)
+        print(f"paquet du client introuvable : {PACK}", file=sys.stderr)
         print("il est confidentiel (clause 9) et n'est pas dans le dépôt.", file=sys.stderr)
         return 1
 
     fuel, explosives = read_pack()
     assignment = json.loads(ASSIGNMENT.read_text("utf-8"))
     org = organisation()
+    # L'identité est lue ICI, à l'exécution, et pas à l'import : voir HEAD_ID.
+    head = head_organisation()
 
     # Les mois absents entrent AVANT la construction : ils produisent de vraies
     # cellules, avec un vrai identifiant déterministe, qui disent seulement
@@ -482,7 +501,7 @@ def main() -> int:
     industrial = sum(1 for d in org.values() if d["industrial"])
     say = lambda m: print(m, file=sys.stderr)
     say(f"{len(cells)} cellules — {m3:,.0f} m3 de gazole, {tonnes:,.0f} tCO2e au total")
-    say(f"  organisation : {HEAD['key']} + {len(org)} départements, dont {industrial} industriels")
+    say(f"  organisation : {head['key']} + {len(org)} départements, dont {industrial} industriels")
     say(f"  couverture : {missing} MISSING ({', '.join(donors) or 'aucun mois reconstitué'})")
     say(f"  affectation : {assignment['version']} ({assignment['status'].split(' - ')[0]})")
 
@@ -491,15 +510,15 @@ def main() -> int:
         return 0
 
     if args.sql:
-        # Le classeur AGM est confidentiel au titre de la clause 9 : il ne quitte
+        # Le classeur du client est confidentiel (clause 9) : il ne quitte
         # pas ce poste. Seules les données dérivées traversent, par stdin, et
         # rien ne s'écrit sur le système de fichiers de la cible — c'est la
         # doctrine de deploy/, elle vaut ici aussi.
-        emit_sql(cells, org)
+        emit_sql(cells, org, head)
         return 0
 
     with db.connect() as conn:
-        load(conn, cells, org)
+        load(conn, cells, org, head)
         n = conn.execute("SELECT count(*) AS n FROM cell").fetchone()["n"]
     say(f"\nchargé. {n} cellules dans le cube.")
     return 0

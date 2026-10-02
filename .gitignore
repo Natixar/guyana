@@ -6,9 +6,10 @@ audit-*
 .claude/*
 !.claude/skills/
 
-# Données AGM sous clause 9 de l'accord de collaboration : quantités physiques,
-# départements, registre d'équipements. Elles ne quittent pas ce poste. La
-# taxonomie pivot, elle, est publiée — c'est site/static/engine/taxonomy.json.
+# Données du client sous clause 9 de l'accord de collaboration : quantités
+# physiques, départements, registre d'équipements. Elles ne quittent pas ce
+# poste. La taxonomie pivot, elle, est publiée — c'est
+# site/static/engine/taxonomy.json.
 /poc-data
 
 # Les analyses portent toutes l'en-tête « Document local, non versionné », et
@@ -25,3 +26,9 @@ audit-*
 
 # Un worktree par branche (#126) : ils vivent ici, jamais dans un commit.
 /.worktrees/
+
+# LE FIXTURE ERP PORTE DES DONNÉES DU CLIENT. Il est produit localement par
+# services/store/make_fixture.py depuis poc-data/, et le déploiement le prend sur
+# le poste de contrôle. Motif ancré, sans barre finale, pour la raison donnée
+# plus haut.
+/site/static/engine/erp-fixture.json

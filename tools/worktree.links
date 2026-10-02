@@ -5,6 +5,8 @@
 # n'ignore pas en tant que lien : chaque entrée doit figurer dans .gitignore
 # sous une forme ancrée et sans barre finale (« /poc-data », pas « poc-data/ »).
 #
-# site/static/engine/erp-fixture.json s'ajoutera quand #121 l'aura sorti du suivi.
+# Le fixture ERP est produit localement depuis poc-data/ et n'est pas suivi :
+# sans ce lien, un worktree n'aurait pas de fixture.
 poc-data
 analyses
+site/static/engine/erp-fixture.json
