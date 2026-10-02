@@ -1,6 +1,6 @@
 # 03 — The ontology, and what H1 implements of it
 
-*State as of 29 September 2026.*
+*State as of 2 October 2026.*
 
 ---
 
@@ -10,7 +10,8 @@ It comes in **two parts, and the order carries an intent**.
 
 **Part I describes the ontology** — the objects, their relations, and the rules
 that bind them. It describes no code. It comes from the maintainer's decisions of
-18, 21 and 29 September 2026, carried by issues #47 and #129 to #137.
+18, 21 and 29 September 2026, carried by issues #47 and #129 to #137, and of
+2 October 2026 on uncertainty, carried by #46 and this note's review.
 
 **Part II describes H1** — what the code does today, which is a **collapsed**
 ontology: several distinct objects share one column, several relations are
@@ -85,8 +86,10 @@ classDiagram
     tag
     shape scalar_vector_table_multidimensional
     dimension
+    reliability
+    representativeness
     uncertainty
-    origin
+    bias
   }
   class Rule {
     type
@@ -99,6 +102,7 @@ classDiagram
     shape scalar_table_map
     value
     uncertainty
+    bias
     journalized
   }
   class Subcategory
@@ -125,6 +129,7 @@ classDiagram
   Rule --> Impact : produces
   Metric --> Anomaly : without a rule
   Rule --> Anomaly : without a constraint
+  Impact --> Anomaly : propagation invalid
   Anomaly --> Task
 ```
 
@@ -369,53 +374,225 @@ be offered as *freemium* — a throttled, machine-readable service for everyone,
 one for high-volume users. It needs a process that keeps it up to date, but it looks
 like a viable business on relatively cheap servers.
 
-## I.8 Quality: where the value comes from, and how far it is right
+## I.8 Quality: facts about every term, labels by projection
+
+**The platform stores facts about each term of a rule, never a quality label.** A
+label — `MEASURED`, *donnée primaire*, *Very good* — is what one standard says about a
+set of facts, and two standards say different things about the same facts. BEGES calls
+a gas-flow measurement multiplied by its GWP *mesurage* (Tableau 3); the GHG Protocol
+calls it *direct measurement*; under the rule of this note it is an exact operation on
+a measured term. Store the facts, and every label is a projection that can be
+recomputed when a standard changes edition. Store a label, and the next standard forces
+a reload.
 
 **`origin` says where THE VALUE comes from. `coverage` says whether the SERIES has a
 date nobody supplied.** A cell can be measured and fill a calendar hole at the same
-time: one axis could not say both.
+time: one axis could not say both. What follows gives `origin` its two facts, adds the
+two the standards require beside it, and shows the four values of H1 as one projection
+among three.
 
-| Value | Meaning |
-|---|---|
-| `MEASURED` | the quantity was read off an instrument, for this interval |
-| `DERIVED` | it follows from a measured quantity through an **exact** operation, all of whose **coefficients are exact** |
-| `ESTIMATED` | the operation or one of its coefficients is uncertain, or the value is borrowed |
-| `NOT_MEASURED` | no measurement exists, and the cell says so |
+### The four facts
 
-**`DERIVED` demands exactness, not merely explicitness.** The number of seconds in a
-given month is exact; so is an average. A flow reconstructed by dividing a monthly
-total by the month's duration is therefore `DERIVED` — the measured quantity is the
-total, and the distribution inside the period is modelled. But **as soon as the law
-itself is uncertain** — an approximate emission coefficient — the result is
-`ESTIMATED`, and **accuracy degrades**. A `DERIVED` value does not claim the emission
-was a constant stream.
+**1. Reliability — how the number was obtained.** The scale is that of the GHG
+Protocol Scope 3 Standard, Box 7.2 (after Weidema & Wesnaes, 1996): *verified data
+based on measurements*; *data partly based on assumptions, or non-verified data based
+on measurements*; *a qualified estimate* — a sector expert, a nameplate rating, a
+supplier's unqualified kgCO2e; *a non-qualified estimate*. The ontology adds the two
+ends the standards leave implicit: **computed** — from other terms, by a rule whose
+operation and coefficients are exact, inside or outside the tool — and **absent**.
 
-**Accuracy is computed, not declared.** The reference BEGES worksheets associate an
-accuracy with specific rules — coefficients included — and combine it with the
-uncertainties carried by the collected data itself, that is, by the metrics.
+**2. Representativeness — whether the number describes this activity.** BEGES Tableau 4
+has four rows, and they are not four grades of one thing. *Primaire* (observed on the
+organisation's own information systems and physical readings) and *secondaire* (a
+published generic or average value) say **where the number was taken**. *Extrapolée*
+(*primary or secondary* data of a **similar** activity, **adapted** to this one) and
+*approchée* (the same, **used as is**) say that it was **not taken here**. The Scope 3
+Standard says the same with three indicators — technology, time, geography — each
+scored by distance from the activity (Table 7.6), and its glossary defines
+*extrapolated* and *proxy data* word for word as BEGES does. The ontology keeps the two
+questions apart: **source** ∈ {own systems, published generic} and **distance** ∈
+{this activity; similar activity, adapted; similar activity, as is}, the three Scope 3
+axes being the sub-fields of the distance. December 2024 copied from December 2025 is
+*own systems, similar in time, as is*.
 
-**`NOT_MEASURED` also covers the metric that cannot change.** An impact computed from
-the nominal power printed on a cooling unit's plate is not a measurement and never
-will be: the only route to improvement is to change the method — actually track the
-leaks — or to change the equipment. **This reading awaits a named source**, and until
-it has one, it is worth no more than the interpretation it replaces.
+**Origin is these two facts together** — reliability and representativeness — and
+nothing else. The H1 column of that name is their projection (below).
 
-**An aggregate declares the SET of its origins, not the weakest one.** Provenance and
-accuracy are two questions: *can I trace this value back to its source* on one side,
-*how wrong is it* on the other. An aggregate carries `{MEASURED, ESTIMATED}`, which
-preserves the useful information — **which share** is estimated, and not merely that
-some share is. Accuracy, in turn, propagates numerically: in quadrature for sources
-whose independence is established, linearly for correlated ones.
+**3. Statistical uncertainty — a half-width and the probability it covers.** Both
+standards use the same object: a relative interval around the point value, at a stated
+confidence level. The GHG guidance on uncertainty (§6.2) and the IPCC Good Practice
+Guidance it follows use **95 %, two-tailed**, and ask that the level used *always be
+reported*; BEGES §5.4 makes no convention of its own and refers to the IPCC guidance,
+its glossary defining *incertitude* as the GUM does. The record is therefore
+`(half-width %, confidence level, n)`: `n`, because a half-width computed from a sample
+carries a t-factor that depends on it (guidance, Annex); the confidence level, because
+a source that states none — a factor given as "± 30 %" with no probability — is
+recorded as `unstated`, which is a reliability finding and not a number to be silently
+read as 95 %. Converting between confidence levels is an exact operation on `k`; it
+changes nothing else. *The reference Bilan Carbone worksheets carry a percentage per
+factor and per rule; that percentage enters this record, with its stated or unstated
+level.*
+
+**4. Bias — the part no interval covers.** GHG Protocol chapter 7 separates
+*statistical* parameter uncertainty, which repeated measurement reveals, from
+*systematic* uncertainty, which it does not: a factor built from a non-representative
+sample, a source not identified, an incomplete method, a faulty instrument. It asks
+that biases be **identified, their direction and likely magnitude discussed, and never
+propagated** — "because the true value is unknown, such systematic biases cannot be
+detected through repeated experiments". BEGES does not model them. The record is
+qualitative — `(cause, direction ∈ {over, under, unknown}, magnitude if estimable,
+remedy)` — and carries one flag the standards do not name but the maintainer's case
+requires: **`method-bound`**, true when no investment in the current method reduces it.
+The impact of a cooling unit computed from the power printed on its plate is the
+example: the only remedies are to track the leaks, or to change the equipment.
+
+**That case answers question 3 of the previous version of this note, and not the way it
+was asked.** The GHG uncertainty guidance (Table 3) rates electricity "*not metered and
+… estimated from equipment and time of use*" as *Fair or Poor* — an **estimate**, of
+reliability *qualified estimate* under Box 7.2 — not as a non-measurement.
+`NOT_MEASURED` therefore keeps its narrow meaning, *the number is absent*, and the
+nameplate case is an estimate carrying a method-bound bias. The source is named; the
+earlier reading is withdrawn.
+
+### Correlation is read off the graph, not declared
+
+The guidance makes independence a **condition** of its method (§3) and names linear
+addition as what replaces quadrature when it fails (§7, note 10). **Which terms share an
+error is a fact of the model**: two cells that reference the **same coefficient
+object** share its error; two series measured by the **same unit** (I.3: a unit is what
+measures, and a replaced sensor opens a new one) share its calibration; two terms
+computed by the **same rule** share its model error. Terms that share no object are
+independent by default, and a declared `correlation group` covers what the graph does
+not — two instruments calibrated by the same laboratory.
+
+### Propagation: on the expression, never on the results
+
+**The uncertainty of a sum of rule applications is computed on the expression, shared
+terms factored out — never by combining per-cell uncertainties.** For `y = k · x` with
+independent relative uncertainties, `u_y² = u_k² + u_x²` (guidance §7). For a total
+`Y = k · Σ xᵢ` over cells that share one coefficient, the coefficient's error enters
+once and in full, the metrics' errors in quadrature:
+
+```
+U_Y² = (k · Σxᵢ · u_k)²  +  k² · Σ (xᵢ · u_xᵢ)²
+```
+
+*Two hundred cells, each xᵢ = 1 at u_x = 0.5 %; one factor k = 1 at u_k = 100 %.
+Y = 200. On the expression: coefficient term 200 × 1.00 = 200; metric term
+√(200 × 0.005²) = 0.071; U_Y ≈ 200, that is 100 %. Combining per-cell results in
+quadrature instead: each cell ≈ √(0.005² + 1²) ≈ 1.00, √200 × 1.00 ≈ 14.1, that is
+7 %. The second figure is the one a spreadsheet produces, and it is wrong by a factor
+of fourteen.* This is the arithmetic behind the rule recorded on #46 on 31 July —
+quadrature for sources whose independence is established, linear for correlated ones —
+and the same principle as I.6: the integral of the rule, not the rule of the integral.
+
+**The method has conditions, and the platform checks them rather than assuming them**
+(guidance §3 and note 9): errors normally distributed; estimator unbiased; terms
+independent, or grouped as above; every individual uncertainty **below 60 %**; no term
+raised to a power. A computation that breaches one is not refused: its interval is
+marked **`propagation invalid`**, which is an anomaly (below) and hence a task. The
+remedy the guidance names — Monte Carlo, the IPCC's Tier 2 — is a second **propagation
+rule type**, to be written the day a client's data needs it; until then the breach is
+visible rather than hidden under a number.
+
+**Scientific and model uncertainty are out of scope by both standards' own statement**
+— the GWP values, the equation itself — and are not numbers in this model. They are
+**references**: the standard edition that fixes the GWPs (I.7), the rule type that
+fixes the equation (I.5). Both enter the signed VC, so that a verifier knows which
+convention was applied; neither widens an interval. Within a standard a GWP is exact by
+convention, which is why a gas measurement × GWP is *computed* from a measured term —
+*mesurage* in BEGES's words, *direct measurement* in the GHG Protocol's — and why
+contrails, whose forcing is a scientific question, are a matter of which standard and
+which rule type, not of which interval.
+
+### What an aggregate carries
+
+**An aggregate declares the distribution of its terms' facts, weighted by impact — not
+the weakest of them.** Provenance and accuracy are two questions: *can I trace this
+value back* on one side, *how wrong is it* on the other. The first propagates as a set,
+the useful information being **which share** is estimated and not that some share is;
+the second propagates numerically, as above. **The weight is the impact, never the
+count.** BEGES asks for primary data *in the emissions*: a site where high-frequency
+sensors supply 90 % of the records and 50 % of the emissions, and published averages
+the other 10 % of records and 50 % of emissions, has an inventory that is half primary
+— the 90/10 split says nothing. Every share the data quality view reports is therefore
+in kgCO2e, and the record count a secondary statistic.
+
+**KPI 1 is a statement about terms, not about impacts.** Nearly every impact carries an
+emission coefficient with a non-zero uncertainty, so nearly every impact projects to
+`ESTIMATED`, and a ratio computed on impact labels would read zero. The 85–90 %
+consistency of Annex 2 is measured on the **metrics**: the impact-weighted share of
+terms whose reliability is *measured* or *computed* and whose distance is *this
+activity*; the remainder is the estimated share, reported beside it. Both numbers are
+published; hiding either is what makes the ratio meaningless.
 
 **An estimated detail under a measured aggregate** — one meter covering several
 machines, split by running hours — turns origin into a **relation**: this set of
-derived values sums to that measured total. It is that internal consistency check
-which makes the split defensible.
+computed values sums to that measured total. It is that internal consistency check
+which makes the split defensible, and it is stored as a constraint, not as labels.
+
+**Ordinal grades are display, and belong to the standard.** The guidance's *High /
+Good / Fair / Poor* at ± 5 / 15 / 30 % (Table 2) and BEGES's *++++ / ++ / + / –*
+(Tableau 4) are read off the stored facts and intervals under the thresholds the
+standard's record carries (I.7); none is stored. The guidance says why in as many words
+(§9): the transformation into a ranking loses the number it came from.
+
+### Trends
+
+GHG Protocol chapter 7 observes that when a facility keeps the same method, the
+systematic terms of two years' estimates are the same and cancel in the difference, so
+that the uncertainty of a trend is smaller than that of a total. **The model can say
+when that holds**, because a computation's VC references its rule types, coefficient
+editions and units: two computations whose shared sources reference the same objects
+have the same systematic terms, and their trend carries the statistical terms only.
+Where an object changed in between, the cancellation is lost on that source and the
+comparison says so — with the caveat the chapter adds itself (note 7): a bias that
+drifts does not cancel.
+
+### Labels, by projection
+
+| Facts | This note (H1 `origin`) | GHG Protocol | BEGES |
+|---|---|---|---|
+| reliability *measured*, distance *this activity*; rule × GWP | `DERIVED` | direct measurement | *mesurage* (Tableau 3) |
+| *measured*, *this activity*; rule × emission factor with `u_k > 0` | `ESTIMATED` | indirect measurement, primary data | *calcul* on *données primaires* (Tableaux 3, 4) |
+| *computed* from measured terms, exact operation and coefficients — a monthly total ÷ its duration, a sum over vehicles | `DERIVED` | primary data | *données primaires* |
+| *measured* or *computed*, source *own systems*, distance *similar, adapted* | `ESTIMATED` | extrapolated data | *données extrapolées* |
+| the same, distance *similar, as is* — December 2024 copied from December 2025 | `ESTIMATED` | proxy data | *données approchées* |
+| source *published generic*, any distance | `ESTIMATED` | secondary data | *données secondaires* |
+| reliability *qualified estimate* — a nameplate, a supplier's unqualified kgCO2e | `ESTIMATED` | estimate, Fair / Poor (guidance, Table 3) | — |
+| *absent* | `NOT_MEASURED` | — | — |
+| *absent*, and a rule input still unfilled | no cell: an anomaly, and no claim | — | to be *estimée à partir de données secondaires, extrapolées ou approchées* (post 1.2, mobile combustion sources) |
+
+**The four values of `origin` survive as this note's projection.** `MEASURED` is
+*measured* and *this activity*; `DERIVED` is *computed* with exact terms from such;
+`ESTIMATED` is whatever carries an uncertain coefficient or a distance; `NOT_MEASURED`
+is *absent*. The rule of the previous version — **`DERIVED` demands exactness, not
+merely explicitness**; the number of seconds in a month is exact, so is an average; a
+flow reconstructed from a monthly total is `DERIVED` and does not claim the emission was
+a constant stream; as soon as the law itself is uncertain the result is `ESTIMATED` —
+is unchanged, and is now a consequence of the facts rather than a definition.
+
+**The surrogate case is settled by Tableau 3.** A measured activity datum multiplied by
+an emission factor is *calcul*, not *mesurage*, under BEGES; whether BEGES would call
+its result *dérivé* was an open question, and the guide does not use the word. The
+projection says `ESTIMATED`, by the coefficient's uncertainty.
+
+**`coverage` is the completeness indicator** of Scope 3 Table 7.6 — the share of the
+activity's dates and sites that the data covers — and the one axis on which the schema
+and both standards already agree. A cell that fills an absent date is complete on no
+axis: its `coverage` says the date was not supplied; its distance says the value came
+from elsewhere. The two facts are not redundant: the first counts holes, the second
+qualifies the filling. An **unfilled** hole is a different state again — a rule input
+absent — and it is the one BEGES means when it says a datum must be estimated before
+the balance is drawn: no impact is computable, no claim is signed, and a task exists.
 
 **Anomalies are first-class objects**: a metric with no rule, a rule with no place or
-period constraint, a coefficient set that has become invalid over its range. Each
-produces a **task** in the back office, with a proposed patch; an agent may create the
-task, **never apply the patch** (#134).
+period constraint, a coefficient set that has become invalid over its range, a
+propagation whose conditions are breached. Each produces a **task** in the back office,
+with a proposed patch; an agent may create the task, **never apply the patch** (#134).
+A bias record is not an anomaly: it is a **finding**, and the list of findings sorted by
+*impact share × uncertainty* is the investment list the GHG Protocol says an
+uncertainty assessment exists to produce.
 
 ## I.9 Time, reloads, replay
 
@@ -437,10 +614,13 @@ interval, which makes a cell's identity verifiable without a naming convention.
 |---|---|---|
 | 1 | operated / not operated, owned / not owned: a **parameter on leaf entities**, whose representation remains to be discussed | — |
 | 2 | geographic and temporal maps as rule parameters, **or** distinct rules: a performance trade-off to be measured | — |
-| 3 | `NOT_MEASURED` for a metric that cannot change: a **named source** is missing | — |
+| 3 | ~~`NOT_MEASURED` for a metric that cannot change~~ — **answered** on 2 October: an estimate with a method-bound bias (I.8, guidance Table 3) | — |
 | 4 | the **formal, machine-readable** representation of this ontology, and its diagrams | — |
 | 5 | where the master tables live, and how a client database declares its edition | #135 |
 | 6 | the **incremental** load of taxonomies and rules towards the front end | — |
+| 7 | the **Monte Carlo propagation rule type**, for the day a term exceeds 60 % (I.8) | — |
+| 8 | a **default uncertainty for a term that states none** — the pedigree approach derives one from the Box 7.2 scores; whether to adopt it, and whose figures | — |
+| 9 | the Bilan Carbone worksheets' per-factor percentages: at **which confidence level** they are given, if any | — |
 
 None of these questions has an issue of its own, except the fifth. **A question
 without an issue has no owner**: that is a tracking defect, not a property of the
@@ -463,7 +643,9 @@ model.
 | a coefficient is a journalized function | `cell.factor`, a `double precision` **copied into every cell** at load time | a scientific revision forces a reload, and two figures published at two dates become incomparable | #131, #133 |
 | a tagged metric of any shape, linked to rules through an N-to-M table | **one scalar** per cell, attached through its own columns | no vector, no table, no image; no metric can be declared orphaned of a rule | no issue |
 | a metric with no rule is an **anomaly** | a null `sub_post` means "unallocated", and allocation spreads it | data from which no impact is computable is presented as a remainder to spread | #129 |
-| origin follows from the rule and from the unit that produced the value | `origin = 'MEASURED'`, **hard-coded** by the loader, on every cell | the quality view reports 100 % measured, faithfully reporting a false label | #116 |
+| origin is two facts — reliability, representativeness — and the label a projection | `origin = 'MEASURED'`, **hard-coded** by the loader, on every cell; one label column, no fact behind it | the quality view reports 100 % measured, faithfully reporting a false label; a copied month cannot say it is a proxy | #116 |
+| every term carries a statistical uncertainty and a bias record; accuracy propagates on the expression | **no** uncertainty column, no bias, no propagation | KPI 1 is a count of labels; no interval exists for any figure the platform signs | no issue |
+| quality shares are weighted by impact | the quality view counts **cells**, one each | a client whose few estimated cells carry most of the emissions reads as nearly clean | no issue |
 | a reload adds, and never erases what a VC used; one generation per cell | `ON CONFLICT (id) DO UPDATE`, **all columns**: a reload replaces | a yearly aggregate then a monthly detail overwrite each other; no generation counter | no issue |
 | anomalies create tasks for a human | **no** table, no route, no screen | a discrepancy that has been observed has no owner inside the tool | #134 |
 | a Natixar reference database, client databases fed one way | **one** database, where a client is the subtree hanging from its root | the partition by data owner does not exist; no reference edition is declarable | #135 |
@@ -621,8 +803,12 @@ stops being a hard-coded rule.
 
 **Two discrepancies with I.8, not to be forgotten**: `schema.sql` currently carries
 the comment *"a `MEASURED` cell can be `MISSING` — the month it is copied from was
-indeed measured"*, whereas I.8 classes a borrowed quantity as `ESTIMATED`; and the
-loader writes `MEASURED` as a literal. Both are the subject of #116.
+indeed measured"*, and the loader writes `MEASURED` as a literal. Both are the subject
+of #116. The comment is right about one fact and silent on the other: the copied
+month's **reliability** is indeed *measured*, but its **representativeness** is
+*similar in time, as is* — BEGES's *donnée approchée* — and it is the second fact that
+projects the label to `ESTIMATED`. One column cannot carry two facts, which is the
+collapse, not the comment, at fault.
 
 ## II.6 Idempotence
 
@@ -702,7 +888,10 @@ climbs the tree — in keeping with the rule of `entity`: no `tenant_id` is stor
   by mistake does not display as a platform without data.
 
 **The unit of account is the cell.** Every share is a ratio of cell counts; a cell
-weighs one, whatever emission it carries.
+weighs one, whatever emission it carries. *That is a collapse (II.1): the ontology
+weighs every share by impact, for the reason given in I.8 — a count can read 90 %
+primary where the emissions are 50 %. H1 can compute `flux × duration × factor` per
+cell, so the weighting is a change to the query, not to the schema.*
 
 ### What the view does not show
 
